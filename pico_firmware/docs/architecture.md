@@ -1,5 +1,7 @@
 # Pico firmware architecture
 
+**Current source milestone (November 18, 2026):** `0.9.0-oled-power`. Older sprint descriptions below document their original scope; storage v5 and the current feature sections supersede obsolete earlier formats. Current combined-board compilation, electrical timing and battery life remain unverified.
+
 ## Purpose of this prototype
 
 Version 0.1 proves the seams that nearly every future Pico feature needs:
@@ -12,10 +14,11 @@ Version 0.1 proves the seams that nearly every future Pico feature needs:
 6. dock-driven context changes; and
 7. non-blocking sound feedback.
 
-The companion, focus, and cooking timer modes have real core behavior. Music,
-wayfinding, notes, and driving are registered now so their wire IDs remain
-stable, but their specialized behavior is deliberately not faked before the
-corresponding input hardware and product rules exist.
+Companion, Focus and Cooking timer behavior, the Music metronome and optional
+Sense tuner, and guarded Sense motion reactions now have core/platform code.
+Driving dock transitions are implemented. Wayfinding and Notes retain stable
+mode IDs, without GPS/compass or recording support; home/car dock electronics
+are not complete.
 
 ## Boundaries
 
@@ -64,7 +67,7 @@ The core owns:
 - battery percentage when a platform adapter supplies it.
 
 Flash writes are coalesced for five seconds so a run of button presses does not
-become one NVS write per interaction. Flash stores only durable personality state. Running timer deadlines are not
+become one NVS write per interaction. Flash stores confirmed durable personality and user preferences, not active timers or editors. Running timer deadlines are not
 persisted because the first prototype has no confirmed real-time clock; a
 reboot must never resurrect a timer with invented elapsed time. Car mode is
 also not persisted—docking selects it, and undocking restores the prior mode.
@@ -77,9 +80,10 @@ Interaction buttons use GPIO interrupts and deferred work, with no idle pin
 polling. Personality and music expose their next transition; active tuner
 retains a 20 ms drain bound and enabled motion a 40 ms sample interval.
 A one-second timer/status tick caps otherwise quiet waits. Zephyr can idle the CPU
-between events. Display shutdown policy, slower advertising after a quiet
-period, microphone duty cycling, and battery ADC sampling belong in the next
-power-measurement pass after the actual board and battery circuit are known.
+between events. OLED brightness/blanking and inactivity timeout are implemented, but their
+actual current savings have not been measured. Advertising optimization,
+peripheral shutdown (including amplifier power) and battery ADC policy remain
+for an instrumented board-level pass.
 
 ## Sprint 01 services
 
@@ -103,10 +107,12 @@ source anchors on the 128x64 panel. Board builds do not need Python asset
 conversion or runtime files. Re-run the tool and its `--check` mode after asset
 changes. Theme IDs remain stable.
 
-Durable records now use v3 (20 bytes) and include theme and next-timer duration.
-The reader migrates v1/v2 records; the platform accepts both lengths. Automatic
+Current durable records use **storage v5 (32 bytes)**: count, theme,
+work/timer and break durations, mute, volume, motion mask, OLED brightness and
+screen timeout. Decoding/migration accepts v1/v2 (16 bytes), v3 (20 bytes)
+and v4 (28 bytes); the next confirmed durable change writes v5. Automatic
 personality transitions do not save, and identical OLED frames skip transfer.
-Boot enters Companion/Home even if a legacy record saved another user mode.
+Boot enters Companion/Home; active utilities and editor drafts do not restore.
 
 ## Sprint 02: session sequencing and I2S audio
 
@@ -114,7 +120,7 @@ Boot enters Companion/Home even if a legacy record saved another user mode.
 It does not measure time: Core uses its existing `Timer` instance for every
 phase. Completion marks a phase waiting; an explicit event starts the next.
 Changing away from Focus cancels a cycle; screen navigation alone preserves it.
-These transient values do not expand persistence v3.
+These transient focus phase values are not persisted in storage v5.
 
 `pico::audio` renders deterministic, integer, bounded stereo PCM. The platform
 `Audio` adapter queues cue IDs to a sleeping I2S worker backed by a fixed slab;
@@ -174,19 +180,22 @@ The implementation polls at ~25 Hz inside the existing loop; it does not yet
 provide hardware sleep/wakeup. See [motion-personality.md](motion-personality.md)
 for timing thresholds, compatibility and physical validation limits.
 
-## Local Settings and storage v4
+## Local Settings and storage v5
 
-`settings.cpp` holds the shared draft-editor actions; Core navigation opens the
-Settings hub and delegates. Renderers show draft values without applying them;
-Save routes through normal setting events, Back discards. Opening Settings stops
-Music input/output while retaining background timer operation. Optional Back
-GPIO reuses the portable button classifier.
+`settings.cpp` contains the shared draft-editor actions; Core navigation opens
+the current eleven-item hub: theme, mute, volume, work/timer, break, motion,
+test sound, brightness, screen time, sleep now and back. Drafts require Save;
+Back cancels them. Brightness previews update the panel live and cancel
+restores the saved level. Timer completion and mode/dock changes can discard
+an editor without saving.
 
-Persistence v4 is 28 bytes and adds break/mute/volume/motion. The common decoder
-migrates 16/20-byte legacy records, and both NVS and simulator accept those
-lengths. Only confirmed changes request coalesced flash saves. No active utility
-or editor is restored. I2S jobs snapshot runtime volume, preserving worker/main
-separation. See [local-settings.md](local-settings.md) for format and validation.
+Storage v4 (28 bytes) originally introduced durable break/mute/volume/motion.
+Storage **v5 (32 bytes)** preserves these and adds brightness (byte 23),
+timeout (bytes 24–27), and a relocated checksum (bytes 28–31). v1–v4
+are read/migrated in memory. Only confirmed durable changes coalesce flash
+writes. Active timers, music, tuner and editors remain transient. I2S jobs
+snapshot runtime volume, keeping the worker isolated from mutable main state.
+See [Local Settings](local-settings.md) and [OLED power](oled-power.md).
 
 ## OLED power policy
 

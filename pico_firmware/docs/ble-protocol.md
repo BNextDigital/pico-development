@@ -1,5 +1,7 @@
 # Pico BLE protocol v1
 
+**Current source milestone:** `0.9.0-oled-power` (November 18, 2026). The protocol byte and 16-byte status remain v1; additive command IDs do not imply the Flutter companion app implements them. See [companion compatibility](https://github.com/BNextDigital/pico-companion/blob/main/pico-companion/docs/firmware-compatibility.md).
+
 Pico advertises one custom 128-bit service:
 
 - Service: `8e7b0001-54f2-4d9b-a3d1-9f150000c001`
@@ -109,7 +111,9 @@ StartCycle refuses to replace a running/paused timer; Next refuses to skip an
 active phase. These syntactically valid no-op commands are accepted by GATT;
 observe status to learn the resulting state. `05` cancels waiting cycles too.
 `04` explicitly replaces a cycle with a standalone timer; `01` remains a pat.
-Break duration and mute reset on reboot, while `0A` work duration remains durable.
+At Sprint 02, break duration and mute were volatile. **On current `main`**, break,
+mute, volume and motion mask persist through storage v5 along with theme,
+work duration, OLED brightness and screen timeout.
 The test-sound command generates the existing Chirp effect without changing
 mood/count. A muted or unavailable output may produce no audible cue.
 
@@ -134,11 +138,14 @@ No audio or pitch readings are streamed over BLE. See [music-tuner.md](music-tun
 
 ## Motion personality additions
 
-Command 40 configures a volatile three-bit behavior mask (default 7 after boot).
+Command 40 configures a three-bit behavior mask (default 7 on fresh storage).
+The mask was originally volatile; it is **durable in current storage v5** after
+a confirmed change and coalesced save.
 Status flag bit 7 means the IMU is ready with a nonzero mask; capability bit 7
 means motion hardware is available. The 16-byte v1 status does not encode the
 mask or raw acceleration. Motion reactions do not control utilities, timers or
-modes and do not persist. Clients must ignore unknown flags. See
+modes and do not themselves persist. The user-configured behavior mask does
+persist. Clients must ignore unknown flags. See
 [motion-personality.md](motion-personality.md) for context guards and tests.
 
 ## Local Settings additions
@@ -154,3 +161,12 @@ OLED brightness/timeout are local settings in storage v5; they add no BLE comman
 IDs or fields to the existing status packet. Logical button commands share the
 wake-only first-input rule when the display is asleep. Timer completion wakes
 the display. See [OLED power policy](oled-power.md).
+
+## Cross-repository consumer status
+
+The Flutter companion app currently encodes only `01`–`06` and decodes the
+original connected/running flags and capabilities through compass bit 6.
+Firmware's pause/wait/mute/metronome/tuner/motion flags and motion capability
+bit 7 are not yet represented in app models. Unknown bits do not change the
+16-byte wire size. The app must not infer missing settings, tempo or pitch
+readback from command writes; those fields are not encoded in status v1.
