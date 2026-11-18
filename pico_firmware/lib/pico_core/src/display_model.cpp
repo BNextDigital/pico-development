@@ -101,7 +101,7 @@ constexpr Glyph font[]{
  {'Y',{5,5,2,2,2}}, {'Z',{7,1,2,4,7}}, {'0',{7,5,5,5,7}}, {'1',{2,6,2,2,7}},
  {'2',{6,1,2,4,7}}, {'3',{6,1,2,1,6}}, {'4',{5,5,7,1,1}}, {'5',{7,4,6,1,6}},
  {'6',{3,4,6,5,2}}, {'7',{7,1,2,2,2}}, {'8',{2,5,2,5,2}}, {'9',{2,5,3,1,6}},
- {':',{0,2,0,2,0}}, {'-',{0,0,7,0,0}}, {'>',{4,2,1,2,4}}, {'/',{1,1,2,4,4}}
+ {'+',{0,2,7,2,0}}, {':',{0,2,0,2,0}}, {'-',{0,0,7,0,0}}, {'>',{4,2,1,2,4}}, {'/',{1,1,2,4,4}}
 };
 void text(MonoSurface &surface, const char *str, unsigned x, unsigned y, unsigned scale = 1)
 {
@@ -176,6 +176,30 @@ void render_screen(const State &state, MonoSurface &surface)
         else {
             text(surface, "THEME", 2, 1);
             text(surface, assets::theme_names[static_cast<unsigned>(state.theme) % 8], 22, surface.height - 7);
+        }
+        return;
+    }
+    if (state.screen == Screen::Music) {
+        char buffer[24];
+        std::snprintf(buffer, sizeof(buffer), "%u BPM", static_cast<unsigned>(state.metronome_bpm));
+        text(surface, buffer, 8, 2, 2);
+        text(surface, state.sound_muted ? "MUTE" : "MUSIC", 104, 4);
+        for (unsigned i = 0; i < state.beats_per_bar; ++i) {
+            const unsigned x = 4 + i * 15;
+            if (state.metronome_running && state.beat_pulse && state.current_beat == i + 1)
+                fill_rect(surface, x, 18, 11, 12);
+            else outline_rect(surface, x, 18, 11, 12);
+        }
+        std::snprintf(buffer, sizeof(buffer), "BEAT %u/%u", static_cast<unsigned>(state.current_beat),
+                      static_cast<unsigned>(state.beats_per_bar));
+        text(surface, buffer, 4, 32);
+        text(surface, state.metronome_running ? "RUN" : "STOPPED", 88, 32);
+        const char *labels[]{"BPM-", "BPM+", state.metronome_running ? "STOP" : "START",
+                             "TAP", "BAR", "HOME"};
+        for (unsigned i = 0; i < 6; ++i) {
+            const auto x = 2 + (i % 3) * 42, y = 41 + (i / 3) * 12;
+            if (i == state.music_index) outline_rect(surface, x, y, 40, 11);
+            text(surface, labels[i], x + 6, y + 3);
         }
         return;
     }

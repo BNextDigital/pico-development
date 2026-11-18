@@ -2,7 +2,7 @@
 #include <cstddef>
 #include <cstdint>
 namespace pico::audio {
-enum class Cue : std::uint8_t { Interact, TimerComplete, WorkComplete, BreakComplete, Count };
+enum class Cue : std::uint8_t { Interact, TimerComplete, WorkComplete, BreakComplete, MetronomeClick, MetronomeAccent, Count };
 inline constexpr std::uint32_t kSampleRate = 31250;
 inline constexpr std::int16_t kPeakLimit = 2048;
 std::uint32_t frames(Cue cue);

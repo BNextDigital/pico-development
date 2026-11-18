@@ -35,15 +35,16 @@ void apply_effects(pico::Effects effects, pico::Core &core,
                    pico::platform::Ble &ble, pico::Capabilities capabilities)
 {
     audio.set_muted(core.state().sound_muted);
+    audio.set_metronome_running(core.state().metronome_running);
     if (pico::has_effect(effects, pico::Effect::Persist)) {
         storage.save(core.persistent_state());
     }
-    if (pico::has_effect(effects, pico::Effect::Render)) {
-        display.render(core.state());
-    }
     if (pico::has_effect(effects, pico::Effect::Chirp) && !core.state().sound_muted) {
         if (audio.ready()) audio.play(core.state().sound_cue);
-        else hardware.chirp();
+        else if (core.state().sound_cue < pico::audio::Cue::MetronomeClick) hardware.chirp();
+    }
+    if (pico::has_effect(effects, pico::Effect::Render)) {
+        display.render(core.state());
     }
     if (pico::has_effect(effects, pico::Effect::Notify)) {
         ble.publish(core.state(), capabilities);
@@ -90,6 +91,8 @@ int main()
     while (true) {
         pico::Event event{};
         if (k_msgq_get(&event_queue, &event, K_MSEC(20)) == 0) {
+            apply_effects(core.handle({pico::EventKind::MusicTick, k_uptime_get_32()}),
+                          core, hardware, audio, display, storage, ble, capabilities);
             const auto effects = core.handle(event);
             apply_effects(effects, core, hardware, audio, display, storage, ble,
                           capabilities);
@@ -98,6 +101,8 @@ int main()
 
         hardware.poll();
 
+        apply_effects(core.handle({pico::EventKind::MusicTick, k_uptime_get_32()}),
+                      core, hardware, audio, display, storage, ble, capabilities);
         const auto now_ms = k_uptime_get_32();
         if (now_ms - last_animation_ms >= 100U) {
             last_animation_ms = now_ms;

@@ -3,6 +3,7 @@
 #include <pico/types.hpp>
 #include <pico/timer.hpp>
 #include <pico/personality.hpp>
+#include <pico/metronome.hpp>
 
 namespace pico {
 
@@ -24,12 +25,16 @@ private:
     void sync_timer();
     Effects timer_complete();
     void activity();
+    void sync_metronome();
+    Effects music_beat();
     void sync_focus();
     Effects start_focus_phase();
 
     State state_{};
     Mode mode_before_car_dock_{Mode::Companion};
     Timer timer_{};
+    Metronome metronome_{};
+    std::uint32_t music_ms_{0};
     FocusSession focus_{};
     Personality personality_;
     std::uint32_t animation_ms_{0};

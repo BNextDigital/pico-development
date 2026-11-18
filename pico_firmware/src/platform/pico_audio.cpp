@@ -16,6 +16,12 @@ K_MEM_SLAB_DEFINE(audio_slab, kBytes, 4, 4);
 K_MSGQ_DEFINE(audio_queue, sizeof(pico::audio::Cue), 4, 4);
 atomic_t audio_ready;
 atomic_t audio_muted;
+atomic_t audio_playing;
+atomic_t metronome_enabled;
+bool beat_cue(pico::audio::Cue cue)
+{
+    return cue == pico::audio::Cue::MetronomeClick || cue == pico::audio::Cue::MetronomeAccent;
+}
 
 bool wait_buffers()
 {
@@ -64,8 +70,12 @@ void audio_loop(void *, void *, void *)
 {
     while (true) {
         pico::audio::Cue cue{};
-        if (k_msgq_get(&audio_queue, &cue, K_FOREVER) == 0 && atomic_get(&audio_ready) && !atomic_get(&audio_muted))
+        if (k_msgq_get(&audio_queue, &cue, K_FOREVER) == 0 && atomic_get(&audio_ready) &&
+            !atomic_get(&audio_muted) && (!beat_cue(cue) || atomic_get(&metronome_enabled))) {
+            atomic_set(&audio_playing, 1);
             play_cue(cue);
+            atomic_clear(&audio_playing);
+        }
     }
 }
 K_THREAD_DEFINE(pico_audio_thread, 2048, audio_loop, nullptr, nullptr, nullptr, 7, 0, 0);
@@ -104,6 +114,14 @@ bool Audio::ready() const
     return false;
 #endif
 }
+void Audio::set_metronome_running(bool running)
+{
+#if defined(CONFIG_PICO_AUDIO_I2S) && DT_NODE_HAS_STATUS(DT_ALIAS(pico_i2s), okay)
+    atomic_set(&metronome_enabled, running ? 1 : 0);
+#else
+    ARG_UNUSED(running);
+#endif
+}
 void Audio::set_muted(bool muted)
 {
 #if defined(CONFIG_PICO_AUDIO_I2S) && DT_NODE_HAS_STATUS(DT_ALIAS(pico_i2s), okay)
@@ -117,6 +135,12 @@ void Audio::play(audio::Cue cue)
 {
 #if defined(CONFIG_PICO_AUDIO_I2S) && DT_NODE_HAS_STATUS(DT_ALIAS(pico_i2s), okay)
     if (!ready() || atomic_get(&audio_muted) || cue >= audio::Cue::Count) return;
+    if (beat_cue(cue)) {
+        if (!atomic_get(&metronome_enabled) || atomic_get(&audio_playing) ||
+            k_msgq_num_used_get(&audio_queue)) return; // Never queue stale beats behind other audio.
+        k_msgq_put(&audio_queue, &cue, K_NO_WAIT);
+        return;
+    }
     if (k_msgq_put(&audio_queue, &cue, K_NO_WAIT) != 0 && cue != audio::Cue::Interact) {
         k_msgq_purge(&audio_queue);
         k_msgq_put(&audio_queue, &cue, K_NO_WAIT);

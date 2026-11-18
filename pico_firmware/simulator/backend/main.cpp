@@ -136,6 +136,12 @@ std::string event_name(pico::EventKind kind)
     case pico::EventKind::SetBreakDuration: return "SetBreakDuration";
     case pico::EventKind::TestSound: return "TestSound";
     case pico::EventKind::SetMuted: return "SetMuted";
+    case pico::EventKind::MusicTick: return "MusicTick";
+    case pico::EventKind::StartMetronome: return "StartMetronome";
+    case pico::EventKind::StopMetronome: return "StopMetronome";
+    case pico::EventKind::SetMetronomeBpm: return "SetMetronomeBpm";
+    case pico::EventKind::SetMetronomeBeats: return "SetMetronomeBeats";
+    case pico::EventKind::TapTempo: return "TapTempo";
     case pico::EventKind::Boot:
         return "Boot";
     case pico::EventKind::Tick:
@@ -195,7 +201,7 @@ std::string event_name(pico::EventKind kind)
 
 std::optional<pico::EventKind> parse_event_kind(const std::string &token)
 {
-    constexpr std::array<pico::EventKind, 31> kinds{
+    constexpr std::array<pico::EventKind, 37> kinds{
         pico::EventKind::Boot,          pico::EventKind::Tick,
         pico::EventKind::PrimaryPressed, pico::EventKind::SecondaryPressed,
         pico::EventKind::Connected,     pico::EventKind::Disconnected,
@@ -219,6 +225,13 @@ std::optional<pico::EventKind> parse_event_kind(const std::string &token)
         pico::EventKind::SetBreakDuration,
         pico::EventKind::TestSound,
         pico::EventKind::SetMuted,
+        pico::EventKind::MusicTick,
+        pico::EventKind::StartMetronome,
+        pico::EventKind::StopMetronome,
+        pico::EventKind::SetMetronomeBpm,
+        pico::EventKind::SetMetronomeBeats,
+        pico::EventKind::TapTempo,
+
 
 
     };
@@ -329,6 +342,7 @@ public:
         const auto seconds = static_cast<std::uint32_t>(now_ms_ / 1000U);
         Result result;
         result.event = "Advance";
+        result.effects |= core_.handle({pico::EventKind::MusicTick, static_cast<std::uint32_t>(now_ms_)});
         if (seconds != now_seconds_) {
             now_seconds_ = seconds;
             result.effects |= core_.handle({pico::EventKind::Tick, now_seconds_});
@@ -444,6 +458,12 @@ public:
                << "\"screen\":" << static_cast<unsigned>(state.screen) << ','
                << "\"menu_index\":" << static_cast<unsigned>(state.menu_index) << ','
                << "\"eyes_closed\":" << (state.eyes_closed ? "true" : "false") << ','
+               << "\"metronome_running\":" << (state.metronome_running ? "true" : "false") << ','
+               << "\"metronome_bpm\":" << state.metronome_bpm << ','
+               << "\"beats_per_bar\":" << static_cast<unsigned>(state.beats_per_bar) << ','
+               << "\"current_beat\":" << static_cast<unsigned>(state.current_beat) << ','
+               << "\"beat_pulse\":" << (state.beat_pulse ? "true" : "false") << ','
+               << "\"music_index\":" << static_cast<unsigned>(state.music_index) << ','
                << "\"focus_phase\":" << static_cast<unsigned>(state.focus_phase) << ','
                << "\"focus_waiting\":" << (state.focus_waiting ? "true" : "false") << ','
                << "\"completed_work_sessions\":" << state.completed_work_sessions << ','

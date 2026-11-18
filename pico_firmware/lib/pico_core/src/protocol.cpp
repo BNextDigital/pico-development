@@ -84,6 +84,9 @@ DecodeResult decode_command(const std::uint8_t *data, std::size_t size)
         if (!read_u32_le(data + 1) || read_u32_le(data + 1) > kMaxTimerSeconds)
             return {DecodeStatus::InvalidValue, {}};
         return {DecodeStatus::Ok, {static_cast<Command>(data[0]) == Command::SetBreakDuration ? EventKind::SetBreakDuration : EventKind::SetTimerDuration, read_u32_le(data + 1)}};
+    case Command::StartMetronome:
+    case Command::StopMetronome:
+    case Command::TapTempo:
     case Command::StartFocusCycle:
     case Command::NextFocusPhase:
     case Command::PauseTimer:
@@ -96,6 +99,9 @@ DecodeResult decode_command(const std::uint8_t *data, std::size_t size)
         if (size != 1U) return wrong_length();
         EventKind kind = EventKind::PauseTimer;
         switch (static_cast<Command>(data[0])) {
+        case Command::StartMetronome: kind = EventKind::StartMetronome; break;
+        case Command::StopMetronome: kind = EventKind::StopMetronome; break;
+        case Command::TapTempo: kind = EventKind::TapTempo; break;
         case Command::StartFocusCycle: kind = EventKind::StartFocusCycle; break;
         case Command::NextFocusPhase: kind = EventKind::NextFocusPhase; break;
         case Command::PauseTimer: kind = EventKind::PauseTimer; break;
@@ -110,10 +116,20 @@ DecodeResult decode_command(const std::uint8_t *data, std::size_t size)
         return {DecodeStatus::Ok, {kind, 0}};
     }
 
+    case Command::SetMetronomeBpm: {
+        if (size != 3U) return wrong_length();
+        const unsigned bpm = static_cast<unsigned>(data[1]) | (static_cast<unsigned>(data[2]) << 8U);
+        if (bpm < 30U || bpm > 240U) return {DecodeStatus::InvalidValue, {}};
+        return {DecodeStatus::Ok, {EventKind::SetMetronomeBpm, bpm}};
+    }
+    case Command::SetMetronomeBeats:
+        if (size != 2U) return wrong_length();
+        if (data[1] < 1U || data[1] > 8U) return {DecodeStatus::InvalidValue, {}};
+        return {DecodeStatus::Ok, {EventKind::SetMetronomeBeats, data[1]}};
     case Command::TestSound:
     case Command::SetMuted:
         if (size != 2U) return wrong_length();
-        if (data[1] >= (static_cast<Command>(data[0]) == Command::TestSound ? static_cast<unsigned>(audio::Cue::Count) : 2U))
+        if (data[1] >= (static_cast<Command>(data[0]) == Command::TestSound ? static_cast<unsigned>(audio::Cue::MetronomeClick) : 2U))
             return {DecodeStatus::InvalidValue, {}};
         return {DecodeStatus::Ok, {static_cast<Command>(data[0]) == Command::TestSound ? EventKind::TestSound : EventKind::SetMuted, data[1]}};
     case Command::RequestStatus:
@@ -136,7 +152,8 @@ void encode_status(const State &state, Capabilities capabilities,
                 (state.timer_running ? 1U << 1U : 0U) |
                 (state.timer_paused ? 1U << 2U : 0U) |
                 (state.focus_waiting ? 1U << 3U : 0U) |
-                (state.sound_muted ? 1U << 4U : 0U);
+                (state.sound_muted ? 1U << 4U : 0U) |
+                (state.metronome_running ? 1U << 5U : 0U);
     output[5] = state.battery_percent;
     write_u32_le(state.timer_remaining_seconds, &output[6]);
     write_u32_le(state.interaction_count, &output[10]);

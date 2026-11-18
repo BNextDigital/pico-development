@@ -220,6 +220,48 @@ class BackendTests(unittest.TestCase):
             rejected = self.harness.send(command)
             self.assertFalse(rejected["ok"])
 
+    def test_music_menu_visual_beats_and_stop(self):
+        self.harness.send("ble 10")
+        for _ in range(3):
+            self.harness.send("ble 11")
+        music = self.harness.send("event FocusButtonTapped")
+        self.assertEqual(music["state"]["screen"], 5)
+        self.assertEqual(music["state"]["metronome_bpm"], 120)
+        first = self.harness.send("event FocusButtonTapped")
+        self.assertTrue(first["state"]["metronome_running"])
+        self.assertTrue(bytes.fromhex(first["status_hex"])[4] & 32)
+        self.assertEqual(first["state"]["sound_cue"], 5)
+        off = self.harness.send("advance_ms 80")
+        self.assertFalse(off["state"]["beat_pulse"])
+        self.assertNotEqual(first["frame_hex"], off["frame_hex"])
+        beat = self.harness.send("advance_ms 420")
+        self.assertEqual(beat["state"]["current_beat"], 2)
+        self.assertEqual(beat["state"]["sound_cue"], 4)
+        self.assertNotIn("Notify", beat["effect_names"])
+        stopped = self.harness.send("event FocusButtonHeld")
+        self.assertFalse(stopped["state"]["metronome_running"])
+        self.assertEqual(stopped["state"]["screen"], 1)
+
+    def test_music_tap_tempo_ble_validation_and_restart(self):
+        self.harness.send("ble 34")
+        self.harness.send("advance_ms 600")
+        tap = self.harness.send("ble 34")
+        self.assertEqual(tap["state"]["metronome_bpm"], 100)
+        tempo = self.harness.send("ble 32 89 00")
+        self.assertEqual(tempo["state"]["metronome_bpm"], 137)
+        self.harness.send("ble 33 03")
+        self.harness.send("ble 30")
+        skipped = self.harness.send("advance 60")
+        self.assertEqual(skipped["state"]["current_beat"], 3)  # 137 elapsed beats in 3/beat bars
+        self.assertIn("Chirp", skipped["effect_names"])
+        self.harness.send("ble 31")
+        for command in ("ble 32 1d 00", "ble 32 f1 00", "ble 32 78", "ble 33 09", "ble 30 00"):
+            self.assertFalse(self.harness.send(command)["ok"])
+        reboot = self.harness.send("power_cycle")
+        self.assertFalse(reboot["state"]["metronome_running"])
+        self.assertEqual(reboot["state"]["metronome_bpm"], 120)
+        self.assertEqual(reboot["state"]["beats_per_bar"], 4)
+
     def test_sprint_durable_settings_and_companion_boot(self):
         self.harness.send("ble 07 04")
         self.harness.send("ble 0a 2c 01 00 00")
