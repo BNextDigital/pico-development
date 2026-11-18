@@ -82,12 +82,14 @@ int main()
     std::uint32_t last_tick = UINT32_MAX;
     while (true) {
         pico::Event event{};
-        if (k_msgq_get(&event_queue, &event, K_MSEC(100)) == 0) {
+        if (k_msgq_get(&event_queue, &event, K_MSEC(20)) == 0) {
             const auto effects = core.handle(event);
             apply_effects(effects, core, hardware, display, storage, ble,
                           capabilities);
             hardware.reflect(core.state());
         }
+
+        hardware.poll();
 
         const auto now_seconds = static_cast<std::uint32_t>(
             k_uptime_get() / MSEC_PER_SEC);

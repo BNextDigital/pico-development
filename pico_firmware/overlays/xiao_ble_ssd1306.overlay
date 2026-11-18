@@ -3,10 +3,23 @@
  * i2c1 uses these header pins; i2c0 is the Sense board's internal IMU bus.
  */
 #include <zephyr/dt-bindings/i2c/i2c.h>
+#include <zephyr/dt-bindings/gpio/gpio.h>
 
 / {
     chosen {
         zephyr,display = &pico_oled;
+    };
+
+    buttons {
+        compatible = "gpio-keys";
+        pico_focus_button: focus_button {
+            gpios = <&gpio0 2 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+            label = "Focus button on D0";
+        };
+    };
+
+    aliases {
+        pico-focus-button = &pico_focus_button;
     };
 };
 

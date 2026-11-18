@@ -65,6 +65,8 @@ enum class EventKind : std::uint8_t {
     RequestStatus,
     SetTheme,
     CycleTheme,
+    FocusButtonTapped,
+    FocusButtonHeld,
 };
 
 struct Event {

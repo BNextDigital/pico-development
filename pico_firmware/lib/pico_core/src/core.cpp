@@ -71,6 +71,31 @@ Effects Core::handle(const Event &event)
         }
         return set_mode(next_user_mode(state_.mode));
 
+    case EventKind::FocusButtonTapped: {
+        // A tap during any running timer is a pat; it never restarts the timer.
+        if (state_.timer_running) {
+            return handle({EventKind::PrimaryPressed, 0});
+        }
+        if (state_.dock == Dock::Car) {
+            return effect(Effect::None);
+        }
+        Effects effects = set_mode(Mode::Focus);
+        effects |= handle({EventKind::StartTimer, 25U * 60U});
+        effects |= handle({EventKind::PrimaryPressed, 0});
+        return effects;
+    }
+
+    case EventKind::FocusButtonHeld: {
+        if (state_.dock == Dock::Car || state_.mode != Mode::Focus ||
+            !state_.timer_running) {
+            return effect(Effect::None);
+        }
+        Effects effects = handle({EventKind::CancelTimer, 0});
+        effects |= set_mode(Mode::Companion);
+        effects |= set_mood(Mood::Neutral);
+        return effects;
+    }
+
     case EventKind::Connected:
         if (state_.connected) {
             return effect(Effect::None);
