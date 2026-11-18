@@ -95,7 +95,7 @@ def build(*, force: bool = False) -> Path:
         ]
 
     print("Building Pico simulator backend from lib/pico_core...")
-    subprocess.run(command, cwd=PROJECT_DIR, check=True)
+    subprocess.run(command, cwd=BUILD_DIR, check=True)
     return BACKEND_BINARY
 
 

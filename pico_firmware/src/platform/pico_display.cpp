@@ -3,6 +3,7 @@
 #include <array>
 #include <cerrno>
 #include <cstdint>
+#include <cstring>
 
 #include <zephyr/devicetree.h>
 #include <zephyr/device.h>
@@ -34,6 +35,8 @@ constexpr std::size_t kFrameBufferSize = pico::display::kDefaultBufferSize;
 const device *display_device = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
 display_capabilities display_caps{};
 std::array<std::uint8_t, kFrameBufferSize> frame_buffer{};
+std::array<std::uint8_t, kFrameBufferSize> last_frame{};
+bool frame_sent;
 
 pico::display::MonoLayout display_layout()
 {
@@ -79,6 +82,7 @@ bool Display::init()
     }
 
     ready_ = true;
+    frame_sent = false;
     LOG_INF("Display ready: %ux%u", display_caps.x_resolution,
             display_caps.y_resolution);
     return true;
@@ -104,6 +108,11 @@ bool Display::render(const State &state)
         return false;
     }
 
+    const auto size = display::required_buffer_size(surface);
+    if (frame_sent && std::memcmp(frame_buffer.data(), last_frame.data(), size) == 0) {
+        return true;
+    }
+
     display_buffer_descriptor descriptor{};
     descriptor.buf_size = display::required_buffer_size(surface);
     descriptor.width = display_caps.x_resolution;
@@ -116,6 +125,8 @@ bool Display::render(const State &state)
         LOG_WRN("Display write failed (%d)", error);
         return false;
     }
+    std::memcpy(last_frame.data(), frame_buffer.data(), size);
+    frame_sent = true;
     return true;
 #else
     ARG_UNUSED(state);

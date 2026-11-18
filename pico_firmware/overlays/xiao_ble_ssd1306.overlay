@@ -16,10 +16,15 @@
             gpios = <&gpio0 2 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
             label = "Focus button on D0";
         };
+        pico_nav_button: nav_button {
+            gpios = <&gpio0 3 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+            label = "Optional navigation button on D1";
+        };
     };
 
     aliases {
         pico-focus-button = &pico_focus_button;
+        pico-nav-button = &pico_nav_button;
     };
 };
 

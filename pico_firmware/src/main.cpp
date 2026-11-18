@@ -80,6 +80,7 @@ int main()
     hardware.reflect(core.state());
 
     std::uint32_t last_tick = UINT32_MAX;
+    std::uint32_t last_animation_ms = 0;
     while (true) {
         pico::Event event{};
         if (k_msgq_get(&event_queue, &event, K_MSEC(20)) == 0) {
@@ -90,6 +91,13 @@ int main()
         }
 
         hardware.poll();
+
+        const auto now_ms = k_uptime_get_32();
+        if (now_ms - last_animation_ms >= 100U) {
+            last_animation_ms = now_ms;
+            apply_effects(core.handle({pico::EventKind::AnimationTick, now_ms}),
+                          core, hardware, display, storage, ble, capabilities);
+        }
 
         const auto now_seconds = static_cast<std::uint32_t>(
             k_uptime_get() / MSEC_PER_SEC);

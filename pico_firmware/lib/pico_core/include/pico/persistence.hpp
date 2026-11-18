@@ -8,11 +8,13 @@
 
 namespace pico::persistence {
 
-inline constexpr std::size_t kBlobSize = 16;
-inline constexpr std::uint8_t kStorageVersion = 2;
+inline constexpr std::size_t kBlobSize = 20;
+inline constexpr std::uint8_t kStorageVersion = 3;
 using Blob = std::array<std::uint8_t, kBlobSize>;
 
 Blob encode(const PersistedState &state);
-bool decode(const Blob &data, PersistedState &state);
+bool decode(const std::uint8_t *data, std::size_t size, PersistedState &state);
+inline bool decode(const Blob &data, PersistedState &state)
+{ return decode(data.data(), data.size(), state); }
 
 } // namespace pico::persistence

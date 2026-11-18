@@ -1,292 +1,244 @@
 #include <pico/core.hpp>
-
 #include <pico/features.hpp>
-
 #include <limits>
 
 namespace pico {
 namespace {
-
-constexpr std::uint32_t kHappyDurationSeconds = 4;
-
-bool valid_mode(Mode mode)
-{
-    return static_cast<std::uint8_t>(mode) < static_cast<std::uint8_t>(Mode::Count);
+bool valid_mode(Mode m) { return m < Mode::Count; }
+bool valid_mood(Mood m) { return m < Mood::Count; }
+bool valid_theme(FaceTheme t) { return t < FaceTheme::Count; }
+constexpr Mode menu_modes[]{Mode::Focus, Mode::Cooking, Mode::Companion,
+                            Mode::Music, Mode::Wayfinding, Mode::Notes};
 }
-
-bool valid_mood(Mood mood)
+void Core::activity() { personality_.activity(state_, animation_ms_); }
+void Core::sync_timer()
 {
-    return static_cast<std::uint8_t>(mood) < static_cast<std::uint8_t>(Mood::Count);
+    state_.timer_running = timer_.running();
+    state_.timer_paused = timer_.paused();
+    state_.timer_total_seconds = timer_.total();
+    state_.timer_remaining_seconds = timer_.remaining();
 }
-
-bool valid_dock(Dock dock)
+Effects Core::timer_complete()
 {
-    return static_cast<std::uint8_t>(dock) < static_cast<std::uint8_t>(Dock::Count);
+    state_.timer_completed = true;
+    personality_.react(state_, Mood::Alert, animation_ms_);
+    return Effect::Render | Effect::Notify | Effect::Chirp;
 }
-bool valid_theme(FaceTheme theme)
-{
-    return static_cast<std::uint8_t>(theme) <
-           static_cast<std::uint8_t>(FaceTheme::Count);
-}
-
-std::uint32_t saturating_add(std::uint32_t lhs, std::uint32_t rhs)
-{
-    if (rhs > std::numeric_limits<std::uint32_t>::max() - lhs) {
-        return std::numeric_limits<std::uint32_t>::max();
-    }
-    return lhs + rhs;
-}
-
-} // namespace
-
 Effects Core::set_theme(FaceTheme theme)
 {
-    if (!valid_theme(theme) || theme == state_.theme) {
-        return effect(Effect::None);
-    }
-
+    if (!valid_theme(theme) || theme == state_.theme) return effect(Effect::None);
+    activity();
     state_.theme = theme;
     return Effect::Render | Effect::Notify | Effect::Persist;
 }
-
+Effects Core::set_mode(Mode mode)
+{
+    if (!valid_mode(mode) || mode == Mode::Driving || state_.dock == Dock::Car ||
+        mode == state_.mode) return effect(Effect::None);
+    activity();
+    state_.mode = mode;
+    return Effect::Render | Effect::Notify | Effect::Persist;
+}
+Effects Core::set_mood(Mood mood)
+{
+    if (!valid_mood(mood)) return effect(Effect::None);
+    activity();
+    personality_.react(state_, mood, animation_ms_);
+    return Effect::Render | Effect::Notify;
+}
+Effects Core::navigate(EventKind kind)
+{
+    if (state_.dock == Dock::Car) return effect(Effect::None);
+    activity();
+    if (kind == EventKind::Back) {
+        state_.screen = state_.screen == Screen::Menu || state_.screen == Screen::Home ? Screen::Home : Screen::Menu;
+        return effect(Effect::Render);
+    }
+    if (kind == EventKind::OpenMenu || state_.screen == Screen::Home) {
+        if (kind == EventKind::OpenMenu) state_.menu_index = 0;
+        state_.screen = Screen::Menu;
+        return effect(Effect::Render);
+    }
+    const int direction = kind == EventKind::NavigatePrevious ? -1 : 1;
+    if (kind == EventKind::NavigateNext || kind == EventKind::NavigatePrevious) {
+        if (state_.screen == Screen::Menu)
+            state_.menu_index = static_cast<std::uint8_t>((state_.menu_index + 8 + direction) % 8);
+        else if (state_.screen == Screen::Utility)
+            state_.utility_index = static_cast<std::uint8_t>((state_.utility_index + 4 + direction) % 4);
+        else if (state_.screen == Screen::Themes) {
+            const auto next = (static_cast<int>(state_.theme) + 8 + direction) % 8;
+            return set_theme(static_cast<FaceTheme>(next)) | Effect::Render;
+        }
+        return effect(Effect::Render);
+    }
+    if (kind != EventKind::Select) return effect(Effect::None);
+    if (state_.screen == Screen::Menu) {
+        if (state_.menu_index == 6) state_.screen = Screen::Themes;
+        else if (state_.menu_index == 7 || state_.menu_index == 2) {
+            state_.screen = Screen::Home;
+            return set_mode(Mode::Companion) | Effect::Render;
+        } else {
+            const auto mode = menu_modes[state_.menu_index];
+            const auto effects = set_mode(mode);
+            state_.screen = feature_for(mode)->prototype_ready ? Screen::Utility : Screen::Unavailable;
+            return effects | Effect::Render;
+        }
+    } else if (state_.screen == Screen::Themes) state_.screen = Screen::Home;
+    else if (state_.screen == Screen::Unavailable) state_.screen = Screen::Menu;
+    else if (state_.screen == Screen::Utility) {
+        switch (state_.utility_index) {
+        case 0: {
+            constexpr std::uint32_t presets[]{60, 300, 1500, 3000};
+            auto next = presets[0];
+            for (unsigned i = 0; i < 4; ++i)
+                if (presets[i] == state_.configured_duration_seconds) next = presets[(i + 1) % 4];
+            return handle({EventKind::SetTimerDuration, next}) | Effect::Render;
+        }
+        case 1:
+            return handle({state_.timer_running ? EventKind::PauseTimer :
+                           state_.timer_paused ? EventKind::ResumeTimer : EventKind::StartTimer,
+                           state_.configured_duration_seconds}) | Effect::Render;
+        case 2: return handle({EventKind::CancelTimer, 0}) | Effect::Render;
+        case 3: state_.screen = Screen::Home; break;
+        }
+    }
+    return effect(Effect::Render);
+}
 Effects Core::handle(const Event &event)
 {
     switch (event.kind) {
     case EventKind::Boot:
+        state_.mode = Mode::Companion;
+        state_.screen = Screen::Home;
+        state_.timer_completed = false;
+        timer_.cancel(); sync_timer(); activity();
         return Effect::Render | Effect::Notify;
-
-    case EventKind::Tick:
-        return on_tick(event.value);
-
+    case EventKind::Tick: return on_tick(event.value);
+    case EventKind::AnimationTick: {
+        animation_ms_ = event.value;
+        const auto before = state_.mood;
+        const bool changed = personality_.advance(state_, animation_ms_);
+        Effects effects = changed ? effect(Effect::Render) : effect(Effect::None);
+        if (before != state_.mood) effects |= effect(Effect::Notify);
+        if (state_.timer_completed && state_.mood != Mood::Alert) {
+            state_.timer_completed = false; state_.screen = Screen::Home;
+            effects |= effect(Effect::Render);
+        }
+        return effects;
+    }
     case EventKind::PrimaryPressed:
-        state_.interaction_count = saturating_add(state_.interaction_count, 1U);
-        state_.mood = Mood::Happy;
-        mood_reset_deadline_seconds_ = saturating_add(state_.uptime_seconds,
-                                                       kHappyDurationSeconds);
+        activity();
+        if (state_.interaction_count != std::numeric_limits<std::uint32_t>::max()) ++state_.interaction_count;
+        personality_.react(state_, Mood::Happy, animation_ms_);
         return Effect::Render | Effect::Notify | Effect::Persist | Effect::Chirp;
-
-    case EventKind::SecondaryPressed:
-        if (state_.dock == Dock::Car) {
-            return effect(Effect::None);
-        }
-        return set_mode(next_user_mode(state_.mode));
-
+    case EventKind::SecondaryPressed: return navigate(EventKind::NavigateNext);
+    case EventKind::OpenMenu: case EventKind::NavigateNext:
+    case EventKind::NavigatePrevious: case EventKind::Select: case EventKind::Back:
+        return navigate(event.kind);
     case EventKind::FocusButtonTapped: {
-        // A tap during any running timer is a pat; it never restarts the timer.
-        if (state_.timer_running) {
-            return handle({EventKind::PrimaryPressed, 0});
-        }
-        if (state_.dock == Dock::Car) {
-            return effect(Effect::None);
-        }
+        if (state_.screen != Screen::Home) return navigate(EventKind::Select);
+        if (state_.timer_running || state_.timer_paused) return handle({EventKind::PrimaryPressed, 0});
+        if (state_.dock == Dock::Car) return effect(Effect::None);
         Effects effects = set_mode(Mode::Focus);
-        effects |= handle({EventKind::StartTimer, 25U * 60U});
+        effects |= handle({EventKind::StartTimer, state_.configured_duration_seconds});
         effects |= handle({EventKind::PrimaryPressed, 0});
         return effects;
     }
-
     case EventKind::FocusButtonHeld: {
+        if (state_.screen != Screen::Home) return navigate(EventKind::Back);
         if (state_.dock == Dock::Car || state_.mode != Mode::Focus ||
-            !state_.timer_running) {
-            return effect(Effect::None);
-        }
+            (!state_.timer_running && !state_.timer_paused)) return effect(Effect::None);
         Effects effects = handle({EventKind::CancelTimer, 0});
         effects |= set_mode(Mode::Companion);
         effects |= set_mood(Mood::Neutral);
         return effects;
     }
-
     case EventKind::Connected:
-        if (state_.connected) {
-            return effect(Effect::None);
-        }
-        state_.connected = true;
-        return Effect::Render | Effect::Notify;
-
+        if (state_.connected) return effect(Effect::None);
+        state_.connected = true; return Effect::Render | Effect::Notify;
     case EventKind::Disconnected:
-        if (!state_.connected) {
-            return effect(Effect::None);
-        }
-        state_.connected = false;
-        return Effect::Render | Effect::Notify;
-
+        if (!state_.connected) return effect(Effect::None);
+        state_.connected = false; return Effect::Render | Effect::Notify;
     case EventKind::DockChanged: {
+        if (event.value >= static_cast<std::uint32_t>(Dock::Count)) return effect(Effect::None);
         const auto dock = static_cast<Dock>(event.value);
-        if (!valid_dock(dock) || dock == state_.dock) {
-            return effect(Effect::None);
-        }
-
-        const auto previous_dock = state_.dock;
+        if (dock == state_.dock) return effect(Effect::None);
+        const auto previous = state_.dock;
         state_.dock = dock;
-
+        state_.screen = Screen::Home;
         if (dock == Dock::Car) {
-            if (previous_dock != Dock::Car) {
-                mode_before_car_dock_ = state_.mode;
-            }
+            mode_before_car_dock_ = state_.mode;
             state_.mode = Mode::Driving;
-        } else if (previous_dock == Dock::Car && state_.mode == Mode::Driving) {
-            state_.mode = valid_mode(mode_before_car_dock_)
-                              ? mode_before_car_dock_
-                              : Mode::Companion;
-        }
-
+        } else if (previous == Dock::Car && state_.mode == Mode::Driving)
+            state_.mode = mode_before_car_dock_;
         return Effect::Render | Effect::Notify | Effect::Persist;
     }
-
     case EventKind::SetTheme:
-        if (event.value >= static_cast<std::uint32_t>(FaceTheme::Count)) {
-            return effect(Effect::None);
-        }
-        return set_theme(static_cast<FaceTheme>(event.value));
-
-    case EventKind::CycleTheme: {
-        const auto current = static_cast<std::uint8_t>(state_.theme);
-        const auto theme_count =
-            static_cast<std::uint8_t>(FaceTheme::Count);
-
-        const auto next =
-            static_cast<std::uint8_t>((current + 1U) % theme_count);
-
-        return set_theme(static_cast<FaceTheme>(next));
-    }
-
+        return event.value < static_cast<unsigned>(FaceTheme::Count) ? set_theme(static_cast<FaceTheme>(event.value)) : effect(Effect::None);
+    case EventKind::CycleTheme:
+        return set_theme(static_cast<FaceTheme>((static_cast<unsigned>(state_.theme) + 1) % 8));
     case EventKind::SetMode:
-        return set_mode(static_cast<Mode>(event.value));
-
+        return event.value < static_cast<unsigned>(Mode::Count) ? set_mode(static_cast<Mode>(event.value)) : effect(Effect::None);
     case EventKind::SetMood:
-        return set_mood(static_cast<Mood>(event.value));
-
-    case EventKind::SetBattery: {
-        const auto percentage = static_cast<std::uint8_t>(event.value);
-        if ((percentage > 100U && percentage != kBatteryUnknown) ||
-            percentage == state_.battery_percent) {
-            return effect(Effect::None);
-        }
-        state_.battery_percent = percentage;
+        return event.value < static_cast<unsigned>(Mood::Count) ? set_mood(static_cast<Mood>(event.value)) : effect(Effect::None);
+    case EventKind::SetBattery:
+        if ((event.value > 100 && event.value != kBatteryUnknown) || event.value == state_.battery_percent) return effect(Effect::None);
+        state_.battery_percent = static_cast<std::uint8_t>(event.value);
         return Effect::Render | Effect::Notify;
-    }
-
+    case EventKind::SetTimerDuration:
+        if (!event.value || event.value > kMaxTimerSeconds || event.value == state_.configured_duration_seconds) return effect(Effect::None);
+        activity(); state_.configured_duration_seconds = event.value;
+        return Effect::Render | Effect::Persist;
     case EventKind::StartTimer:
-        if (event.value == 0U || event.value > kMaxTimerSeconds) {
-            return effect(Effect::None);
-        }
-        state_.timer_running = true;
-        state_.timer_total_seconds = event.value;
-        state_.timer_remaining_seconds = event.value;
-        timer_deadline_seconds_ = saturating_add(state_.uptime_seconds, event.value);
+        if (!timer_.start(event.value, state_.uptime_seconds)) return effect(Effect::None);
+        activity(); state_.timer_completed = false; sync_timer();
         return Effect::Render | Effect::Notify;
-
-    case EventKind::CancelTimer:
-        if (!state_.timer_running) {
-            return effect(Effect::None);
-        }
-        state_.timer_running = false;
-        state_.timer_total_seconds = 0;
-        state_.timer_remaining_seconds = 0;
-        timer_deadline_seconds_ = 0;
-        return Effect::Render | Effect::Notify;
-
-    case EventKind::RequestStatus:
-        return effect(Effect::Notify);
+    case EventKind::PauseTimer: {
+        if (!timer_.running()) return effect(Effect::None);
+        activity();
+        const bool finished = timer_.pause(state_.uptime_seconds);
+        sync_timer();
+        return finished ? timer_complete() : Effect::Render | Effect::Notify;
     }
-
+    case EventKind::ResumeTimer:
+        if (!timer_.resume(state_.uptime_seconds)) return effect(Effect::None);
+        activity(); sync_timer(); return Effect::Render | Effect::Notify;
+    case EventKind::CancelTimer:
+        if (!timer_.running() && !timer_.paused() && !state_.timer_completed) return effect(Effect::None);
+        timer_.cancel(); sync_timer(); activity(); state_.timer_completed = false;
+        return Effect::Render | Effect::Notify;
+    case EventKind::RequestStatus: return effect(Effect::Notify);
+    }
     return effect(Effect::None);
 }
-
-Effects Core::set_mode(Mode mode)
+Effects Core::on_tick(std::uint32_t now)
 {
-    if (!valid_mode(mode) || mode == Mode::Driving || state_.dock == Dock::Car ||
-        mode == state_.mode) {
-        return effect(Effect::None);
-    }
-
-    state_.mode = mode;
-    return Effect::Render | Effect::Notify | Effect::Persist;
-}
-
-Effects Core::set_mood(Mood mood)
-{
-    if (!valid_mood(mood) || mood == state_.mood) {
-        return effect(Effect::None);
-    }
-
-    state_.mood = mood;
-    mood_reset_deadline_seconds_ = 0;
-    return Effect::Render | Effect::Notify | Effect::Persist;
-}
-
-Effects Core::on_tick(std::uint32_t now_seconds)
-{
-    state_.uptime_seconds = now_seconds;
+    animation_ms_ = now * 1000U;
+    state_.uptime_seconds = now;
+    const auto previous = state_.timer_remaining_seconds;
+    const bool complete = timer_.advance(now);
+    sync_timer();
     Effects effects = effect(Effect::None);
-
-    if (state_.timer_running) {
-        const auto remaining = now_seconds >= timer_deadline_seconds_
-                                   ? 0U
-                                   : timer_deadline_seconds_ - now_seconds;
-        if (remaining != state_.timer_remaining_seconds) {
-            state_.timer_remaining_seconds = remaining;
-            effects |= effect(Effect::Render);
-            effects |= effect(Effect::Notify);
-        }
-
-        if (remaining == 0U) {
-            state_.timer_running = false;
-            state_.mood = Mood::Alert;
-            mood_reset_deadline_seconds_ = saturating_add(now_seconds,
-                                                           kHappyDurationSeconds);
-            effects |= effect(Effect::Chirp);
-        }
-    }
-
-    if (mood_reset_deadline_seconds_ != 0U &&
-        now_seconds >= mood_reset_deadline_seconds_) {
-        mood_reset_deadline_seconds_ = 0;
-        if (state_.mood == Mood::Happy || state_.mood == Mood::Alert) {
-            state_.mood = Mood::Neutral;
-            effects |= effect(Effect::Render);
-            effects |= effect(Effect::Notify);
-        }
-    }
-
+    if (previous != state_.timer_remaining_seconds) effects |= Effect::Render | Effect::Notify;
+    if (complete) effects |= timer_complete();
+    effects |= handle({EventKind::AnimationTick, animation_ms_});
     return effects;
 }
-
 PersistedState Core::persistent_state() const
 {
-    PersistedState persisted{};
-
-    persisted.mode =
-        state_.mode == Mode::Driving
-            ? mode_before_car_dock_
-            : state_.mode;
-
-    persisted.mood =
-        state_.mood == Mood::Happy ||
-        state_.mood == Mood::Alert
-            ? Mood::Neutral
-            : state_.mood;
-
-    persisted.theme = state_.theme;
-    persisted.interaction_count = state_.interaction_count;
-
-    return persisted;
+    return {state_.mode == Mode::Driving ? mode_before_car_dock_ : state_.mode,
+            Mood::Neutral, state_.interaction_count, state_.theme,
+            state_.configured_duration_seconds};
 }
-bool Core::restore(const PersistedState &persisted)
+bool Core::restore(const PersistedState &p)
 {
-    if (!valid_mode(persisted.mode) ||
-        persisted.mode == Mode::Driving ||
-        !valid_mood(persisted.mood) ||
-        !valid_theme(persisted.theme)) {
-        return false;
-    }
-
-    state_.mode = persisted.mode;
-    state_.mood = persisted.mood;
-    state_.theme = persisted.theme;
-    state_.interaction_count = persisted.interaction_count;
-    mode_before_car_dock_ = persisted.mode;
-
+    if (!valid_mode(p.mode) || p.mode == Mode::Driving || !valid_mood(p.mood) ||
+        !valid_theme(p.theme) || !p.configured_duration_seconds ||
+        p.configured_duration_seconds > kMaxTimerSeconds) return false;
+    state_.mode = p.mode; state_.mood = p.mood;
+    state_.theme = p.theme; state_.interaction_count = p.interaction_count;
+    state_.configured_duration_seconds = p.configured_duration_seconds;
+    mode_before_car_dock_ = p.mode;
     return true;
 }
-} // namespace pico
+}
