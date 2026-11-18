@@ -97,6 +97,11 @@ int main()
             apply_effects(effects, core, hardware, display, storage, ble,
                           capabilities);
             hardware.reflect(core.state());
+#if defined(CONFIG_PICO_BRINGUP_DIAGNOSTICS)
+            if (now_seconds % 5U == 0U) {
+                display.diagnose(core.state());
+            }
+#endif
         }
     }
 

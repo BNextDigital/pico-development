@@ -9,6 +9,10 @@
 #include <zephyr/drivers/display.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/util.h>
+#if defined(CONFIG_PICO_BRINGUP_DIAGNOSTICS)
+#include <zephyr/drivers/i2c.h>
+#include <zephyr/sys/printk.h>
+#endif
 
 #include <pico/display_model.hpp>
 
@@ -124,5 +128,36 @@ Capabilities Display::capabilities() const
     return ready_ ? capability(Capability::Display)
                   : capability(Capability::None);
 }
+
+#if defined(CONFIG_PICO_BRINGUP_DIAGNOSTICS)
+void Display::diagnose(const State &state)
+{
+    const bool frame_written = render(state);
+    printk("[Pico diag] uptime=%u display_ready=%u frame_written=%u\n",
+           static_cast<unsigned int>(state.uptime_seconds),
+           static_cast<unsigned int>(ready_),
+           static_cast<unsigned int>(frame_written));
+#if PICO_HAS_DISPLAY
+#if DT_ON_BUS(DT_CHOSEN(zephyr_display), i2c)
+    const device *bus = DEVICE_DT_GET(DT_BUS(DT_CHOSEN(zephyr_display)));
+    if (!device_is_ready(bus)) {
+        printk("[Pico diag] OLED I2C controller is not ready\n");
+        return;
+    }
+
+    // Address-only writes: no OLED commands or framebuffer data are sent.
+    std::uint8_t unused = 0;
+    const int at_3c = i2c_write(bus, &unused, 0, 0x3c);
+    const int at_3d = i2c_write(bus, &unused, 0, 0x3d);
+    printk("[Pico diag] %s: 0x3c=%d 0x3d=%d (0=ACK)\n",
+           bus->name, at_3c, at_3d);
+#else
+    printk("[Pico diag] Chosen display is not on I2C\n");
+#endif
+#else
+    printk("[Pico diag] No enabled chosen display\n");
+#endif
+}
+#endif
 
 } // namespace pico::platform

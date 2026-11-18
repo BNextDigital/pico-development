@@ -76,6 +76,30 @@ ground connection, breadboard row bridges, and header solder joints. Look for
 An OLED at 0x3d needs a matching overlay address; an SH1106 display needs its
 own compatible and configuration. Do not assume either from a blank screen.
 
+### Repeating USB diagnostics
+
+The XIAO configuration enables temporary bring-up diagnostics every five
+seconds, so reopening the USB terminal after reset does not miss them:
+
+```powershell
+python -m serial.tools.list_ports -v
+python -m serial.tools.miniterm COM6 115200 --dtr 1
+```
+
+Replace COM6 with the board's actual application COM port. Close other serial
+terminals first. Exit miniterm with Ctrl+]. Use normal application mode, not
+the double-reset bootloader drive.
+
+`[Pico diag]` lines report whether display initialization and frame writes
+succeeded, plus address-only probes on the display's I2C bus at 0x3c and
+0x3d. A probe result of 0 means an address acknowledged; negative values
+are driver errors and do not, by themselves, identify the physical cause.
+An ACK does not identify the controller model. The diagnostic redraws the
+current frame but does not retry failed device initialization. After fixing
+wiring, power-cycle the board to rerun initialization.
+
+Set `CONFIG_PICO_BRINGUP_DIAGNOSTICS=n` in the XIAO configuration when done.
+
 ## SDK references
 
 - [XIAO board definitions](https://github.com/nrfconnect/sdk-zephyr/tree/ncs-v3.4.2/boards/seeed/xiao_ble)

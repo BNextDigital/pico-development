@@ -18,6 +18,14 @@ config PICO_SETTINGS
     depends on SETTINGS
     default y
 
+config PICO_BRINGUP_DIAGNOSTICS
+    bool "Repeat display and I2C diagnostics on the console"
+    depends on I2C && PRINTK
+    default n
+    help
+      Every five seconds, report display readiness and probe the two common
+      OLED I2C addresses. Disable after breadboard troubleshooting.
+
 config PICO_SETTINGS_SAVE_DELAY_SECONDS
     int "Delay used to coalesce flash writes"
     depends on PICO_SETTINGS
