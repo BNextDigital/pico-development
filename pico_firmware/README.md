@@ -38,6 +38,13 @@ The decisions distilled from the wider Pico project are recorded in
 hardware ledger is in
 [`docs/hardware-bringup.md`](docs/hardware-bringup.md).
 
+## Music metronome
+
+The Music menu now opens an offline visual metronome with 30–240 BPM,
+1–8 beats per bar, tap tempo and optional accented I2S clicks. See
+[Music controls, build and validation](docs/music-metronome.md).
+Target compilation and physical timing checks remain outstanding.
+
 ## Sprint 02
 
 Optional MAX98357A I2S sound cues and confirmed work/break cycles are implemented

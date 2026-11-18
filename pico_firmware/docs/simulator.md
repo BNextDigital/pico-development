@@ -137,3 +137,13 @@ JSON adds `focus_phase` (0 none/1 work/2 break), `focus_waiting`,
 `completed_work_sessions`, `break_duration_seconds`, `sound_muted`, `sound_cue`.
 Advancing time past completion never auto-starts the next phase. Power cycling
 clears session state and mute, and restores the existing durable settings.
+
+## Music controls
+
+Metronome starts Music, Stop beat stops playback, Tap tempo samples current
+simulated time, and Set BPM applies the numeric input (30–240). Beats per bar
+can be set through `event SetMetronomeBeats 3` or BLE `33 03`. The GUI uses
+20 ms clock steps during metronome playback. Use backend `advance_ms` to test
+exact boundaries; large advances skip stale beats instead of replaying them.
+Music JSON fields and test examples are in [music-metronome.md](music-metronome.md).
+The preview remains visual; Chirp effects do not play desktop audio.
