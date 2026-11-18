@@ -186,11 +186,12 @@ void render_screen(const State &state, MonoSurface &surface)
         return;
     }
     if (state.screen == Screen::Settings) {
-        constexpr const char *names[]{"FACE THEME","MUTE","VOLUME","WORK/TIMER","BREAK","MOTION","TEST SOUND","BACK"};
+        constexpr const char *names[]{"FACE THEME","MUTE","VOLUME","WORK/TIMER","BREAK","MOTION","TEST SOUND","BRIGHTNESS","SCREEN TIME","SLEEP NOW","BACK"};
         text(surface,"SETTINGS",4,2,2);
         const unsigned first = (state.settings_index/4)*4;
         for (unsigned row=0; row<4; ++row) {
             const auto i=first+row;
+            if (i >= 11) break;
             text(surface,i == state.settings_index ? ">" : " ",2,20+row*10);
             text(surface,names[i],10,20+row*10);
             char value[24]{};
@@ -199,6 +200,11 @@ void render_screen(const State &state, MonoSurface &surface)
             else if (i == 2) std::snprintf(value,sizeof(value),"%u",static_cast<unsigned>(state.sound_volume_percent));
             else if (i == 3 || i == 4) duration(value,sizeof(value),i == 3 ? state.configured_duration_seconds : state.break_duration_seconds);
             else if (i == 5) std::snprintf(value,sizeof(value),"%s",state.motion_config ? "ON" : "OFF");
+            else if (i == 7) std::snprintf(value,sizeof(value),"%u",state.display_brightness_percent);
+            else if (i == 8) {
+                if (state.display_timeout_minutes) std::snprintf(value,sizeof(value),"%u M",state.display_timeout_minutes);
+                else std::snprintf(value,sizeof(value),"OFF");
+            }
             text(surface,value,88,20+row*10);
         }
         return;
@@ -217,11 +223,16 @@ void render_screen(const State &state, MonoSurface &surface)
             text(surface,state.setting_draft & motion::kRock ? "ROCK ON" : "ROCK OFF",24,23);
             text(surface,state.setting_draft & motion::kRest ? "REST ON" : "REST OFF",24,33);
         } else {
-            text(surface,state.setting_key == SettingKey::Mute ? "SOUND MUTE" : "VOLUME",24,2);
+            text(surface,state.setting_key == SettingKey::Mute ? "SOUND MUTE" :
+                state.setting_key == SettingKey::Brightness ? "BRIGHTNESS" :
+                state.setting_key == SettingKey::DisplayTimeout ? "SCREEN TIMEOUT" : "VOLUME",24,2);
             char value[24];
             if (state.setting_key == SettingKey::Mute)
                 std::snprintf(value,sizeof(value),"%s",state.setting_draft ? "MUTED" : "SOUND ON");
-            else std::snprintf(value,sizeof(value),"%u PERCENT",static_cast<unsigned>(state.setting_draft));
+            else if (state.setting_key == SettingKey::DisplayTimeout) {
+                if (!state.setting_draft) std::snprintf(value,sizeof(value),"OFF");
+                else std::snprintf(value,sizeof(value),"%u MIN",static_cast<unsigned>(state.setting_draft));
+            } else std::snprintf(value,sizeof(value),"%u PERCENT",static_cast<unsigned>(state.setting_draft));
             text(surface,value,12,21,2);
         }
         constexpr const char *actions[]{"-","+","SAVE","CANCEL"};
@@ -379,7 +390,7 @@ bool render(const State &state, MonoSurface surface)
     }
 
     std::fill(surface.data, surface.data + required_buffer_size(surface), 0U);
-    render_screen(state, surface);
+    if (!state.display_asleep) render_screen(state, surface);
     return true;
 }
 

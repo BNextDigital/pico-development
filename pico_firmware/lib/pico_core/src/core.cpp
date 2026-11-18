@@ -10,7 +10,12 @@ bool valid_theme(FaceTheme t) { return t < FaceTheme::Count; }
 constexpr Mode menu_modes[]{Mode::Focus, Mode::Cooking, Mode::Companion,
                             Mode::Music, Mode::Wayfinding, Mode::Notes};
 }
-void Core::activity() { personality_.activity(state_, animation_ms_); }
+void Core::activity()
+{
+    personality_.activity(state_, animation_ms_);
+    display_activity_ms_ = animation_ms_;
+    state_.display_asleep = false;
+}
 void Core::sync_timer()
 {
     state_.timer_running = timer_.running();
@@ -54,6 +59,7 @@ Effects Core::timer_complete()
                        focus_.phase() == FocusPhase::Break ? audio::Cue::BreakComplete : audio::Cue::TimerComplete;
     focus_.complete(); sync_focus();
     state_.timer_completed = true;
+    display_activity_ms_ = animation_ms_; state_.display_asleep = false;
     personality_.react(state_, Mood::Alert, animation_ms_);
     return Effect::Render | Effect::Notify | Effect::Chirp;
 }
@@ -116,7 +122,7 @@ Effects Core::navigate(EventKind kind)
         if (state_.screen == Screen::Menu)
             state_.menu_index = static_cast<std::uint8_t>((state_.menu_index + 9 + direction) % 9);
         else if (state_.screen == Screen::Settings)
-            state_.settings_index = static_cast<std::uint8_t>((state_.settings_index+8+direction)%8);
+            state_.settings_index = static_cast<std::uint8_t>((state_.settings_index+11+direction)%11);
         else if (state_.screen == Screen::Utility) {
             const int count = state_.mode == Mode::Focus ? 6 : 4;
             state_.utility_index = static_cast<std::uint8_t>((state_.utility_index + count + direction) % count);
@@ -153,7 +159,10 @@ Effects Core::navigate(EventKind kind)
         case 4: return open_duration_editor(true);
         case 5: return open_setting(SettingKey::Motion);
         case 6: return handle({EventKind::TestSound,static_cast<unsigned>(audio::Cue::TimerComplete)});
-        case 7: state_.screen = Screen::Menu; break;
+        case 7: return open_setting(SettingKey::Brightness);
+        case 8: return open_setting(SettingKey::DisplayTimeout);
+        case 9: return handle({EventKind::SleepDisplay,0});
+        case 10: state_.screen = Screen::Menu; break;
         }
     } else if (state_.screen == Screen::Tuner) {
         return handle({state_.tuner_running ? EventKind::StopTuner : EventKind::StartTuner,0});
@@ -186,7 +195,28 @@ Effects Core::navigate(EventKind kind)
 }
 Effects Core::handle(const Event &event)
 {
+    // A sleeping screen consumes the first physical-style input as wake only.
+    if (state_.display_asleep && (event.kind == EventKind::PrimaryPressed ||
+        event.kind == EventKind::SecondaryPressed || event.kind == EventKind::FocusButtonTapped ||
+        event.kind == EventKind::FocusButtonHeld || event.kind == EventKind::NavigateNext ||
+        event.kind == EventKind::NavigatePrevious || event.kind == EventKind::Select || event.kind == EventKind::Back)) {
+        activity(); return Effect::Render | Effect::Notify;
+    }
     switch (event.kind) {
+    case EventKind::SetBrightness:
+        if (event.value < 5 || event.value > 100 || event.value == state_.display_brightness_percent)
+            return effect(Effect::None);
+        state_.display_brightness_percent = static_cast<std::uint8_t>(event.value);
+        activity(); return Effect::Render | Effect::Persist;
+    case EventKind::SetDisplayTimeout:
+        if (event.value > 30 || event.value == state_.display_timeout_minutes) return effect(Effect::None);
+        state_.display_timeout_minutes = static_cast<std::uint8_t>(event.value);
+        activity(); return Effect::Render | Effect::Persist;
+    case EventKind::SleepDisplay:
+        if (state_.timer_completed || state_.tuner_running || state_.metronome_running)
+            return effect(Effect::None);
+        state_.screen = Screen::Home; state_.display_asleep = true;
+        return effect(Effect::Render);
     case EventKind::Boot:
         state_.mode = Mode::Companion;
         state_.screen = Screen::Home;
@@ -198,9 +228,13 @@ Effects Core::handle(const Event &event)
     case EventKind::Tick: return on_tick(event.value);
     case EventKind::AnimationTick: {
         animation_ms_ = event.value;
+        const bool was_asleep = state_.display_asleep;
+        if (display::auto_sleep_allowed(state_) &&
+            animation_ms_ - display_activity_ms_ >= state_.display_timeout_minutes * 60000U)
+            state_.display_asleep = true;
         const auto before = state_.mood;
         const bool changed = personality_.advance(state_, animation_ms_);
-        Effects effects = changed ? effect(Effect::Render) : effect(Effect::None);
+        Effects effects = changed || was_asleep != state_.display_asleep ? effect(Effect::Render) : effect(Effect::None);
         if (before != state_.mood) effects |= effect(Effect::Notify);
         if (state_.timer_completed && state_.mood != Mood::Alert) {
             state_.timer_completed = false; state_.screen = Screen::Home;
@@ -439,19 +473,23 @@ PersistedState Core::persistent_state() const
     return {state_.mode == Mode::Driving ? mode_before_car_dock_ : state_.mode,
             Mood::Neutral, state_.interaction_count, state_.theme,
             state_.configured_duration_seconds,state_.break_duration_seconds,state_.sound_muted,
-            state_.sound_volume_percent,state_.motion_config};
+            state_.sound_volume_percent,state_.motion_config,
+            state_.display_brightness_percent,state_.display_timeout_minutes};
 }
 bool Core::restore(const PersistedState &p)
 {
     if (!valid_mode(p.mode) || p.mode == Mode::Driving || !valid_mood(p.mood) ||
         !valid_theme(p.theme) || !p.configured_duration_seconds ||
         p.configured_duration_seconds > kMaxTimerSeconds || !p.break_duration_seconds ||
-        p.break_duration_seconds > kMaxTimerSeconds || p.sound_volume_percent > 100 || p.motion_config > motion::kAll) return false;
+        p.break_duration_seconds > kMaxTimerSeconds || p.sound_volume_percent > 100 || p.motion_config > motion::kAll ||
+        p.display_brightness_percent < 5 || p.display_brightness_percent > 100 || p.display_timeout_minutes > 30) return false;
     state_.mode = p.mode; state_.mood = p.mood;
     state_.theme = p.theme; state_.interaction_count = p.interaction_count;
     state_.configured_duration_seconds = p.configured_duration_seconds;
     state_.break_duration_seconds = p.break_duration_seconds; state_.sound_muted = p.sound_muted;
     state_.sound_volume_percent = p.sound_volume_percent; state_.motion_config = p.motion_config;
+    state_.display_brightness_percent = p.display_brightness_percent;
+    state_.display_timeout_minutes = p.display_timeout_minutes;
     mode_before_car_dock_ = p.mode;
     return true;
 }

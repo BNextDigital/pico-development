@@ -1,6 +1,7 @@
 #include <cmath>
 #include <vector>
 #include <pico/core.hpp>
+#include <pico/service_schedule.hpp>
 #include <pico/button.hpp>
 #include <pico/display_model.hpp>
 #include <pico/features.hpp>
@@ -372,6 +373,8 @@ void test_focus_button_standalone_controls()
 #include "duration_tests.hpp"
 #include "settings_tests.hpp"
 #include "menu_tests.hpp"
+#include "schedule_tests.hpp"
+#include "oled_tests.hpp"
 
 } // namespace
 
@@ -396,6 +399,9 @@ int main()
     run_duration_tests();
     run_settings_tests();
     test_icon_menu_frames();
+    run_schedule_tests();
+    test_oled_settings_and_power_policy();
+    test_oled_timeout_wrap_preview_and_rendering();
     test_button_debounce_and_hold();
     test_button_deadline_schedule();
     test_focus_button_standalone_controls();

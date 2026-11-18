@@ -87,6 +87,76 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(returned["state"]["menu_index"], 3)
         self.assertEqual(returned["frame_hex"], frames[3])
 
+    def test_core_deadlines_follow_expression_and_metronome(self) -> None:
+        self.assertEqual(self.harness.initial["next_core_wake_ms"], 1000)
+        self.harness.send("event PrimaryPressed")
+        before = self.harness.send("advance_ms 3999")
+        self.assertEqual(before["state"]["mood_name"], "happy")
+        self.assertEqual(before["next_core_wake_ms"], 1)
+        after = self.harness.send("advance_ms 1")
+        self.assertEqual(after["state"]["mood_name"], "neutral")
+        music = self.harness.send("event StartMetronome")
+        self.assertEqual(music["next_core_wake_ms"], 80)
+        pulse_end = self.harness.send("advance_ms 80")
+        self.assertEqual(pulse_end["next_core_wake_ms"], 420)
+        beat = self.harness.send("advance_ms 420")
+        self.assertEqual(beat["next_core_wake_ms"], 80)
+
+    def test_oled_preview_sleep_alert_and_restart(self) -> None:
+        self.harness.send("event OpenSettings")
+        for _ in range(7):
+            self.harness.send("event NavigateNext")
+        self.harness.send("event Select")
+        preview = self.harness.send("event Select")
+        self.assertEqual(preview["state"]["display_preview_percent"], 55)
+        self.assertEqual(preview["state"]["display_brightness_percent"], 50)
+        self.harness.send("event Back")
+        cancelled = self.harness.send("status")
+        self.assertEqual(cancelled["state"]["display_preview_percent"], 50)
+        self.harness.send("event SetBrightness 75")
+        self.harness.send("event SetDisplayTimeout 1")
+        asleep = self.harness.send("advance 60")
+        self.assertTrue(asleep["state"]["display_asleep"])
+        self.assertFalse(any(bytes.fromhex(asleep["frame_hex"])))
+        wake = self.harness.send("event Select")
+        self.assertFalse(wake["state"]["display_asleep"])
+        self.assertEqual(wake["state"]["screen"], 8)  # wake does not open editor
+        self.harness.send("event StartTimer 1")
+        self.harness.send("event SleepDisplay")
+        alert = self.harness.send("advance 1")
+        self.assertEqual(alert["state"]["mood_name"], "alert")
+        self.assertFalse(alert["state"]["display_asleep"])
+        self.assertTrue(any(bytes.fromhex(alert["frame_hex"])))
+        self.harness.send("advance 5")
+        reboot = self.harness.send("power_cycle")
+        self.assertEqual(reboot["state"]["display_brightness_percent"], 75)
+        self.assertEqual(reboot["state"]["display_timeout_minutes"], 1)
+        self.assertFalse(reboot["state"]["display_asleep"])
+
+    def test_v4_oled_defaults_migrate_without_losing_preferences(self) -> None:
+        self.harness.send("event SetTheme 4")
+        self.harness.send("event SetVolume 70")
+        self.harness.send("event SetBrightness 80")
+        self.harness.send("advance 5")
+        self.harness.close()
+        path = Path(self.temporary.name) / "pico-state.bin"
+        legacy = bytearray(path.read_bytes()[:23]) + bytearray([0])
+        legacy[4] = 4
+        checksum = 2166136261
+        for byte in legacy:
+            checksum = ((checksum ^ byte) * 16777619) & 0xFFFFFFFF
+        legacy += checksum.to_bytes(4, "little")
+        path.write_bytes(legacy)
+        self.harness = Harness(self.executable, path)
+        restored = self.harness.initial["state"]
+        self.assertEqual(restored["theme"], 4)
+        self.assertEqual(restored["sound_volume_percent"], 70)
+        self.assertEqual(restored["display_brightness_percent"], 50)
+        self.assertEqual(restored["display_timeout_minutes"], 0)
+        self.harness.send("event SetBrightness 75")
+        self.harness.send("advance 5")
+        self.assertEqual(len(path.read_bytes()), 32)
+
     def test_boot_and_interaction_use_real_core_and_renderer(self) -> None:
         boot = self.harness.initial
         self.assertEqual(boot["state"]["mode_name"], "companion")
@@ -468,7 +538,7 @@ class BackendTests(unittest.TestCase):
         self.assertFalse(restored["state"]["sound_muted"])
         self.harness.send("ble 25 1e")
         self.harness.send("advance 5")
-        self.assertEqual(len((Path(self.temporary.name)/"pico-state.bin").read_bytes()),28)
+        self.assertEqual(len((Path(self.temporary.name)/"pico-state.bin").read_bytes()),32)
 
     def test_sprint_durable_settings_and_companion_boot(self):
         self.harness.send("ble 07 04")

@@ -72,9 +72,11 @@ also not persisted—docking selects it, and undocking restores the prior mode.
 ## Power posture
 
 There is no polling thread per feature. The main loop blocks on the event queue
-with a 20 ms ceiling for music/microphone/motion service timing. Interaction
-buttons use GPIO interrupts and deferred work, with no idle pin polling. A 100 ms
-animation sampler and one-second timer tick share this loop. Zephyr can idle the CPU
+until the earliest timer, personality, metronome or sensor service deadline.
+Interaction buttons use GPIO interrupts and deferred work, with no idle pin
+polling. Personality and music expose their next transition; active tuner
+retains a 20 ms drain bound and enabled motion a 40 ms sample interval.
+A one-second timer/status tick caps otherwise quiet waits. Zephyr can idle the CPU
 between events. Display shutdown policy, slower advertising after a quiet
 period, microphone duty cycling, and battery ADC sampling belong in the next
 power-measurement pass after the actual board and battery circuit are known.
@@ -123,9 +125,10 @@ Mute clears pending cues; the current bounded cue may finish. See
 
 The optional quieter profile disables diagnostic probes. D0/D1 and optional
 Back use interrupt-driven debounce/hold deadlines; legacy sw0/sw1 aliases keep
-their existing press-edge behavior. Deadline-based main-loop waits and battery
-policy remain future work pending physical power measurements. See
-[interrupt button design and checks](interrupt-buttons.md).
+their existing press-edge behavior. Main-loop waits now use service deadlines; battery
+policy remains future work pending physical power measurements. See
+[interrupt button design and checks](interrupt-buttons.md) and
+[deadline sleep design and checks](deadline-sleep.md).
 
 ## Music metronome
 
@@ -184,3 +187,12 @@ migrates 16/20-byte legacy records, and both NVS and simulator accept those
 lengths. Only confirmed changes request coalesced flash saves. No active utility
 or editor is restored. I2S jobs snapshot runtime volume, preserving worker/main
 separation. See [local-settings.md](local-settings.md) for format and validation.
+
+## OLED power policy
+
+Brightness and inactivity timeout belong to portable durable state; current
+screen sleep is transient. Core applies wake/alert priority and supplies the
+timeout deadline. The platform adapter owns contrast/blanking, skips writes
+while blanked and restores the frame before unblanking. Unsupported operations
+fall back gracefully. See [OLED power design](oled-power.md) for storage v5,
+simulator behavior and physical validation.

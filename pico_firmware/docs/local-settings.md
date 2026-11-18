@@ -173,3 +173,10 @@ tuner, motion off/on and bonding still operate with the saved preferences.
 This completes the first Settings hub. OLED brightness/contrast, separate
 per-feature timer defaults, factory-reset UI and battery/sleep policy remain
 future work; no destructive reset control is added here.
+
+## OLED follow-up
+
+[OLED power controls](oled-power.md) extend this hub with Brightness, Screen
+Time and Sleep Now after Test Sound, moving Back to the last row. Brightness
+previews live and Cancel restores the saved value. Storage v5 supersedes v4
+with migration; see the linked guide for exact format and hardware checks.

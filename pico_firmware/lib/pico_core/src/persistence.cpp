@@ -48,7 +48,9 @@ Blob encode(const PersistedState &state)
     data[20] = state.sound_muted ? 1 : 0;
     data[21] = state.sound_volume_percent;
     data[22] = state.motion_config;
-    write_u32_le(fnv1a(data.data(),24),&data[24]);
+    data[23] = state.display_brightness_percent;
+    write_u32_le(state.display_timeout_minutes,&data[24]);
+    write_u32_le(fnv1a(data.data(),28),&data[28]);
     return data;
 }
 
@@ -56,7 +58,7 @@ bool decode(const std::uint8_t *data, std::size_t size, PersistedState &state)
 {
     if (!data || size < 5) return false;
     const auto version = data[4];
-    const auto expected = version == 1 || version == 2 ? 16U : version == 3 ? 20U : version == 4 ? 28U : 0U;
+    const auto expected = version == 1 || version == 2 ? 16U : version == 3 ? 20U : version == 4 ? 28U : version == 5 ? 32U : 0U;
     if (!expected || size != expected || data[0] != 'P' || data[1] != 'I' ||
         data[2] != 'C' || data[3] != 'O' ||
         read_u32_le(data + expected - 4) != fnv1a(data, expected - 4)) return false;
@@ -68,11 +70,15 @@ bool decode(const std::uint8_t *data, std::size_t size, PersistedState &state)
         theme >= FaceTheme::Count || !duration || duration > kMaxTimerSeconds) return false;
     const auto break_duration = version >= 4 ? read_u32_le(data+16) : 300U;
     if (!break_duration || break_duration > kMaxTimerSeconds ||
-        (version >= 4 && (data[20] > 1 || data[21] > 100 || data[22] > motion::kAll || data[23] != 0))) return false;
+        (version >= 4 && (data[20] > 1 || data[21] > 100 || data[22] > motion::kAll || (version == 4 && data[23] != 0)))) return false;
+    const auto brightness = version >= 5 ? data[23] : 50U;
+    const auto timeout = version >= 5 ? read_u32_le(data+24) : 0U;
+    if (brightness < 5 || brightness > 100 || timeout > 30) return false;
     state = {mode,mood,read_u32_le(data+8),theme,duration,break_duration,
              version >= 4 ? data[20] != 0 : false,
              static_cast<std::uint8_t>(version >= 4 ? data[21] : 25U),
-             static_cast<std::uint8_t>(version >= 4 ? data[22] : motion::kAll)};
+             static_cast<std::uint8_t>(version >= 4 ? data[22] : motion::kAll),
+             static_cast<std::uint8_t>(brightness),static_cast<std::uint8_t>(timeout)};
     return true;
 }
 } // namespace pico::persistence

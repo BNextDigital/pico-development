@@ -6,7 +6,7 @@ menu "Pico"
 
 config PICO_FIRMWARE_VERSION
     string "Firmware version"
-    default "0.8.0-interrupt-buttons"
+    default "0.9.0-oled-power"
 
 config PICO_DISPLAY
     bool "Render Pico on the chosen monochrome display"

@@ -4,6 +4,7 @@
 #include <zephyr/logging/log.h>
 
 #include <pico/core.hpp>
+#include <pico/service_schedule.hpp>
 
 #include "platform/pico_motion.hpp"
 #include "platform/pico_audio.hpp"
@@ -104,18 +105,28 @@ int main()
     hardware.reflect(core.state());
 
     std::uint32_t last_tick = UINT32_MAX;
-    std::uint32_t last_animation_ms = 0;
-    while (true) {
-        pico::Event event{};
-        if (k_msgq_get(&event_queue, &event, K_MSEC(20)) == 0) {
-            apply_effects(core.handle({pico::EventKind::MusicTick, k_uptime_get_32()}),
-                          core, hardware, audio, microphone, display, storage, ble, capabilities);
-            const auto effects = core.handle(event);
-            apply_effects(effects, core, hardware, audio, microphone, display, storage, ble,
-                          capabilities);
+    // Service clocks before actions, so a pause/tap uses the actual wake time.
+    const auto service_clocks = [&] {
+        const auto now = k_uptime_get();
+        const auto seconds = static_cast<std::uint32_t>(now / MSEC_PER_SEC);
+        if (seconds != last_tick) {
+            last_tick = seconds;
+            apply_effects(core.handle({pico::EventKind::Tick, seconds}), core, hardware,
+                          audio, microphone, display, storage, ble, capabilities);
             hardware.reflect(core.state());
+#if defined(CONFIG_PICO_BRINGUP_DIAGNOSTICS)
+            if (seconds % 5U == 0U) display.diagnose(core.state());
+#endif
         }
-
+        // Read again after potentially slow diagnostics/display writes.
+        const auto ms = k_uptime_get_32();
+        apply_effects(core.handle({pico::EventKind::MusicTick, ms}), core, hardware,
+                      audio, microphone, display, storage, ble, capabilities);
+        apply_effects(core.handle({pico::EventKind::AnimationTick, ms}), core, hardware,
+                      audio, microphone, display, storage, ble, capabilities);
+    };
+    while (true) {
+        service_clocks();
         motion.poll(core.state().motion_config);
         if (core.state().motion_ready != motion.ready()) {
             apply_effects(core.handle({pico::EventKind::MotionReady,motion.ready() ? 1U : 0U}),
@@ -127,28 +138,19 @@ int main()
                           core,hardware,audio,microphone,display,storage,ble,capabilities);
         }
 
-        apply_effects(core.handle({pico::EventKind::MusicTick, k_uptime_get_32()}),
-                      core, hardware, audio, microphone, display, storage, ble, capabilities);
-        const auto now_ms = k_uptime_get_32();
-        if (now_ms - last_animation_ms >= 100U) {
-            last_animation_ms = now_ms;
-            apply_effects(core.handle({pico::EventKind::AnimationTick, now_ms}),
-                          core, hardware, audio, microphone, display, storage, ble, capabilities);
-        }
-
-        const auto now_seconds = static_cast<std::uint32_t>(
-            k_uptime_get() / MSEC_PER_SEC);
-        if (now_seconds != last_tick) {
-            last_tick = now_seconds;
-            const auto effects = core.handle({pico::EventKind::Tick, now_seconds});
-            apply_effects(effects, core, hardware, audio, microphone, display, storage, ble,
-                          capabilities);
+        // Compute from fresh uptime: time spent rendering or diagnosing must not
+        // be added to a timeout calculated before that work.
+        const auto now = static_cast<std::uint64_t>(k_uptime_get());
+        const auto ms = static_cast<std::uint32_t>(now);
+        const auto wait = pico::schedule::wait_ms(now, last_tick,
+            core.next_animation_ms(ms), core.next_music_ms(ms),
+            motion.next_poll_ms(core.state().motion_config, ms), core.state().tuner_running);
+        pico::Event event{};
+        if (k_msgq_get(&event_queue, &event, K_MSEC(wait)) == 0) {
+            service_clocks();
+            apply_effects(core.handle(event), core, hardware, audio, microphone,
+                          display, storage, ble, capabilities);
             hardware.reflect(core.state());
-#if defined(CONFIG_PICO_BRINGUP_DIAGNOSTICS)
-            if (now_seconds % 5U == 0U) {
-                display.diagnose(core.state());
-            }
-#endif
         }
     }
 

@@ -77,13 +77,14 @@ remain available.
 
 ## Power limits and next roadmap steps
 
-This removes continuous *button* reads, not the main loop's 20 ms timeout.
-Music timing, microphone results and polled motion still share that cadence.
+This step removed continuous *button* reads while retaining the 20 ms main-loop
+timeout. The subsequent [deadline-sleep change](deadline-sleep.md) replaces
+that fixed timeout with service deadlines.
 No current reduction or battery runtime has been measured. Do not describe
 this build as full interrupt-only sleep or battery-ready firmware.
 
-Next: make the main-loop wait deadline-aware while preserving music/sensor
-latency; add measurable peripheral idle policy and amplifier shutdown with
+The deadline-sleep change preserves music/sensor latency. Next add measurable
+peripheral idle policy and amplifier shutdown with
 confirmed hardware; then measure whole-device idle/connected/active current
 before selecting battery policy. OLED contrast and explicit display sleep can
 follow with wake/alert priority tests. Location, notes and peer features remain

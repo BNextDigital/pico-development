@@ -1,5 +1,7 @@
 #include <cmath>
 #include <pico/core.hpp>
+#include <pico/display_power.hpp>
+#include <pico/service_schedule.hpp>
 #include <pico/display_model.hpp>
 #include <pico/features.hpp>
 #include <pico/persistence.hpp>
@@ -156,6 +158,9 @@ std::string event_name(pico::EventKind kind)
     case pico::EventKind::SetMotionConfig: return "SetMotionConfig";
     case pico::EventKind::SetVolume: return "SetVolume";
     case pico::EventKind::OpenSettings: return "OpenSettings";
+    case pico::EventKind::SetBrightness: return "SetBrightness";
+    case pico::EventKind::SetDisplayTimeout: return "SetDisplayTimeout";
+    case pico::EventKind::SleepDisplay: return "SleepDisplay";
     case pico::EventKind::Boot:
         return "Boot";
     case pico::EventKind::Tick:
@@ -215,7 +220,7 @@ std::string event_name(pico::EventKind kind)
 
 std::optional<pico::EventKind> parse_event_kind(const std::string &token)
 {
-    constexpr std::array<pico::EventKind, 50> kinds{
+    constexpr std::array<pico::EventKind, 53> kinds{
         pico::EventKind::Boot,          pico::EventKind::Tick,
         pico::EventKind::PrimaryPressed, pico::EventKind::SecondaryPressed,
         pico::EventKind::Connected,     pico::EventKind::Disconnected,
@@ -258,6 +263,9 @@ std::optional<pico::EventKind> parse_event_kind(const std::string &token)
         pico::EventKind::SetMotionConfig,
         pico::EventKind::SetVolume,
         pico::EventKind::OpenSettings,
+        pico::EventKind::SetBrightness,
+        pico::EventKind::SetDisplayTimeout,
+        pico::EventKind::SleepDisplay,
 
 
 
@@ -530,6 +538,9 @@ public:
                << "\"storage_pending\":"
                << (pending_dirty_ ? "true" : "false") << ','
                << "\"save_due_seconds\":" << save_due_seconds_ << ','
+               << "\"next_core_wake_ms\":" << pico::schedule::wait_ms(now_ms_, now_seconds_,
+                    core_.next_animation_ms(static_cast<std::uint32_t>(now_ms_)),
+                    core_.next_music_ms(static_cast<std::uint32_t>(now_ms_)), UINT32_MAX, false) << ','
                << "\"led_on\":"
                << (state.connected || state.uptime_seconds % 4U == 0U ? "true"
                                                                       : "false")
@@ -568,6 +579,10 @@ public:
                << "\"motion_ready\":" << (state.motion_ready ? "true" : "false") << ','
                << "\"motion_settled\":" << (state.motion_settled ? "true" : "false") << ','
                << "\"motion_config\":" << static_cast<unsigned>(state.motion_config) << ','
+               << "\"display_brightness_percent\":" << static_cast<unsigned>(state.display_brightness_percent) << ','
+               << "\"display_preview_percent\":" << pico::display::brightness_percent(state) << ','
+               << "\"display_timeout_minutes\":" << static_cast<unsigned>(state.display_timeout_minutes) << ','
+               << "\"display_asleep\":" << (state.display_asleep ? "true" : "false") << ','
                << "\"microphone_ready\":" << (state.microphone_ready ? "true" : "false") << ','
                << "\"tuner_running\":" << (state.tuner_running ? "true" : "false") << ','
                << "\"tuner_signal\":" << static_cast<unsigned>(state.tuner.signal) << ','

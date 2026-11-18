@@ -51,18 +51,17 @@ and hardware access under firmware control.
 
 ## Next development priorities
 
-The icon root menu and Local Settings are merged. Interrupt-driven interaction
-buttons are the next power-foundation change; target/physical checks are in
-[interrupt-buttons.md](interrupt-buttons.md). After button acceptance:
+The icon root menu, Local Settings, interrupt-driven buttons and deadline waits
+are implemented. OLED brightness and screen sleep extend the power foundation;
+[OLED controls](oled-power.md) document physical acceptance and migration.
 
-1. Replace the fixed main-loop wait with service deadlines, preserving metronome,
-   microphone, timer and motion response. Measure idle/active current.
-2. Add peripheral idle/shutdown policy with confirmed wiring and wake/alert tests.
-3. Extend local display settings (contrast and explicit display sleep) once wake
-   behavior and power measurements are reliable.
-4. Scope Notes capture/storage or Wayfinding hardware separately. Neither is
-   unlocked merely by its existing menu icon.
+1. Validate OLED contrast/blanking, wake/alert priority and whole-device current
+   with the actual active hardware profiles and diagnostics disabled.
+2. Add peripheral idle/shutdown policy with confirmed amplifier wiring. Measure
+   idle, connected, motion, metronome and tuner consumption separately.
+3. Finalize battery hardware, monitoring and policy using those measurements.
+4. Scope Notes capture/storage or Wayfinding hardware separately; their menu
+   icons do not imply those features are implemented.
 
-Existing implemented services and optional hardware profiles still require their
-individual target and physical acceptance checks; host success alone is not
-hardware validation.
+Host success alone does not validate target compilation, OLED readability,
+acoustic tuner accuracy, audio output, electrical behavior or battery runtime.

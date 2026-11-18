@@ -68,7 +68,7 @@ void test_settings_v4_roundtrip_migration_and_corruption()
     core.handle({E::SetBreakDuration,420}); core.handle({E::SetMuted,1});
     core.handle({E::SetVolume,70}); core.handle({E::SetMotionConfig,1});
     auto blob=pico::persistence::encode(core.persistent_state());
-    CHECK(blob.size() == 28 && blob[4] == 4);
+    CHECK(blob.size() == 32 && blob[4] == 5);
     pico::PersistedState state;
     CHECK(pico::persistence::decode(blob,state));
     pico::Core restored; CHECK(restored.restore(state)); restored.handle({E::Boot,0});

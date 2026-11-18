@@ -40,6 +40,16 @@ public:
         if (due) beat_ = static_cast<unsigned>((beat_ - 1 + due) % beats_) + 1;
         return due != 0;
     }
+    // Earliest next beat or end of its visual pulse, including fractional BPM.
+    std::uint32_t next_update_ms(std::uint32_t now) const
+    {
+        if (!running_) return UINT32_MAX;
+        const auto phase = static_cast<std::uint64_t>(phase_) +
+                           static_cast<std::uint64_t>(now - last_ms_) * bpm_;
+        if (phase >= 60000U) return 0;
+        const auto target = phase < 80U * bpm_ ? 80U * bpm_ : 60000U;
+        return static_cast<std::uint32_t>((target - phase + bpm_ - 1U) / bpm_);
+    }
     // Rolling average of up to four valid tap intervals. Long gaps start over.
     bool tap(std::uint32_t now)
     {

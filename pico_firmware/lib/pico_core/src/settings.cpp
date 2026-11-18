@@ -43,7 +43,9 @@ Effects Core::open_setting(SettingKey key)
     state_.setting_key = key;
     state_.setting_draft = key == SettingKey::Theme ? static_cast<unsigned>(state_.theme) :
         key == SettingKey::Mute ? static_cast<unsigned>(state_.sound_muted) :
-        key == SettingKey::Volume ? state_.sound_volume_percent : state_.motion_config;
+        key == SettingKey::Volume ? state_.sound_volume_percent :
+        key == SettingKey::Brightness ? state_.display_brightness_percent :
+        key == SettingKey::DisplayTimeout ? state_.display_timeout_minutes : state_.motion_config;
     state_.setting_action = 1;
     state_.screen = Screen::SettingEdit;
     return effect(Effect::Render);
@@ -57,15 +59,19 @@ Effects Core::edit_setting(EventKind kind)
             (kind == EventKind::NavigateNext ? 1 : 3)) % 4);
     } else if (kind == EventKind::Select) {
         const unsigned maximum = state_.setting_key == SettingKey::Mute ? 1 :
-            state_.setting_key == SettingKey::Volume ? 100 : 7;
-        const unsigned step = state_.setting_key == SettingKey::Volume ? 5 : 1;
+            state_.setting_key == SettingKey::Volume || state_.setting_key == SettingKey::Brightness ? 100 :
+            state_.setting_key == SettingKey::DisplayTimeout ? 30 : 7;
+        const unsigned step = state_.setting_key == SettingKey::Volume || state_.setting_key == SettingKey::Brightness ? 5 : 1;
+        const unsigned minimum = state_.setting_key == SettingKey::Brightness ? 5 : 0;
         switch (state_.setting_action) {
-        case 0: state_.setting_draft = state_.setting_draft > step ? state_.setting_draft-step : 0; break;
+        case 0: state_.setting_draft = state_.setting_draft > step + minimum ? state_.setting_draft-step : minimum; break;
         case 1: state_.setting_draft = state_.setting_draft+step < maximum ? state_.setting_draft+step : maximum; break;
         case 2: {
             const auto event = state_.setting_key == SettingKey::Theme ? EventKind::SetTheme :
                 state_.setting_key == SettingKey::Mute ? EventKind::SetMuted :
-                state_.setting_key == SettingKey::Volume ? EventKind::SetVolume : EventKind::SetMotionConfig;
+                state_.setting_key == SettingKey::Volume ? EventKind::SetVolume :
+                state_.setting_key == SettingKey::Brightness ? EventKind::SetBrightness :
+                state_.setting_key == SettingKey::DisplayTimeout ? EventKind::SetDisplayTimeout : EventKind::SetMotionConfig;
             state_.screen = Screen::Settings;
             return handle({event,state_.setting_draft}) | Effect::Render;
         }
