@@ -17,6 +17,7 @@ LOG_MODULE_REGISTER(pico_hardware, CONFIG_PICO_LOG_LEVEL);
 #define BUZZER_NODE DT_ALIAS(pico_buzzer)
 #define FOCUS_BUTTON_NODE DT_ALIAS(pico_focus_button)
 #define NAV_BUTTON_NODE DT_ALIAS(pico_nav_button)
+#define BACK_BUTTON_NODE DT_ALIAS(pico_back_button)
 
 #define PICO_HAS_PRIMARY_BUTTON DT_NODE_HAS_STATUS(PRIMARY_BUTTON_NODE, okay)
 #define PICO_HAS_SECONDARY_BUTTON DT_NODE_HAS_STATUS(SECONDARY_BUTTON_NODE, okay)
@@ -26,6 +27,7 @@ LOG_MODULE_REGISTER(pico_hardware, CONFIG_PICO_LOG_LEVEL);
 #define PICO_HAS_BUZZER DT_NODE_HAS_STATUS(BUZZER_NODE, okay)
 #define PICO_HAS_FOCUS_BUTTON DT_NODE_HAS_STATUS(FOCUS_BUTTON_NODE, okay)
 #define PICO_HAS_NAV_BUTTON DT_NODE_HAS_STATUS(NAV_BUTTON_NODE, okay)
+#define PICO_HAS_BACK_BUTTON DT_NODE_HAS_STATUS(BACK_BUTTON_NODE, okay)
 
 namespace {
 
@@ -43,6 +45,12 @@ bool focus_button_ready;
 const gpio_dt_spec nav_button = GPIO_DT_SPEC_GET(NAV_BUTTON_NODE, gpios);
 pico::Button nav_button_state;
 bool nav_button_ready;
+#endif
+
+#if PICO_HAS_BACK_BUTTON
+const gpio_dt_spec back_button = GPIO_DT_SPEC_GET(BACK_BUTTON_NODE, gpios);
+pico::Button back_button_state;
+bool back_button_ready;
 #endif
 
 #if PICO_HAS_PRIMARY_BUTTON
@@ -193,6 +201,14 @@ bool Hardware::init(EventSink sink)
     else LOG_ERR("Navigation button GPIO could not be configured");
 #endif
 
+#if PICO_HAS_BACK_BUTTON
+    back_button_ready = gpio_is_ready_dt(&back_button) &&
+                        gpio_pin_configure_dt(&back_button, GPIO_INPUT) == 0;
+    ready &= back_button_ready;
+    if (back_button_ready) LOG_INF("Optional Back/Cancel button ready");
+    else LOG_WRN("Optional Back button unavailable; hold-to-back remains available");
+#endif
+
 #if PICO_HAS_STATUS_LED
     if (!gpio_is_ready_dt(&status_led) ||
         gpio_pin_configure_dt(&status_led, GPIO_OUTPUT_INACTIVE) != 0) {
@@ -245,7 +261,7 @@ bool Hardware::init(EventSink sink)
 
 void Hardware::poll()
 {
-#if PICO_HAS_FOCUS_BUTTON || PICO_HAS_NAV_BUTTON
+#if PICO_HAS_FOCUS_BUTTON || PICO_HAS_NAV_BUTTON || PICO_HAS_BACK_BUTTON
     const auto sample = [](const gpio_dt_spec &pin, pico::Button &button,
                            bool ready, EventKind tap, EventKind hold) {
         if (!ready) return;
@@ -260,6 +276,9 @@ void Hardware::poll()
 #if PICO_HAS_FOCUS_BUTTON
     sample(focus_button, focus_button_state, focus_button_ready,
            EventKind::FocusButtonTapped, EventKind::FocusButtonHeld);
+#endif
+#if PICO_HAS_BACK_BUTTON
+    sample(back_button, back_button_state, back_button_ready, EventKind::Back, EventKind::Back);
 #endif
 #if PICO_HAS_NAV_BUTTON
     sample(nav_button, nav_button_state, nav_button_ready,
