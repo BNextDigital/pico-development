@@ -183,3 +183,7 @@ Select and Back for all draft editors; preview is not committed until Save.
 Break, mute, volume and motion now survive power cycle after the coalesced save.
 Storage v4 reads older records through the production migration path. JSON adds
 settings/edit state and volume; see [local-settings.md](local-settings.md).
+
+The root menu uses the same icon carousel as firmware: Navigate cycles the
+nine icons and Action selects, with the caption beneath the icon. See
+[icon root menu](icon-root-menu.md) for layout and hardware checks.

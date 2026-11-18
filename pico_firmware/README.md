@@ -38,6 +38,12 @@ The decisions distilled from the wider Pico project are recorded in
 hardware ledger is in
 [`docs/hardware-bringup.md`](docs/hardware-bringup.md).
 
+## Icon root menu
+
+The root menu now uses a large icon with a caption underneath and position dots.
+Navigate cycles icons and Action selects; button mappings remain unchanged. See
+[icon menu layout and validation](docs/icon-root-menu.md).
+
 ## Local Settings
 
 Menu -> Settings adds theme preview, mute/volume, work/break duration, motion

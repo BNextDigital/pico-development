@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cstdio>
 #include <pico/face_assets.hpp>
+#include <pico/menu_icons.hpp>
+#include <cstring>
 
 namespace pico::display {
 namespace {
@@ -304,15 +306,29 @@ void render_screen(const State &state, MonoSurface &surface)
         return;
     }
     if (state.screen == Screen::Menu) {
-        constexpr const char *items[]{"FOCUS TIMER","COOKING TIMER","HOME","MUSIC",
-                                      "WAYFINDING","NOTES","FACE THEMES","SETTINGS","BACK"};
-        text(surface, "PICO MENU", 2, 2, 2);
-        const auto first = (state.menu_index / 4) * 4;
-        for (unsigned i = 0; i < 4; ++i) {
-            const auto index = first + i;
-            if (index >= 9) break;
-            text(surface, index == state.menu_index ? ">" : " ", 2, 20 + i * 10);
-            text(surface, items[index], 10, 20 + i * 10);
+        const auto selected = static_cast<unsigned>(state.menu_index) % assets::menu_icons.size();
+        const auto &icon = assets::menu_icons[selected];
+        const bool large = surface.width >= 96 && surface.height >= 56;
+        const unsigned scale = large ? 2U : 1U;
+        const unsigned left = (surface.width-16U*scale)/2U, top = large ? 5U : 1U;
+        for (unsigned y=0; y<16; ++y)
+            for (unsigned x=0; x<16; ++x)
+                if (icon.rows[y] & (0x8000U >> x))
+                    fill_rect(surface,left+x*scale,top+y*scale,scale,scale);
+        const auto label_width = static_cast<unsigned>(std::strlen(icon.label))*4U*scale-scale;
+        text(surface,icon.label,(surface.width-label_width)/2U,large ? 44U : 19U,scale);
+        // Carousel chevrons and a quiet position indicator; no animation loop.
+        const unsigned arrow_y = top+8U*scale-4U;
+        for (unsigned i=0; i<5; ++i) {
+            const unsigned offset = i < 3 ? 2-i : i-2;
+            fill_rect(surface,5+offset,arrow_y+i*2,2,2);
+            fill_rect(surface,surface.width-9-offset,arrow_y+i*2,2,2);
+        }
+        const unsigned first = (surface.width-51U)/2U;
+        for (unsigned i=0; i<assets::menu_icons.size(); ++i) {
+            const unsigned x=first+i*6U, y=surface.height-4U;
+            if (i == selected) fill_rect(surface,x,y,3,3);
+            else fill_rect(surface,x+1,y+1,1,1);
         }
         return;
     }
