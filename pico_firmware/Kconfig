@@ -6,7 +6,7 @@ menu "Pico"
 
 config PICO_FIRMWARE_VERSION
     string "Firmware version"
-    default "0.1.0"
+    default "0.2.0-sprint01"
 
 config PICO_DISPLAY
     bool "Render Pico on the chosen monochrome display"

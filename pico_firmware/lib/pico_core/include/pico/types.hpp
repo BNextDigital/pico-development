@@ -67,7 +67,18 @@ enum class EventKind : std::uint8_t {
     CycleTheme,
     FocusButtonTapped,
     FocusButtonHeld,
+    AnimationTick,
+    OpenMenu,
+    NavigateNext,
+    NavigatePrevious,
+    Select,
+    Back,
+    PauseTimer,
+    ResumeTimer,
+    SetTimerDuration,
 };
+
+enum class Screen : std::uint8_t { Home, Menu, Utility, Themes, Unavailable };
 
 struct Event {
     EventKind kind{EventKind::Boot};
@@ -118,6 +129,14 @@ struct State {
     std::uint32_t timer_remaining_seconds{0};
     std::uint32_t interaction_count{0};
     FaceTheme theme{FaceTheme::Modern};
+    bool timer_paused{false};
+    bool timer_completed{false};
+    bool eyes_closed{false};
+    std::int8_t gaze_x{0};
+    Screen screen{Screen::Home};
+    std::uint8_t menu_index{0};
+    std::uint8_t utility_index{1};
+    std::uint32_t configured_duration_seconds{1500};
 };
 
 struct PersistedState {
@@ -125,6 +144,7 @@ struct PersistedState {
     Mood mood{Mood::Neutral};
     std::uint32_t interaction_count{0};
     FaceTheme theme{FaceTheme::Modern};
+    std::uint32_t configured_duration_seconds{1500};
 };
 
 } // namespace pico

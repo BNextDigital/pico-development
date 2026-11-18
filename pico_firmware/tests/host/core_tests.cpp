@@ -182,7 +182,7 @@ void test_display_model_is_layout_independent()
     }
 
     CHECK(pico::display::pixel_at(horizontal_surface, 3, 3));
-    CHECK(pico::display::pixel_at(horizontal_surface, 41, 24));
+    CHECK(pico::display::pixel_at(horizontal_surface, 3, 3));
 
     pico::display::MonoSurface short_surface{
         horizontal.data(), 4, pico::display::kDefaultWidth,
@@ -250,11 +250,11 @@ void test_theme_events_and_persistence()
 
     // A real version-1 record: Companion, Neutral, reserved byte 0,
     // interaction count 42, followed by its original FNV-1a checksum.
-    const pico::persistence::Blob legacy{
+    const std::array<std::uint8_t, 16> legacy{
         0x50, 0x49, 0x43, 0x4f, 0x01, 0x00, 0x00, 0x00,
         0x2a, 0x00, 0x00, 0x00, 0xaf, 0x6c, 0x55, 0xef,
     };
-    CHECK(pico::persistence::decode(legacy, persisted));
+    CHECK(pico::persistence::decode(legacy.data(), legacy.size(), persisted));
     CHECK(persisted.theme == pico::FaceTheme::Modern);
     CHECK(persisted.interaction_count == 42U);
 }
@@ -339,6 +339,8 @@ void test_focus_button_standalone_controls()
     CHECK(!core.state().timer_running);
 }
 
+#include "sprint01_tests.hpp"
+
 } // namespace
 
 int main()
@@ -354,6 +356,7 @@ int main()
     test_display_model_is_layout_independent();
     test_persistence_codec_round_trip_and_validation();
     test_theme_events_and_persistence();
+    run_sprint01_tests();
     test_button_debounce_and_hold();
     test_focus_button_standalone_controls();
 

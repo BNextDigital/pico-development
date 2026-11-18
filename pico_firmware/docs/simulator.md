@@ -108,3 +108,20 @@ power_cycle
 factory_reset
 quit
 ```
+
+## Sprint 01 controls
+
+The GUI adds theme selection, pause/resume, virtual D0 tap/hold, previous,
+select and back. M opens/advances menus; Space remains Interact. The real
+framebuffer now includes the timer utility and unavailable-feature screen.
+
+Clock samples are 100 ms (`advance_ms` in the backend); `advance SECONDS` remains
+available. Use `python simulator/pico_sim.py --seed 42`, or backend `--seed 42`,
+for repeatable idle behavior. State JSON now includes theme, screen, cursor,
+closed-eye state, paused timer state and configured duration. Backend clock,
+BLE decoder, personality, timers and persistence remain the production C++.
+
+Persistence accepts 16-byte v1/v2 and 20-byte v3 records. Boot always starts in
+Companion mode and keeps durable theme/count/duration. Desktop compilation
+runs in the ignored simulator build directory so MSVC objects do not dirty
+source folders. See `sprint01.md` for test results and unverified hardware.

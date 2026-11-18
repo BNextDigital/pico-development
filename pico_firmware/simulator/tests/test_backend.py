@@ -140,6 +140,58 @@ class BackendTests(unittest.TestCase):
         self.assertTrue(future_event["ok"])
         self.assertEqual(future_event["effects"], 0)
 
+    def test_sprint_themes_sleep_blink_and_wake(self):
+        frames = set()
+        for theme in range(8):
+            snap = self.harness.send(f"ble 07 {theme:02x}")
+            self.assertEqual(snap["state"]["theme"], theme)
+            frames.add(snap["frame_hex"])
+        self.assertEqual(len(frames), 8)
+        saw_blink = False
+        for _ in range(100):
+            snap = self.harness.send("advance_ms 100")
+            saw_blink |= snap["state"]["eyes_closed"]
+            self.assertFalse(snap["persist_queued"])
+        self.assertTrue(saw_blink)
+        sleepy = self.harness.send("advance 300")
+        self.assertEqual(sleepy["state"]["mood_name"], "sleepy")
+        wake = self.harness.send("ble 01")
+        self.assertEqual(wake["state"]["mood_name"], "happy")
+
+    def test_sprint_pause_resume_completion_and_menu(self):
+        self.harness.send("ble 10")
+        selected = self.harness.send("event FocusButtonTapped")
+        self.assertEqual(selected["state"]["screen"], 2)
+        self.harness.send("ble 0a 0a 00 00 00")
+        self.harness.send("ble 13")
+        self.harness.send("advance 3")
+        paused = self.harness.send("ble 08")
+        self.assertTrue(paused["state"]["timer_paused"])
+        self.assertEqual(bytes.fromhex(paused["status_hex"])[4] & 4, 4)
+        still = self.harness.send("advance 50")
+        self.assertEqual(still["state"]["timer_remaining_seconds"], 7)
+        self.harness.send("ble 09")
+        finished = self.harness.send("advance 7")
+        self.assertEqual(finished["state"]["mood_name"], "alert")
+        self.assertTrue(finished["chirped"])
+        home = self.harness.send("advance 4")
+        self.assertEqual(home["state"]["screen"], 0)
+        self.harness.send("ble 04 05 00 00 00")
+        cancelled = self.harness.send("ble 05")
+        self.assertFalse(cancelled["state"]["timer_running"])
+
+    def test_sprint_durable_settings_and_companion_boot(self):
+        self.harness.send("ble 07 04")
+        self.harness.send("ble 0a 2c 01 00 00")
+        self.harness.send("event FocusButtonTapped")
+        self.harness.send("advance 5")
+        reboot = self.harness.send("power_cycle")
+        self.assertEqual(reboot["state"]["theme"], 4)
+        self.assertEqual(reboot["state"]["configured_duration_seconds"], 300)
+        self.assertEqual(reboot["state"]["mode_name"], "companion")
+        self.assertFalse(reboot["state"]["timer_running"])
+
+
 
 class UiHelperTests(unittest.TestCase):
     def test_duration_format(self) -> None:

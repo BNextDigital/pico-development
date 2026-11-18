@@ -32,9 +32,9 @@ class BackendError(RuntimeError):
 
 
 class BackendProcess:
-    def __init__(self, executable: Path, state_path: Path):
+    def __init__(self, executable: Path, state_path: Path, seed: int = 0x5049434F):
         self.process = subprocess.Popen(
-            [str(executable), "--state", str(state_path)],
+            [str(executable), "--state", str(state_path), "--seed", str(seed)],
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -100,6 +100,7 @@ class PicoSimulatorApp:
         self.backend = backend
         self.snapshot = backend.snapshot
         self.closed = False
+        self._last_frame_hex: str | None = None
         self.display_image: tk.PhotoImage | None = None
         self.display_scaled: tk.PhotoImage | None = None
         self.mode_lookup: dict[str, int] = {}
@@ -117,7 +118,7 @@ class PicoSimulatorApp:
         self.root.bind("<space>", lambda _event: self._send("event PrimaryPressed"))
         self.root.bind("<Key-m>", lambda _event: self._send("event SecondaryPressed"))
         self.root.bind("<Key-M>", lambda _event: self._send("event SecondaryPressed"))
-        self.root.after(1000, self._clock_tick)
+        self.root.after(100, self._clock_tick)
 
     def _configure_style(self) -> None:
         style = ttk.Style(self.root)
@@ -200,10 +201,17 @@ class PicoSimulatorApp:
         ).pack(side="left", expand=True, padx=(0, 8))
         ttk.Button(
             button_row,
-            text="Mode  [M]",
+            text="Menu / Next [M]",
             command=lambda: self._send("event SecondaryPressed"),
             style="Secondary.TButton",
         ).pack(side="left", expand=True)
+
+        navigation = ttk.Frame(shell)
+        navigation.pack(fill="x")
+        for label, event in (("D0 tap", "FocusButtonTapped"), ("D0 hold", "FocusButtonHeld"),
+                             ("Previous", "NavigatePrevious"), ("Select", "Select"), ("Back", "Back")):
+            ttk.Button(navigation, text=label,
+                       command=lambda e=event: self._send("event " + e)).pack(side="left", padx=2)
 
         readout = ttk.Frame(panel, padding=(8, 10))
         readout.grid(row=1, column=0, sticky="ew")
@@ -305,6 +313,16 @@ class PicoSimulatorApp:
         ttk.Button(
             timer_box, text="Cancel", command=lambda: self._send("event CancelTimer")
         ).grid(row=0, column=3, padx=(6, 0))
+
+        ttk.Button(timer_box, text="Pause", command=lambda: self._send("event PauseTimer")).grid(row=1, column=2)
+        ttk.Button(timer_box, text="Resume", command=lambda: self._send("event ResumeTimer")).grid(row=1, column=3)
+        ttk.Label(timer_box, text="Face theme (0-7)").grid(row=2, column=0)
+        self.theme_var = tk.StringVar(value="0")
+        theme_choice = ttk.Combobox(timer_box, textvariable=self.theme_var,
+                                   values=tuple(str(i) for i in range(8)), width=4, state="readonly")
+        theme_choice.grid(row=2, column=1)
+        ttk.Button(timer_box, text="Apply theme", command=lambda: self._send(
+            "event SetTheme " + self.theme_var.get())).grid(row=2, column=2, columnspan=2)
 
         time_box = ttk.LabelFrame(parent, text="Simulation clock", padding=10)
         time_box.grid(row=4, column=0, sticky="ew", pady=(0, 8))
@@ -427,7 +445,7 @@ class PicoSimulatorApp:
         state = snapshot["state"]
         self.mode_var.set(state["mode_name"].upper())
         self.mood_var.set(state["mood_name"].upper())
-        self.timer_var.set(format_duration(state["timer_remaining_seconds"]))
+        self.timer_var.set(format_duration(state["timer_remaining_seconds"]) + (" PAUSED" if state.get("timer_paused") else ""))
         self.interactions_var.set(str(state["interaction_count"]))
         self.dock_var.set(state["dock"])
         if state["battery_percent"] != 255:
@@ -466,6 +484,9 @@ class PicoSimulatorApp:
             self._append_log(snapshot)
 
     def _render_display(self, frame_hex: str) -> None:
+        if frame_hex == self._last_frame_hex:
+            return
+        self._last_frame_hex = frame_hex
         try:
             frame = bytes.fromhex(frame_hex)
         except ValueError:
@@ -569,8 +590,8 @@ class PicoSimulatorApp:
             return
         if not self.paused_var.get():
             speed = {"1×": 1, "10×": 10, "60×": 60}.get(self.speed_var.get(), 1)
-            self._send(f"advance {speed}")
-        self.root.after(1000, self._clock_tick)
+            self._send(f"advance_ms {speed * 100}")
+        self.root.after(100, self._clock_tick)
 
     def close(self) -> None:
         self.closed = True
@@ -582,6 +603,7 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Pico desktop hardware simulator")
     parser.add_argument("--state", type=Path, default=DEFAULT_STATE_PATH)
     parser.add_argument("--rebuild", action="store_true")
+    parser.add_argument("--seed", type=lambda value: int(value, 0), default=0x5049434F)
     parser.add_argument("--backend", type=Path, help="use an already-built backend")
     return parser.parse_args()
 
@@ -590,7 +612,7 @@ def main() -> int:
     args = parse_args()
     try:
         executable = args.backend or build(force=args.rebuild)
-        backend = BackendProcess(executable, args.state.resolve())
+        backend = BackendProcess(executable, args.state.resolve(), args.seed)
     except (BackendError, RuntimeError, subprocess.CalledProcessError) as error:
         print(f"Could not start Pico simulator: {error}", file=sys.stderr)
         return 1

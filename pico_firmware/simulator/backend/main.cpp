@@ -165,13 +165,32 @@ std::string event_name(pico::EventKind kind)
         return "FocusButtonTapped";
     case pico::EventKind::FocusButtonHeld:
         return "FocusButtonHeld";
+    case pico::EventKind::AnimationTick:
+        return "AnimationTick";
+    case pico::EventKind::OpenMenu:
+        return "OpenMenu";
+    case pico::EventKind::NavigateNext:
+        return "NavigateNext";
+    case pico::EventKind::NavigatePrevious:
+        return "NavigatePrevious";
+    case pico::EventKind::Select:
+        return "Select";
+    case pico::EventKind::Back:
+        return "Back";
+    case pico::EventKind::PauseTimer:
+        return "PauseTimer";
+    case pico::EventKind::ResumeTimer:
+        return "ResumeTimer";
+    case pico::EventKind::SetTimerDuration:
+        return "SetTimerDuration";
+
     }
     return "Event" + std::to_string(static_cast<unsigned int>(kind));
 }
 
 std::optional<pico::EventKind> parse_event_kind(const std::string &token)
 {
-    constexpr std::array<pico::EventKind, 17> kinds{
+    constexpr std::array<pico::EventKind, 26> kinds{
         pico::EventKind::Boot,          pico::EventKind::Tick,
         pico::EventKind::PrimaryPressed, pico::EventKind::SecondaryPressed,
         pico::EventKind::Connected,     pico::EventKind::Disconnected,
@@ -181,6 +200,16 @@ std::optional<pico::EventKind> parse_event_kind(const std::string &token)
         pico::EventKind::RequestStatus,
         pico::EventKind::SetTheme,      pico::EventKind::CycleTheme,
         pico::EventKind::FocusButtonTapped, pico::EventKind::FocusButtonHeld,
+        pico::EventKind::AnimationTick,
+        pico::EventKind::OpenMenu,
+        pico::EventKind::NavigateNext,
+        pico::EventKind::NavigatePrevious,
+        pico::EventKind::Select,
+        pico::EventKind::Back,
+        pico::EventKind::PauseTimer,
+        pico::EventKind::ResumeTimer,
+        pico::EventKind::SetTimerDuration,
+
     };
     for (const auto kind : kinds) {
         if (token == event_name(kind)) {
@@ -261,8 +290,8 @@ std::string decode_status_name(pico::protocol::DecodeStatus status)
 
 class Simulator {
 public:
-    explicit Simulator(std::filesystem::path state_path)
-        : state_path_(std::move(state_path))
+    explicit Simulator(std::filesystem::path state_path, std::uint32_t seed)
+        : core_(seed), seed_(seed), state_path_(std::move(state_path))
     {
         load_state();
         last_result_ = dispatch({pico::EventKind::Boot, 0});
@@ -283,20 +312,25 @@ public:
         return result;
     }
 
-    Result advance(std::uint32_t seconds)
+    Result advance_ms(std::uint64_t milliseconds)
     {
-        if (seconds > std::numeric_limits<std::uint32_t>::max() - now_seconds_) {
-            now_seconds_ = std::numeric_limits<std::uint32_t>::max();
-        } else {
-            now_seconds_ += seconds;
-        }
-        auto result = dispatch({pico::EventKind::Tick, now_seconds_});
+        now_ms_ += milliseconds;
+        const auto seconds = static_cast<std::uint32_t>(now_ms_ / 1000U);
+        Result result;
         result.event = "Advance";
-        result.message = "Advanced simulated time by " + std::to_string(seconds) +
-                         " second" + (seconds == 1U ? "" : "s");
+        if (seconds != now_seconds_) {
+            now_seconds_ = seconds;
+            result.effects |= core_.handle({pico::EventKind::Tick, now_seconds_});
+        }
+        result.effects |= core_.handle({pico::EventKind::AnimationTick,
+                                       static_cast<std::uint32_t>(now_ms_)});
+        apply_effects(result);
+        result.storage_saved = flush_if_due();
         last_result_ = result;
         return result;
     }
+    Result advance(std::uint32_t seconds)
+    { return advance_ms(static_cast<std::uint64_t>(seconds) * 1000U); }
 
     Result ble_command(const std::vector<std::uint8_t> &bytes)
     {
@@ -322,7 +356,8 @@ public:
         pending_dirty_ = false;
         save_due_seconds_ = 0;
         now_seconds_ = 0;
-        core_ = pico::Core{};
+        now_ms_ = 0;
+        core_ = pico::Core{seed_};
         restored_ = false;
         if (factory_reset) {
             std::error_code error;
@@ -394,6 +429,12 @@ public:
                << "\"timer_total_seconds\":" << state.timer_total_seconds << ','
                << "\"timer_remaining_seconds\":"
                << state.timer_remaining_seconds << ','
+               << "\"theme\":" << static_cast<unsigned>(state.theme) << ','
+               << "\"screen\":" << static_cast<unsigned>(state.screen) << ','
+               << "\"menu_index\":" << static_cast<unsigned>(state.menu_index) << ','
+               << "\"eyes_closed\":" << (state.eyes_closed ? "true" : "false") << ','
+               << "\"timer_paused\":" << (state.timer_paused ? "true" : "false") << ','
+               << "\"configured_duration_seconds\":" << state.configured_duration_seconds << ','
                << "\"interaction_count\":" << state.interaction_count << "},"
                << "\"catalog\":" << catalog_json() << '}';
         return output.str();
@@ -468,12 +509,10 @@ private:
         pico::persistence::Blob blob{};
         input.read(reinterpret_cast<char *>(blob.data()),
                    static_cast<std::streamsize>(blob.size()));
-        if (input.gcount() != static_cast<std::streamsize>(blob.size())) {
-            return;
-        }
-
+        const auto bytes_read = static_cast<std::size_t>(input.gcount());
+        if (bytes_read == blob.size() && input.peek() != std::char_traits<char>::eof()) return;
         pico::PersistedState state{};
-        restored_ = pico::persistence::decode(blob, state) && core_.restore(state);
+        restored_ = pico::persistence::decode(blob.data(), bytes_read, state) && core_.restore(state);
     }
 
     static std::string effect_names_json(pico::Effects effects)
@@ -529,8 +568,10 @@ private:
     }
 
     pico::Core core_{};
+    std::uint32_t seed_;
     std::filesystem::path state_path_;
     std::uint32_t now_seconds_{0};
+    std::uint64_t now_ms_{0};
     pico::persistence::Blob pending_blob_{};
     bool pending_dirty_{false};
     std::uint32_t save_due_seconds_{0};
@@ -554,12 +595,17 @@ Result command_error(std::string message)
 int main(int argc, char **argv)
 {
     std::filesystem::path state_path = "simulator/build/pico-sim-state.bin";
+    std::uint32_t seed = 0x5049434fU;
     for (int index = 1; index < argc; ++index) {
         const std::string argument = argv[index];
         if (argument == "--state" && index + 1 < argc) {
             state_path = argv[++index];
+        } else if (argument == "--seed" && index + 1 < argc) {
+            const auto parsed = parse_u32(argv[++index]);
+            if (!parsed) { std::cerr << "Invalid seed\n"; return 2; }
+            seed = *parsed;
         } else if (argument == "--help") {
-            std::cout << "pico_sim_backend [--state FILE]\n";
+            std::cout << "pico_sim_backend [--state FILE] [--seed UINT32]\n";
             return 0;
         } else {
             std::cerr << "Unknown argument: " << argument << '\n';
@@ -567,7 +613,7 @@ int main(int argc, char **argv)
         }
     }
 
-    Simulator simulator(state_path);
+    Simulator simulator(state_path, seed);
     std::cout << simulator.json(simulator.last_result()) << '\n' << std::flush;
 
     std::string line;
@@ -598,6 +644,11 @@ int main(int argc, char **argv)
             result = !seconds.has_value()
                          ? command_error("Usage: advance SECONDS")
                          : simulator.advance(*seconds);
+        } else if (command == "advance_ms") {
+            std::string token; input >> token;
+            const auto milliseconds = parse_u32(token);
+            result = milliseconds ? simulator.advance_ms(*milliseconds)
+                                  : command_error("Usage: advance_ms MILLISECONDS");
         } else if (command == "ble") {
             std::string packet;
             std::getline(input, packet);
