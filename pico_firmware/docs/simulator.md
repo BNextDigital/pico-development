@@ -192,3 +192,8 @@ Snapshots include `next_core_wake_ms` for timer/personality/music deadlines.
 This excludes motion polling, tuner drain and platform worker activity; it is
 not a power estimate. Explicit time jumps retain their existing behavior. See
 [deadline sleep](deadline-sleep.md) for the host scheduling model and checks.
+
+OLED controls are available through the shared Settings menu. JSON includes
+saved/preview brightness, timeout and sleep state; the GUI dims lit pixels for
+preview and displays black during sleep. These colors do not model measured
+OLED luminance. See [OLED power controls](oled-power.md).

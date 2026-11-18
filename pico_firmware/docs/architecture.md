@@ -187,3 +187,12 @@ migrates 16/20-byte legacy records, and both NVS and simulator accept those
 lengths. Only confirmed changes request coalesced flash saves. No active utility
 or editor is restored. I2S jobs snapshot runtime volume, preserving worker/main
 separation. See [local-settings.md](local-settings.md) for format and validation.
+
+## OLED power policy
+
+Brightness and inactivity timeout belong to portable durable state; current
+screen sleep is transient. Core applies wake/alert priority and supplies the
+timeout deadline. The platform adapter owns contrast/blanking, skips writes
+while blanked and restores the frame before unblanking. Unsupported operations
+fall back gracefully. See [OLED power design](oled-power.md) for storage v5,
+simulator behavior and physical validation.

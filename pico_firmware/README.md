@@ -38,6 +38,13 @@ The decisions distilled from the wider Pico project are recorded in
 hardware ledger is in
 [`docs/hardware-bringup.md`](docs/hardware-bringup.md).
 
+## OLED power controls
+
+Local Settings adds live brightness preview (5–100%), optional screen timeout
+(Off or 1–30 minutes), and Sleep Now. The first button wakes only; timer alerts
+wake the display. Preferences migrate to storage v5. See
+[OLED controls and hardware checks](docs/oled-power.md).
+
 ## Deadline-based sleeping
 
 The main loop now waits for timer, personality, music and sensor deadlines,
@@ -60,7 +67,7 @@ Navigate cycles icons and Action selects; button mappings remain unchanged. See
 ## Local Settings
 
 Menu -> Settings adds theme preview, mute/volume, work/break duration, motion
-preferences and test sound with Save/Cancel. Storage v4 migrates older records
+preferences and test sound with Save/Cancel. Storage v5 migrates older records
 and preserves all confirmed preferences. Existing two-button controls remain;
 a third Back button is optional. See [Local Settings](docs/local-settings.md).
 

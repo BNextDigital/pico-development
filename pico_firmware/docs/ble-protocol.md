@@ -149,3 +149,8 @@ persist through storage v4, as do theme/work duration. Previous runtime-only
 notes describe their introduction; the v4 behavior supersedes them. The packet
 has no new settings readback fields. See [local-settings.md](local-settings.md)
 for editor controls, migration and downgrade behavior.
+
+OLED brightness/timeout are local settings in storage v5; they add no BLE command
+IDs or fields to the existing status packet. Logical button commands share the
+wake-only first-input rule when the display is asleep. Timer completion wakes
+the display. See [OLED power policy](oled-power.md).
