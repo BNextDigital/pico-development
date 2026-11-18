@@ -1,5 +1,8 @@
 # Music: visual metronome and tap tempo
 
+> **Original feature delivery:** `0.4.0-music` is a historical branch/version reference. The metronome remains in current `main` (`0.9.0-oled-power`), alongside tuner, Local Settings and OLED power. Target-device beat jitter and optional I2S remain unverified.
+
+
 Firmware `0.4.0-music`, branch `feature/music-metronome`, based on main after
 Sprint 02 (merge `60be85a`). This is Pico's first Music utility. It runs offline
 on the existing XIAO/OLED/buttons; the amplifier is optional.

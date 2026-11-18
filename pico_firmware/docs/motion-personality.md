@@ -1,5 +1,8 @@
 # Motion-aware personality
 
+> **Historical implementation milestone:** This guide originally describes the optional IMU feature at `0.6.0-motion`. On current `main` (`0.9.0-oled-power`), Local Settings persist the motion mask through storage v5. Hardware sensor thresholds and current draw remain unverified.
+
+
 Local Settings now makes the behavior mask durable and configurable on-device;
 see [local-settings.md](local-settings.md). That v4 behavior supersedes the
 original runtime-only configuration notes below.
@@ -125,10 +128,10 @@ Runtime BLE command **`40 ff`** sets a three-bit mask:
 | 2 | 4 | Stillness / Sleepy |
 
 Examples: `40 07` all (default), `40 01` pickup only, `40 03` pickup + rock,
-`40 00` off. Values above 7 and wrong packet lengths are rejected. Settings are
-volatile and reset to all enabled on reboot; persistence v3 remains unchanged.
-Local settings navigation is a later milestone; configuration currently uses
-BLE or simulator controls.
+`40 00` off. Values above 7 and wrong packet lengths are rejected. At this original milestone, settings were volatile. **Now on main**, the
+motion mask persists through storage v5 after confirmed Local Settings or BLE
+changes and a coalesced save; fresh storage defaults to all enabled. Users
+can configure the three reactions locally through Menu -> Settings -> Motion.
 
 The unchanged 16-byte v1 status uses flag bit 7 for **sensor ready + nonzero
 motion mask**, and capability bit 7 for motion availability. It does not imply

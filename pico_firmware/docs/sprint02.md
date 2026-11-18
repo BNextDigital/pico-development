@@ -1,5 +1,8 @@
 # Sprint 02: sound cues and work/break sessions
 
+> **Historical sprint record, not current `main` instructions.** The v3 durability, runtime-only break/mute, 20 ms polling, pending motion/tuner and original backlog below refer to Sprint 02's point-in-time state. Current firmware adds Local Settings, persistent storage **v5**, IMU/tuner utilities, interrupt-driven buttons, deadline sleeping, icon navigation and OLED power. [Current overview](../README.md), [BLE protocol](ble-protocol.md), and [hardware bring-up](hardware-bringup.md) supersede stale instructions. The amplifier wiring and original test methodology remain useful, subject to current-profile checks.
+
+
 Branch: `sprint/02-audio-and-focus`, based on `main` at `c3ac491` after both
 hardware bring-up and Sprint 01 were merged. Firmware version: `0.3.0-sprint02`.
 The OLED-only build, D0/D1 inputs, phone-initiated bonding and bring-up diagnostics
