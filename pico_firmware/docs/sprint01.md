@@ -1,5 +1,8 @@
 # Sprint 01 — personality and interactive utilities
 
+> **Historical sprint record, not current `main` instructions.** The branch/version, pre-merge status, original presets, v3 format and 20 ms input polling below describe this sprint at delivery. Current firmware uses the icon menu, ±1-minute editors, IRQ/deferred button handling, deadline waits, storage **v5** and OLED sleep/brightness. Use the [firmware README](../README.md) and [current first boot](xiao-first-boot.md) for an up-to-date build and physical validation checklist.
+
+
 ## Baseline and validation status
 
 Based on `hardware/xiao-oled-bringup` at `13c219096a6b4a4d91fb60b9d2728e2b7896c5fb`,

@@ -1,13 +1,16 @@
 # XIAO Sense + OLED first boot
 
-For Sprint 01 personality, menus, timer pause/resume, optional D1 wiring and
-updated migration/validation status, use [the Sprint 01 guide](sprint01.md).
+This is the baseline **current-source first-flash procedure**. For complete
+software/hardware state, use the [firmware overview](../README.md) and
+[bring-up ledger](hardware-bringup.md). [Sprint 01](sprint01.md) is a
+historical description, not the current button/timer specification.
 
 Target: Seeed Studio XIAO nRF52840 Sense, nRF Connect SDK **3.4.2**,
 128x64 I2C SSD1306 OLED at address **0x3c**.
 
-This configuration has been checked against the SDK's board definitions and
-display binding. A target build and physical-board test are still required.
+The earlier XIAO baseline had physical OLED, BLE and D0 checks. This latest
+`0.9.0-oled-power` source and combined peripheral profiles still require a
+fresh target build and physical regression.
 
 ## Wiring
 
@@ -22,41 +25,39 @@ Unplug USB before moving wires. Connect by the labels on the actual modules:
 
 Leave audio and battery out of this first test. The microphone and IMU are
 onboard; they do not need external jumpers. The XIAO reset button resets the
-board; it is not the firmware's interaction button. The overlay now configures
-an optional focus pushbutton on D0; no MAX98357 audio driver is configured.
+board; it is not the firmware's interaction button. The baseline overlay
+configures D0/D1 inputs; optional MAX98357A I2S output is not enabled.
 
-## Standalone focus button
+## Physical input controls: D0, D1 and optional D2
 
-With USB unplugged, connect a normally-open momentary switch between **D0
-(P0.02)** and **GND**. The overlay enables the internal pull-up; no external
-resistor or supply connection is needed. Existing OLED wiring stays in place.
+With USB unplugged, connect normally-open momentary buttons from each chosen
+signal to **GND**. All are active-low with internal pull-ups; do not wire
+the button to 3V3 or add an unverified external resistor. Four-leg tactile
+buttons have internally connected pairs; use a continuity meter to verify
+the selected terminals are separate when not pressed.
 
-| Switch contact | XIAO |
-| --- | --- |
-| First switched terminal | D0 |
-| Other switched terminal | GND |
+| Input | Wire | Current behavior |
+| --- | --- | --- |
+| D0 Action | D0/P0.02 to GND | Context-sensitive select/interact/timer; hold for cancel/back |
+| D1 Navigate | D1/P0.03 to GND | Open/cycle icon root menu; hold for Back |
+| Optional D2 Back | D2/P0.28 to GND | Dedicated Back when `xiao_third_button.overlay` is added |
 
-A four-leg tactile button usually has two pairs of permanently joined legs.
-Use one terminal from each electrical pair. Check that the selected terminals
-are open at rest and connected only while pressed; a continuity meter can
-identify them. Put the legs on separate breadboard strips so the breadboard
-does not short across the switch. Do not rely on leg orientation alone.
+The base OLED overlay includes D0 and D1; D2 is optional and not configured
+unless explicitly added. D0/D1/D2 use GPIO edges and deferred debounce/hold
+work, not 20 ms idle polling. A missing optional switch is harmless. See
+[interrupt button design](interrupt-buttons.md) for physical acceptance.
 
-- Tap and release while no timer is running: enter Focus mode, smile, and
-  start 25 minutes.
-- Tap during a running timer: smile without restarting or changing the timer.
-- Hold for about one second during a Focus timer: cancel it and return to
-  Companion mode. Releasing a hold does not also count as a tap.
-- A hold while idle does nothing; tap again after a completed session to
-  start another 25 minutes. Break cycling is not automatic yet.
-- Cooking and other non-Focus timers are not cancelled by a hold. Car-dock
-  driving mode blocks starting a focus session.
+At Home, D0 can start a configured Focus timer; it pats during running timers
+and confirms a waiting work/break phase. D1 navigates a labeled icon root
+menu, D0 selects. Focus/Cooking duration editors adjust by one minute; Local
+Settings exposes theme, sound, durations, motion, brightness and screen sleep.
+The **first** physical-style button while the OLED is asleep wakes without
+taking its normal action. See [Settings](local-settings.md),
+[minute editor](minute-duration-controls.md) and [OLED power](oled-power.md).
 
-Input debounce is 30 ms, sampled from the event loop every 20 ms while idle.
-The button has no dependency on a BLE connection. BLE command `01` still
-only interacts with Pico and does not start a focus timer. To test completion
-quickly, send `02 01` then `04 0A 00 00 00` over BLE for a ten-second Focus
-timer. Its visual alert is supported; audio is still unconfigured.
+BLE command `01` still only interacts with Pico. For a short diagnostic timer
+after bonding, set Focus with `02 01` and send `04 0A 00 00 00` (10 seconds).
+BLE seconds-resolution diagnostics are distinct from local one-minute editing.
 
 ## Build in VS Code on Windows
 
@@ -149,6 +150,10 @@ Temporary SMP debug logging and pairing-complete/failure callbacks provide
 more detail if this attempt fails. Capture the log from connection through
 failure. `BLE pairing complete; bonded=1` and `BLE link security level 2`
 are the expected success indications. Send command `01` only after pairing.
+
+## Validation boundary
+
+Boot, OLED face, BLE bonding and D0 had been tested on an older baseline; the current icon menu, interrupt buttons, storage v5, brightness/sleep, optional D2, tuner/IMU and I2S still need target/physical checks. Use the relevant linked feature guides before marking the new firmware board-ready.
 
 ## SDK references
 

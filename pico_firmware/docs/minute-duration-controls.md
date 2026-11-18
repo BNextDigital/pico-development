@@ -1,5 +1,8 @@
 # One-minute duration controls
 
+> **Current-state note (November 18, 2026):** This editor remains implemented. Local Settings subsequently made break duration durable in storage v4, and OLED power extended that format to **v5**. The introduction-era branch/format claims below are historical.
+
+
 The subsequent [Local Settings buildout](local-settings.md) makes break duration
 durable and adds the Settings hub. Its v4 storage details supersede the original
 runtime-only break notes below.
@@ -45,10 +48,11 @@ change, dock transition or reboot also leaves the editor without committing.
   minute, without changing the setting until Save. Cancel retains exact seconds.
 - Work and standalone/Cooking timers continue sharing the existing configured
   duration. Separate per-feature defaults are not added by this focused change.
-- Work/timer duration still persists through the existing coalesced v3 save.
-  Break duration remains runtime-only, as before. Durable break/settings storage
-  belongs to the broader Local Settings work and will need a documented migration.
-- No BLE command IDs, mode IDs, wire packet lengths or persistence formats change.
+- The editor itself introduced no BLE mode/command/packet change. **Today**
+  work/timer and break durations are durable using coalesced **v5** writes;
+  the v3/runtime-only description belongs to its original delivery branch.
+- Both BLE timer duration commands retain their original second precision,
+  while local edits still use one-minute steps.
 
 The Focus utility adds Break at index 5, retaining prior action indexes 0–4.
 Other timer utilities retain four actions. Editor appends screen ID 7. Simulator

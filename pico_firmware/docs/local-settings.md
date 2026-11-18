@@ -1,5 +1,7 @@
 # Local Settings
 
+**Current source (November 18, 2026):** storage v5 and the OLED-power follow-up extend the original v4 Settings implementation. Earlier implementation/test sections below describe their original milestone.
+
 Firmware `0.7.0-local-settings`, continuing the minute-editor branch/PR. Adds a
 Settings hub, shared draft editors, durable preferences and optional third-button
 input. No new hardware is required for the existing two-button setup.
@@ -17,6 +19,9 @@ Open **Menu -> SETTINGS**. D1 moves through items; D0 selects. The hub contains:
 | Break | Adjust in one-minute steps, then Save/Cancel |
 | Motion | Preview pickup/rock/rest combinations, then Save/Cancel |
 | Test sound | Request the short timer-completion cue at saved mute/volume |
+| Brightness | Preview 5–100% in five-point steps; Save or Cancel |
+| Screen Time | Off or 1–30 minutes; Save or Cancel |
+| Sleep Now | Blank display and return Home; next button wakes without acting |
 | Back | Return to the main menu |
 
 Each editor starts with + selected. Navigate cycles − / + / Save / Cancel;
@@ -65,39 +70,40 @@ that utility's explicit Cancel action or the existing Home Focus hold shortcut.
 The existing debounce/hold classifier is reused, so a hold emits one Back and
 its release does not produce a second action.
 
-## Durable settings: storage v4
+## Durable settings: current storage v5
 
-Theme, interaction count and work duration remain durable. New durable fields:
-**break duration, mute, volume and motion behavior mask**. These now persist
-whether changed locally or through their existing/new BLE commands. Confirmation
-requests a coalesced save (normally five seconds), not one write per adjustment.
-Allow the save window before unplugging. Boot always enters Companion/Home with
-no active timer, tuner, metronome or unfinished editor.
+Confirmed theme, count, work/timer and break durations, mute, volume, motion
+mask, OLED brightness and display timeout are durable. A change schedules a
+coalesced save (five-second default), not a write per preview step. Wait for
+the save window before disconnecting power. Active timers and editor drafts
+are deliberately not restored; every boot enters Companion/Home.
 
-| Record offset | Size | v4 value |
+| Record offset | Size | Current v5 value |
 | --- | --- | --- |
-| 0–3 | 4 | PICO magic |
-| 4 | 1 | Storage version 4 |
-| 5–7 | 3 | Existing mode, mood, theme |
-| 8–11 | 4 | Interaction count |
-| 12–15 | 4 | Work/timer seconds |
-| 16–19 | 4 | Break seconds |
-| 20 | 1 | Mute, 0/1 |
-| 21 | 1 | Volume percent, 0–100 |
-| 22 | 1 | Motion mask, 0–7 |
-| 23 | 1 | Reserved zero |
-| 24–27 | 4 | FNV-1a checksum over bytes 0–23 |
+| 0–3 | 4 | `PICO` magic |
+| 4 | 1 | Storage version 5 |
+| 5–7 | 3 | Legacy mode/mood/theme fields |
+| 8–11 | 4 | Lifetime interaction count |
+| 12–15 | 4 | Work/timer duration in seconds |
+| 16–19 | 4 | Break duration in seconds |
+| 20 | 1 | Mute flag |
+| 21 | 1 | Volume percent (0–100) |
+| 22 | 1 | Motion behavior mask (0–7) |
+| 23 | 1 | OLED brightness percent (5–100) |
+| 24–27 | 4 | Screen inactivity timeout (0=Off, 1–30 minutes) |
+| 28–31 | 4 | FNV-1a checksum over bytes 0–27 |
 
-The 28-byte decoder accepts v1/v2 (16 bytes), v3 (20 bytes), and v4 (28 bytes).
-Legacy records retain theme/count/work duration where those versions stored them;
-new fields default to break=300 s, unmuted, volume=25, motion=7. Checksums, lengths,
-enums, ranges and reserved values are validated. Migration is in-memory; the next
-normal confirmed change/persistence event writes v4. Platform NVS loading accepts
-all supported lengths, and simulator files migrate through the same codec.
+The decoder accepts prior v1/v2 (16 bytes), v3 (20 bytes), v4 (28 bytes),
+and v5 (32 bytes), with validation and in-memory migration. Defaults for older
+missing values: break 300 seconds, unmuted, volume 25%, motion mask 7,
+brightness 50%, timeout Off. The next confirmed durable change writes v5;
+automatic reactions and time ticks do not write flash. BLE bonds are stored
+independently from Pico's preference blob.
 
-**Downgrade:** older firmware cannot read v4 and falls back to default Pico
-preferences. BLE bonds use separate settings and are not erased by this migration.
-Do not downgrade expecting the new preferences to survive an older firmware save.
+**Downgrade warning:** firmware predating v5 may not read the v5 state blob;
+do not rely on old firmware to preserve newer preferences. Original storage
+v4 layout and tests belong to the earlier Local Settings milestone; see
+[OLED power](oled-power.md) for v5 acceptance.
 
 ## Sound behavior
 
@@ -153,7 +159,7 @@ optional audio profile and wiring; the commands above do not enable I2S output.
 ## Validation and follow-up
 
 Passed locally: host regression suite under C++17 with warnings as errors,
-all **23 simulator tests**, ASan/UBSan host run (LeakSanitizer disabled), asset
+all **23 simulator tests at the original v4 milestone**, ASan/UBSan host run (LeakSanitizer disabled), asset
 regeneration, Python syntax and whitespace checks. Framebuffer previews inspected.
 
 New tests cover preview/cancel/save, hub return paths, setting bounds, timer
@@ -170,13 +176,14 @@ reboot and verify them. Test Back with two-button holds and, if fitted, D2.
 Trigger a short BLE timer during an edit to check alert priority. Confirm Music,
 tuner, motion off/on and bonding still operate with the saved preferences.
 
-This completes the first Settings hub. OLED brightness/contrast, separate
-per-feature timer defaults, factory-reset UI and battery/sleep policy remain
+This completes the original Settings hub. OLED brightness/contrast and screen
+sleep were subsequently implemented; see the next section. Separate
+per-feature defaults, factory-reset UI and battery *hardware* policy remain
 future work; no destructive reset control is added here.
 
 ## OLED follow-up
 
 [OLED power controls](oled-power.md) extend this hub with Brightness, Screen
 Time and Sleep Now after Test Sound, moving Back to the last row. Brightness
-previews live and Cancel restores the saved value. Storage v5 supersedes v4
-with migration; see the linked guide for exact format and hardware checks.
+previews live and Cancel restores the saved value. Storage v5 is now the current format (see table above); the linked guide
+has electrical acceptance tests. Current Settings has 11 rows including Back.

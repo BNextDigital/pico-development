@@ -1,5 +1,7 @@
 # Pico desktop hardware simulator
 
+**Current source (November 18, 2026):** the simulator follows the shared core through storage **v5** and OLED brightness/sleep. Sprint-specific sections record their introduction-era behavior; later sections supersede their older persistence claims.
+
 ## Purpose
 
 The simulator is a permanent host platform for Pico firmware, not a second
@@ -181,7 +183,7 @@ accept second-resolution durations. See [minute-duration-controls.md](minute-dur
 The Settings shortcut opens the same hub as BLE 15. Use virtual Navigate,
 Select and Back for all draft editors; preview is not committed until Save.
 Break, mute, volume and motion now survive power cycle after the coalesced save.
-Storage v4 reads older records through the production migration path. JSON adds
+Current storage v5 reads v1–v4 records through the production migration path. JSON adds
 settings/edit state and volume; see [local-settings.md](local-settings.md).
 
 The root menu uses the same icon carousel as firmware: Navigate cycles the
@@ -193,7 +195,8 @@ This excludes motion polling, tuner drain and platform worker activity; it is
 not a power estimate. Explicit time jumps retain their existing behavior. See
 [deadline sleep](deadline-sleep.md) for the host scheduling model and checks.
 
-OLED controls are available through the shared Settings menu. JSON includes
+OLED controls (Brightness, Screen Time, Sleep Now) are available through the
+shared eleven-item Settings menu. JSON includes
 saved/preview brightness, timeout and sleep state; the GUI dims lit pixels for
 preview and displays black during sleep. These colors do not model measured
 OLED luminance. See [OLED power controls](oled-power.md).

@@ -1,171 +1,73 @@
-# Pico fundamental firmware prototype
+# Pico firmware
 
-This is the first coherent firmware skeleton for Pico: the small, offline-first
-BLE companion with a monochrome face, physical personality, contextual docks,
-and focused utility modes.
+Offline-first Zephyr/C++17 firmware for Pico, a small BLE companion with expressive 128×64 monochrome face, contextual docks and local tools. Target hardware: **Seeed Studio XIAO nRF52840 Sense** with **nRF Connect SDK 3.4.2**.
 
-Version `0.1.0-prototype` already provides:
+**Snapshot (November 18, 2026):** the source build-version default is `0.9.0-oled-power` (`Kconfig` and `VERSION`). This is a software milestone, **not a hardware-validated release**. Earlier XIAO OLED, BLE and D0 behavior were physically demonstrated; compilation and acceptance of the latest combined profile are still pending.
 
-- a deterministic, host-tested C++17 personality/mode core;
-- companion interactions and a deadline-based focus/general timer;
-- car-dock entry into driving mode with safe restoration on undock;
-- layered monochrome face components for a 128x64 OLED;
-- physical buttons, status LED, optional dock inputs, and optional PWM chirps;
-- an encrypted custom BLE GATT service for commands and status notifications;
-- NVS-backed personality state and BLE bonds; and
-- compile-time feature descriptors for companion, focus, music, cooking,
-  wayfinding, notes, and driving modes.
+## Implemented software
 
-The project intentionally does not invent pin assignments, a microphone
-driver, battery ADC math, or GPS/compass hardware before those exact parts are
-known. Every uncertain peripheral is isolated behind devicetree and a platform
-adapter, so the portable core does not change when the breadboard wiring does.
+| Capability | Current implementation / boundary |
+| --- | --- |
+| Personality | Eight layered bitmap faces, blink/idle behavior and guarded reactions |
+| Controls | D0 Action, D1 Navigate, optional D2 Back; icon root menu; GPIO interrupts with deferred debounce/hold |
+| Time | Reusable pause/resume timer, Cooking/general timer, Focus work/break confirmation, one-minute local editors |
+| Music | Visual metronome (30–240 BPM, 1–8 beats/bar and tap tempo); optional Sense PDM chromatic tuner |
+| Motion | Optional Sense IMU pickup/rock/rest classification and personality behavior mask |
+| Audio | Optional MAX98357A I2S sound cues, volume/mute and visual-only fallback |
+| Settings | Eleven menu items: theme, mute, volume, work/timer, break, motion, test sound, brightness, screen time, sleep now and back |
+| OLED power | 5–100% brightness, Off/1–30-minute inactivity timeout, wake-only first input, timer-alert wake |
+| Persistence | 32-byte **storage v5**, migration from v1–v4, coalesced saves; transient timers and editors not restored |
+| BLE | Encrypted custom GATT protocol v1, 16-byte status, additive commands; bonds stored separately |
+
+Optional peripherals have hardware adapters and host coverage, but **target compilation, audio/acoustic accuracy, OLED contrast, button interrupts, sensor thresholds and current draw need real-board validation**. Wayfinding GPS/compass, Notes recording, complete dock electronics and final battery/power hardware are not implemented.
 
 ## Repository map
 
-| Path | Role |
+| Path | Purpose |
 | --- | --- |
-| `lib/pico_core` | Hardware-independent state, feature registry, and BLE codec |
-| `src/platform` | Zephyr adapters for BLE, OLED, GPIO/PWM, and settings |
-| `src/main.cpp` | Event-loop orchestration only |
-| `simulator` | Reusable desktop hardware simulator using the production core |
-| `overlays` | Explicit, replaceable prototype wiring |
-| `tests/host` | Fast tests that run without a Nordic SDK or board |
-| `docs` | Architecture, protocol, and safe hardware bring-up |
+| `lib/pico_core/` | Allocation-aware portable personality, utilities, BLE codec, display/persistence |
+| `src/platform/`, `src/main.cpp` | Zephyr device adapters and deadline-driven main loop |
+| `overlays/`, `configs/` | Explicit XIAO board peripheral profiles |
+| `simulator/` | Desktop virtual hardware running the production core |
+| `tests/host/`, `tests/platform/` | Regression and adapter-model test sources |
+| `docs/` | Architecture, first flash, protocol and feature validation guides |
 
-The decisions distilled from the wider Pico project are recorded in
-[`docs/product-map.md`](docs/product-map.md); the confirmed-versus-provisional
-hardware ledger is in
-[`docs/hardware-bringup.md`](docs/hardware-bringup.md).
+## Build and flash
 
-## OLED power controls
+Open an **nRF Connect SDK 3.4.2 terminal** in `pico_firmware/`. Start with the OLED-only profile (optional D1 may remain disconnected):
 
-Local Settings adds live brightness preview (5–100%), optional screen timeout
-(Off or 1–30 minutes), and Sleep Now. The first button wakes only; timer alerts
-wake the display. Preferences migrate to storage v5. See
-[OLED controls and hardware checks](docs/oled-power.md).
-
-## Deadline-based sleeping
-
-The main loop now waits for timer, personality, music and sensor deadlines,
-instead of a fixed 20 ms timeout. GPIO/BLE events wake it early. Active tuner
-and motion retain their service bounds. See [design and hardware checks](docs/deadline-sleep.md).
-Current draw and target timing still need physical validation.
-
-## Interrupt-driven controls
-
-Interaction buttons now use GPIO edges with deferred debounce/hold deadlines,
-removing idle button polling while preserving the current controls. See
-[design, tests and hardware checks](docs/interrupt-buttons.md). The main loop now uses the deadline policy above; battery-life gains are unmeasured.
-
-## Icon root menu
-
-The root menu now uses a large icon with a caption underneath and position dots.
-Navigate cycles icons and Action selects; button mappings remain unchanged. See
-[icon menu layout and validation](docs/icon-root-menu.md).
-
-## Local Settings
-
-Menu -> Settings adds theme preview, mute/volume, work/break duration, motion
-preferences and test sound with Save/Cancel. Storage v5 migrates older records
-and preserves all confirmed preferences. Existing two-button controls remain;
-a third Back button is optional. See [Local Settings](docs/local-settings.md).
-
-## Minute duration controls
-
-Duration presets are replaced by a ±1-minute preview editor with Save/Cancel,
-including a local Break row in Focus. See
-[minute duration controls and validation](docs/minute-duration-controls.md).
-
-## Motion personality
-
-The optional Sense IMU profile adds pickup-like wake, a deliberate rock/Happy
-reaction and inactivity-plus-stillness Sleepy behavior. Motion stays out of
-utility/menu/timer controls and does not write flash. See
-[motion build, controls and physical checks](docs/motion-personality.md).
-Target/physical validation is still pending; host/simulator checks pass.
-
-## Onboard microphone tuner
-
-The optional Sense microphone profile adds a local chromatic tuner with note,
-cents, sharp/flat meter and signal-level guidance. No extra wiring or speaker.
-See [tuner build and physical validation](docs/music-tuner.md). Target capture
-and acoustic accuracy remain unverified; host/simulator tests pass.
-
-## Music metronome
-
-The Music menu now opens an offline visual metronome with 30–240 BPM,
-1–8 beats per bar, tap tempo and optional accented I2S clicks. See
-[Music controls, build and validation](docs/music-metronome.md).
-Target compilation and physical timing checks remain outstanding.
-
-## Sprint 02
-
-Optional MAX98357A I2S sound cues and confirmed work/break cycles are implemented
-on `sprint/02-audio-and-focus`. The OLED-only build remains supported.
-See [Sprint 02 build, wiring and validation](docs/sprint02.md). Host/simulator
-checks pass; target compilation and physical audio testing remain outstanding.
-
-## Sprint 01
-
-The dedicated `sprint/01-personality-and-utilities` branch adds eight rendered
-face themes, deterministic blinks/idle behavior, navigation and a reusable
-pause/resume timer. Start with [the sprint delivery and XIAO validation guide](docs/sprint01.md).
-The existing D0 focus controls remain available; optional D1 adds menu navigation.
-Target build and new physical validation are pending on the local SDK/board.
-
-## Build
-
-For the purchased XIAO nRF52840 Sense and SDK 3.4.2, open an **nRF Connect
-SDK terminal** in `pico_firmware` and build the explicit XIAO overlay:
-
-```sh
-west build --no-sysbuild -p always -b xiao_ble/nrf52840/sense -d build-sprint01 . -- -DDTC_OVERLAY_FILE=overlays/xiao_ble_ssd1306.overlay -DEXTRA_CONF_FILE=configs/xiao_ble.conf
+```powershell
+west build --no-sysbuild -p always -b xiao_ble/nrf52840/sense -d build-xiao . -- -DDTC_OVERLAY_FILE=overlays/xiao_ble_ssd1306.overlay -DEXTRA_CONF_FILE=configs/xiao_ble.conf
 ```
 
-Copy `build-sprint01/zephyr/zephyr.uf2` to the double-reset **XIAO BLE** drive.
-See [Sprint 01](docs/sprint01.md) for new-input wiring and physical validation.
-The older DK overlay is a separate example; do not flash DK output to the XIAO.
+Optional combined **Sense microphone + IMU + OLED** profile (no external amp required):
 
-Run the portable core tests with any C++17 compiler:
-
-```sh
-./tests/host/run.sh
+```powershell
+west build --no-sysbuild -p always -b xiao_ble/nrf52840/sense -d build-xiao-motion . -- "-DDTC_OVERLAY_FILE=overlays/xiao_ble_motion_tuner.overlay" "-DEXTRA_CONF_FILE=configs/xiao_ble.conf;configs/xiao_tuner.conf;configs/xiao_motion.conf"
 ```
 
-## Desktop simulator
+For D2 Back, add `overlays/xiao_third_button.overlay` to the overlay list. The separate [I2S guide](docs/sprint02.md) documents the amplifier profile and safe wiring; do **not** attach the speaker to a GPIO or assume independent overlays can be combined without checking resources. The optional `configs/xiao_quiet.conf` disables diagnostic probes for power measurements.
 
-The desktop simulator compiles and runs the exact portable firmware core, BLE
-codec, display compositor, and persistence codec used by the board build. Its
-host shell supplies virtual buttons, docks, battery input, BLE packets, OLED,
-LED, speaker chirps, flash storage, and accelerated time.
+After a successful build, double-reset the XIAO to mount its **XIAO BLE** UF2 drive and copy the selected `build-*/zephyr/zephyr.uf2` file. Never use a DK image on the XIAO. See [first-boot instructions](docs/xiao-first-boot.md) and the [hardware ledger](docs/hardware-bringup.md).
 
-On Windows, double-click `simulator/run.bat`. On macOS or Linux, run:
+## Portable checks
 
 ```sh
-./simulator/run.sh
+sh tests/host/run.sh
+sh tests/platform/run.sh
+sh simulator/run-tests.sh
+python tools/compile_face_assets.py --check
 ```
 
-The backend rebuilds itself when shared core sources or headers change, so
-ordinary firmware behavior and sprite iterations do not require a new
-simulator. See [`docs/simulator.md`](docs/simulator.md) for setup, controls,
-extension rules, and headless tests.
+On Windows run `simulator/run.bat`; on macOS/Linux run `./simulator/run.sh`. See [simulator guide](docs/simulator.md). Earlier feature PRs document successful local tests. **These tests and the target build were not rerun during this documentation update.**
 
-The code targets current Zephyr-style board names and APIs in nRF Connect SDK
-3.x. Older releases may require the legacy underscore board name documented in
-the bring-up guide and small API compatibility adjustments.
+## Next acceptance milestones
 
-## First milestone
+1. Flash a clean chosen build and confirm boot log, OLED, LED, D0/D1 navigation and optional D2 if wired.
+2. Validate BLE advertising, phone-initiated bonding, encrypted commands/status and reconnection.
+3. Exercise Focus, editable Settings, timer-alert wake and storage-v5 persistence after the five-second save window.
+4. Test PDM tuner, IMU reactions and optional I2S only with the relevant enabled profile/hardware.
+5. Measure actual current by display, BLE, motion, tuner and audio state before estimating battery life.
+6. Complete amplifier shutdown and battery monitoring hardware; then expand companion-app protocol parity.
 
-The breadboard milestone is deliberately small and observable:
-
-1. Pico boots and advertises.
-2. A button makes Pico react locally without a phone.
-3. A bonded phone reads status and triggers the same interaction.
-4. The OLED face and LED reflect state.
-5. A 30-second timer completes with a visible alert and, once safely wired, a
-   short chirp.
-6. Reset preserves the selected non-driving mode and interaction count.
-
-Once that passes on the purchased board, the next work item is an exact board
-overlay plus microphone/battery bring-up—not a rewrite of the core.
+Central references: [architecture](docs/architecture.md), [product map](docs/product-map.md), [BLE protocol](docs/ble-protocol.md), [OLED power](docs/oled-power.md), [local settings](docs/local-settings.md). [Sprint 01](docs/sprint01.md) and [Sprint 02](docs/sprint02.md) are **historical records**. The [Flutter app](https://github.com/BNextDigital/pico-companion) currently implements only original BLE commands `0x01`–`0x06`, not every firmware-local feature.

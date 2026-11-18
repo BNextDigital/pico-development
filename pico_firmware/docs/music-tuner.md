@@ -1,5 +1,8 @@
 # Music tuner: onboard Sense microphone
 
+> **Original feature delivery:** `0.5.0-tuner` describes the implementation when added. Current `main` also includes motion, Local Settings and OLED power (storage v5). PDM/SDK target compilation and acoustic accuracy still need board validation.
+
+
 [Local Settings](local-settings.md) adds saved mute/volume preferences. Listening
 still temporarily suppresses sound without changing those saved values.
 
