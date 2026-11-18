@@ -1,0 +1,30 @@
+/* XIAO nRF52840 Sense + four-pin 128x64 SSD1306 OLED, nRF Connect SDK 3.4.2.
+ * VCC -> 3V3, GND -> GND, SDA -> D4/P0.04, SCL -> D5/P0.05.
+ * i2c1 uses these header pins; i2c0 is the Sense board's internal IMU bus.
+ */
+#include <zephyr/dt-bindings/i2c/i2c.h>
+
+/ {
+    chosen {
+        zephyr,display = &pico_oled;
+    };
+};
+
+&i2c1 {
+    status = "okay";
+    clock-frequency = <I2C_BITRATE_STANDARD>;
+
+    pico_oled: ssd1306@3c {
+        compatible = "solomon,ssd1306";
+        reg = <0x3c>;
+        width = <128>;
+        height = <64>;
+        segment-offset = <0>;
+        page-offset = <0>;
+        display-offset = <0>;
+        multiplex-ratio = <63>;
+        segment-remap;
+        com-invdir;
+        prechargep = <0x22>;
+    };
+};
