@@ -346,6 +346,7 @@ void test_focus_button_standalone_controls()
 #include "music_tests.hpp"
 #include "tuner_tests.hpp"
 #include "motion_tests.hpp"
+#include "duration_tests.hpp"
 
 } // namespace
 
@@ -367,6 +368,7 @@ int main()
     run_music_tests();
     run_tuner_tests();
     run_motion_tests();
+    run_duration_tests();
     test_button_debounce_and_hold();
     test_focus_button_standalone_controls();
 

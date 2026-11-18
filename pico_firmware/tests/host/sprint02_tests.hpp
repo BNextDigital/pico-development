@@ -106,7 +106,7 @@ void test_session_menu_and_extended_protocol()
     using E = pico::EventKind;
     pico::Core core;
     core.handle({E::OpenMenu,0}); core.handle({E::Select,0});
-    core.handle({E::NavigatePrevious,0}); core.handle({E::NavigatePrevious,0});
+    core.handle({E::NavigatePrevious,0}); core.handle({E::NavigatePrevious,0}); core.handle({E::NavigatePrevious,0});
     CHECK(core.state().utility_index == 4);
     core.handle({E::Select,0});
     CHECK(core.state().focus_phase == pico::FocusPhase::Work);

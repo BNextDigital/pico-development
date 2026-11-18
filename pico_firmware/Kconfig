@@ -6,7 +6,7 @@ menu "Pico"
 
 config PICO_FIRMWARE_VERSION
     string "Firmware version"
-    default "0.6.0-motion"
+    default "0.6.1-minute-controls"
 
 config PICO_DISPLAY
     bool "Render Pico on the chosen monochrome display"

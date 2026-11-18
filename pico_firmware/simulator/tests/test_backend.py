@@ -361,6 +361,34 @@ class BackendTests(unittest.TestCase):
         self.assertNotEqual(end["state"]["mood_name"],"happy")
         self.assertFalse(self.harness.send("motion 9000 0 0 40")["ok"])
 
+    def test_minute_duration_editor_confirm_cancel_and_break(self):
+        self.harness.send("ble 10"); self.harness.send("ble 13")
+        self.harness.send("ble 12")  # Duration
+        opened = self.harness.send("event FocusButtonTapped")
+        self.assertEqual(opened["state"]["screen"],7)
+        self.assertEqual(opened["state"]["draft_duration_seconds"],1500)
+        preview = self.harness.send("event FocusButtonTapped")
+        self.assertEqual(preview["state"]["draft_duration_seconds"],1560)
+        self.assertEqual(preview["state"]["configured_duration_seconds"],1500)
+        self.assertNotIn("Persist",preview["effect_names"])
+        self.assertNotEqual(opened["frame_hex"],preview["frame_hex"])
+        cancelled = self.harness.send("event FocusButtonHeld")
+        self.assertEqual(cancelled["state"]["screen"],2)
+        self.assertEqual(cancelled["state"]["configured_duration_seconds"],1500)
+        self.harness.send("ble 13"); self.harness.send("ble 13")
+        self.harness.send("ble 11")  # Save
+        saved = self.harness.send("ble 13")
+        self.assertEqual(saved["state"]["configured_duration_seconds"],1560)
+        self.harness.send("ble 12")  # Break, utility index 5
+        self.harness.send("ble 13"); self.harness.send("ble 13")
+        self.harness.send("ble 11")
+        rest = self.harness.send("ble 13")
+        self.assertEqual(rest["state"]["break_duration_seconds"],360)
+        self.harness.send("advance 5")
+        reboot = self.harness.send("power_cycle")
+        self.assertEqual(reboot["state"]["configured_duration_seconds"],1560)
+        self.assertEqual(reboot["state"]["break_duration_seconds"],300)  # existing runtime-only setting
+
     def test_sprint_durable_settings_and_companion_boot(self):
         self.harness.send("ble 07 04")
         self.harness.send("ble 0a 2c 01 00 00")

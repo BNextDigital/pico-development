@@ -104,7 +104,7 @@ enum class EventKind : std::uint8_t {
     SetMotionConfig,
 };
 
-enum class Screen : std::uint8_t { Home, Menu, Utility, Themes, Unavailable, Music, Tuner };
+enum class Screen : std::uint8_t { Home, Menu, Utility, Themes, Unavailable, Music, Tuner, DurationEdit };
 
 struct Event {
     EventKind kind{EventKind::Boot};
@@ -182,6 +182,9 @@ struct State {
     bool motion_ready{false};
     bool motion_settled{false};
     std::uint8_t motion_config{motion::kAll};
+    std::uint32_t draft_duration_seconds{1500};
+    bool editing_break_duration{false};
+    std::uint8_t duration_action{1}; // -1 minute, +1 minute, Save, Cancel
 };
 
 struct PersistedState {

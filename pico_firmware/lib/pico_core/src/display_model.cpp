@@ -183,6 +183,21 @@ void render_screen(const State &state, MonoSurface &surface)
         }
         return;
     }
+    if (state.screen == Screen::DurationEdit) {
+        char buffer[24];
+        text(surface,state.editing_break_duration ? "BREAK DURATION" :
+                     state.mode == Mode::Focus ? "WORK DURATION" : "TIMER DURATION",8,2);
+        std::snprintf(buffer,sizeof(buffer),"%u MIN",static_cast<unsigned>(state.draft_duration_seconds/60U));
+        text(surface,buffer,20,17,2);
+        text(surface,"1 MINUTE STEPS",36,33);
+        constexpr const char *actions[]{"-1 MIN","+1 MIN","SAVE","CANCEL"};
+        for (unsigned i=0; i<4; ++i) {
+            const unsigned x=2+(i%2)*64, y=43+(i/2)*10;
+            if (state.duration_action == i) outline_rect(surface,x,y,60,9);
+            text(surface,actions[i],x+10,y+2);
+        }
+        return;
+    }
     if (state.screen == Screen::Tuner) {
         text(surface,"TUNER",2,2);
         text(surface,state.tuner_running ? "MIC ON" : "MIC OFF",96,2);
@@ -264,17 +279,17 @@ void render_screen(const State &state, MonoSurface &surface)
     text(surface, buffer, 24, 1, 2);
     text(surface, state.focus_phase == FocusPhase::Break ? "BREAK TIMER" :
                   state.mode == Mode::Cooking ? "COOKING TIMER" : "FOCUS TIMER", 20, 15);
-    constexpr const char *actions[]{"DURATION", "START", "CANCEL", "HOME", "WORK/BREAK"};
-    for (unsigned i = 0; i < (state.mode == Mode::Focus ? 5U : 4U); ++i) {
-        text(surface, state.utility_index == i ? ">" : " ", 2, 23 + i * 8);
+    constexpr const char *actions[]{"DURATION", "START", "CANCEL", "HOME", "WORK/BREAK", "BREAK"};
+    for (unsigned i = 0; i < (state.mode == Mode::Focus ? 6U : 4U); ++i) {
+        text(surface, state.utility_index == i ? ">" : " ", 2, 21 + i * 7);
         const char *label = i == 1 && state.timer_running ? "PAUSE" :
                             i == 1 && state.timer_paused ? "RESUME" :
                             i == 4 && state.focus_waiting ? "NEXT PHASE" :
                             i == 4 && state.focus_phase != FocusPhase::None ? "CYCLE ACTIVE" : actions[i];
-        text(surface, label, 10, 23 + i * 8);
-        if (i == 0) {
-            duration(buffer, sizeof(buffer), state.configured_duration_seconds);
-            text(surface, buffer, 64, 23);
+        text(surface, label, 10, 21 + i * 7);
+        if (i == 0 || i == 5) {
+            duration(buffer, sizeof(buffer), i == 5 ? state.break_duration_seconds : state.configured_duration_seconds);
+            text(surface, buffer, 64, 21+i*7);
         }
     }
 }

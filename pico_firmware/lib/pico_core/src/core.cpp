@@ -48,6 +48,7 @@ Effects Core::start_focus_phase()
 Effects Core::timer_complete()
 {
     metronome_.stop(); sync_metronome();
+    if (state_.screen == Screen::DurationEdit) state_.screen = Screen::Home;
     state_.tuner_running = false;
     state_.sound_cue = focus_.phase() == FocusPhase::Work ? audio::Cue::WorkComplete :
                        focus_.phase() == FocusPhase::Break ? audio::Cue::BreakComplete : audio::Cue::TimerComplete;
@@ -68,6 +69,7 @@ Effects Core::set_mode(Mode mode)
     if (!valid_mode(mode) || mode == Mode::Driving || state_.dock == Dock::Car ||
         mode == state_.mode) return effect(Effect::None);
     activity();
+    if (state_.screen == Screen::DurationEdit) state_.screen = Screen::Home;
     if (focus_.phase() != FocusPhase::None && mode != Mode::Focus) {
         timer_.cancel(); focus_.cancel(); sync_timer(); sync_focus(); state_.timer_completed = false;
     }
@@ -87,10 +89,46 @@ Effects Core::set_mood(Mood mood)
     personality_.react(state_, mood, animation_ms_);
     return Effect::Render | Effect::Notify;
 }
+Effects Core::open_duration_editor(bool break_duration)
+{
+    state_.editing_break_duration = break_duration;
+    const auto seconds = break_duration ? state_.break_duration_seconds : state_.configured_duration_seconds;
+    // Existing BLE/legacy second-resolution settings remain untouched until Save.
+    state_.draft_duration_seconds = ((seconds+59U)/60U)*60U;
+    state_.duration_action = 1;
+    state_.screen = Screen::DurationEdit;
+    return effect(Effect::Render);
+}
+Effects Core::edit_duration(EventKind kind)
+{
+    if (kind == EventKind::Back || kind == EventKind::OpenMenu) {
+        state_.screen = kind == EventKind::Back ? Screen::Utility : Screen::Menu;
+    } else if (kind == EventKind::NavigateNext || kind == EventKind::NavigatePrevious) {
+        state_.duration_action = static_cast<std::uint8_t>((state_.duration_action +
+            (kind == EventKind::NavigateNext ? 1 : 3)) % 4);
+    } else if (kind == EventKind::Select) {
+        switch (state_.duration_action) {
+        case 0:
+            if (state_.draft_duration_seconds > 60U) state_.draft_duration_seconds -= 60U;
+            break;
+        case 1:
+            if (state_.draft_duration_seconds < kMaxTimerSeconds) state_.draft_duration_seconds += 60U;
+            break;
+        case 2: {
+            const auto event = state_.editing_break_duration ? EventKind::SetBreakDuration : EventKind::SetTimerDuration;
+            state_.screen = Screen::Utility;
+            return handle({event,state_.draft_duration_seconds}) | Effect::Render;
+        }
+        case 3: state_.screen = Screen::Utility; break;
+        }
+    }
+    return effect(Effect::Render);
+}
 Effects Core::navigate(EventKind kind)
 {
     if (state_.dock == Dock::Car) return effect(Effect::None);
     activity();
+    if (state_.screen == Screen::DurationEdit) return edit_duration(kind);
     if ((state_.screen == Screen::Music || state_.screen == Screen::Tuner) &&
         (kind == EventKind::Back || kind == EventKind::OpenMenu)) {
         metronome_.stop(); sync_metronome();
@@ -112,7 +150,7 @@ Effects Core::navigate(EventKind kind)
         if (state_.screen == Screen::Menu)
             state_.menu_index = static_cast<std::uint8_t>((state_.menu_index + 8 + direction) % 8);
         else if (state_.screen == Screen::Utility) {
-            const int count = state_.mode == Mode::Focus ? 5 : 4;
+            const int count = state_.mode == Mode::Focus ? 6 : 4;
             state_.utility_index = static_cast<std::uint8_t>((state_.utility_index + count + direction) % count);
         }
         else if (state_.screen == Screen::Music)
@@ -153,13 +191,7 @@ Effects Core::navigate(EventKind kind)
     else if (state_.screen == Screen::Unavailable) state_.screen = Screen::Menu;
     else if (state_.screen == Screen::Utility) {
         switch (state_.utility_index) {
-        case 0: {
-            constexpr std::uint32_t presets[]{60, 300, 1500, 3000};
-            auto next = presets[0];
-            for (unsigned i = 0; i < 4; ++i)
-                if (presets[i] == state_.configured_duration_seconds) next = presets[(i + 1) % 4];
-            return handle({EventKind::SetTimerDuration, next}) | Effect::Render;
-        }
+        case 0: return open_duration_editor(false);
         case 1:
             return handle({state_.timer_running ? EventKind::PauseTimer :
                            state_.timer_paused ? EventKind::ResumeTimer : EventKind::StartTimer,
@@ -167,6 +199,7 @@ Effects Core::navigate(EventKind kind)
         case 2: return handle({EventKind::CancelTimer, 0}) | Effect::Render;
         case 3: state_.screen = Screen::Home; break;
         case 4: return handle({state_.focus_waiting ? EventKind::NextFocusPhase : EventKind::StartFocusCycle, 0});
+        case 5: return open_duration_editor(true);
         }
     }
     return effect(Effect::Render);
