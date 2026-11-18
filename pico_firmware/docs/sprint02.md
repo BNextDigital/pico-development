@@ -12,8 +12,9 @@ active/paused timer still pats Pico. Hold D0 on Home cancels Focus. D1 opens or
 cycles the menu; D0 selects; hold D1 goes back.
 
 For a repeating session: Menu -> Focus Timer -> **WORK/BREAK**. The configured
-work duration defaults to 25 minutes; breaks default to five minutes. Duration
-presets configure work; BLE `22` configures break duration. A cycle cannot
+work duration defaults to 25 minutes; breaks default to five minutes. The DURATION
+editor configures work in one-minute steps; the BREAK editor or BLE `22` configures break duration. See
+[minute-duration-controls.md](minute-duration-controls.md) for the newer editor. A cycle cannot
 replace a running/paused timer: cancel it first.
 
 Each phase counts down using the existing `Timer`. Pause/resume apply to either

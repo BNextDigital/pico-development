@@ -167,3 +167,11 @@ scenarios; `motion X_MG Y_MG Z_MG DELTA_MS` accepts explicit samples. Large samp
 gaps clear arming. Virtual time advances alone do not synthesize accelerometer
 data. JSON includes motion readiness, settled state and mask. See
 [motion-personality.md](motion-personality.md) for examples and limitations.
+
+## Minute duration editor
+
+Open a timer utility, navigate to Duration and select to edit. Navigate moves
+between −1 minute / +1 minute / Save / Cancel; Select activates, Back discards.
+Focus adds a Break duration row at index 5. Editor screen ID is 7, and JSON
+exposes draft seconds, break target and highlighted action. BLE continues to
+accept second-resolution durations. See [minute-duration-controls.md](minute-duration-controls.md).
