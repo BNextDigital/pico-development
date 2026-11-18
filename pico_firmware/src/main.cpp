@@ -116,7 +116,6 @@ int main()
             hardware.reflect(core.state());
         }
 
-        hardware.poll();
         motion.poll(core.state().motion_config);
         if (core.state().motion_ready != motion.ready()) {
             apply_effects(core.handle({pico::EventKind::MotionReady,motion.ready() ? 1U : 0U}),

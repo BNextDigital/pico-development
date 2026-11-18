@@ -17,3 +17,5 @@ ${CXX:-c++} \
     -o "$build_dir/pico_core_tests"
 
 "$build_dir/pico_core_tests"
+
+sh "$project_dir/tests/platform/run.sh"
