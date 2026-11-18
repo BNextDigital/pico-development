@@ -64,7 +64,7 @@ int settings_set(const char *name, std::size_t length, settings_read_cb read_cb,
     if (std::strcmp(name, "state") != 0) {
         return -ENOENT;
     }
-    if (length != 16U && length != loaded_blob.size()) {
+    if (length != 16U && length != 20U && length != loaded_blob.size()) {
         LOG_WRN("Ignoring stored state with unexpected size %u",
                 static_cast<unsigned int>(length));
         return 0;

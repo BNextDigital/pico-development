@@ -44,7 +44,11 @@ Blob encode(const PersistedState &state)
     data[7] = static_cast<std::uint8_t>(state.theme);
     write_u32_le(state.interaction_count, &data[8]);
     write_u32_le(state.configured_duration_seconds, &data[12]);
-    write_u32_le(fnv1a(data.data(), 16), &data[16]);
+    write_u32_le(state.break_duration_seconds,&data[16]);
+    data[20] = state.sound_muted ? 1 : 0;
+    data[21] = state.sound_volume_percent;
+    data[22] = state.motion_config;
+    write_u32_le(fnv1a(data.data(),24),&data[24]);
     return data;
 }
 
@@ -52,7 +56,7 @@ bool decode(const std::uint8_t *data, std::size_t size, PersistedState &state)
 {
     if (!data || size < 5) return false;
     const auto version = data[4];
-    const auto expected = version == 1 || version == 2 ? 16U : version == 3 ? 20U : 0U;
+    const auto expected = version == 1 || version == 2 ? 16U : version == 3 ? 20U : version == 4 ? 28U : 0U;
     if (!expected || size != expected || data[0] != 'P' || data[1] != 'I' ||
         data[2] != 'C' || data[3] != 'O' ||
         read_u32_le(data + expected - 4) != fnv1a(data, expected - 4)) return false;
@@ -62,7 +66,13 @@ bool decode(const std::uint8_t *data, std::size_t size, PersistedState &state)
     const auto duration = version >= 3 ? read_u32_le(data + 12) : 1500U;
     if (mode >= Mode::Count || mode == Mode::Driving || mood >= Mood::Count ||
         theme >= FaceTheme::Count || !duration || duration > kMaxTimerSeconds) return false;
-    state = {mode, mood, read_u32_le(data + 8), theme, duration};
+    const auto break_duration = version >= 4 ? read_u32_le(data+16) : 300U;
+    if (!break_duration || break_duration > kMaxTimerSeconds ||
+        (version >= 4 && (data[20] > 1 || data[21] > 100 || data[22] > motion::kAll || data[23] != 0))) return false;
+    state = {mode,mood,read_u32_le(data+8),theme,duration,break_duration,
+             version >= 4 ? data[20] != 0 : false,
+             static_cast<std::uint8_t>(version >= 4 ? data[21] : 25U),
+             static_cast<std::uint8_t>(version >= 4 ? data[22] : motion::kAll)};
     return true;
 }
 } // namespace pico::persistence

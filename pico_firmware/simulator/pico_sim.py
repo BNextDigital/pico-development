@@ -352,6 +352,8 @@ class PicoSimulatorApp:
         ttk.Checkbutton(timer_box, text="Motion reactions", variable=self.motion_var, command=lambda: self._send(
             "event SetMotionConfig " + ("7" if self.motion_var.get() else "0"))).grid(row=8,column=0,columnspan=2)
 
+        ttk.Button(timer_box, text="Settings", command=lambda: self._send("event OpenSettings")).grid(row=8,column=2,columnspan=2)
+
         time_box = ttk.LabelFrame(parent, text="Simulation clock", padding=10)
         time_box.grid(row=4, column=0, sticky="ew", pady=(0, 8))
         self.paused_var = tk.BooleanVar(value=False)

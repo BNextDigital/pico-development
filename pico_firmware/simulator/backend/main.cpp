@@ -154,6 +154,8 @@ std::string event_name(pico::EventKind kind)
     case pico::EventKind::MotionRock: return "MotionRock";
     case pico::EventKind::MotionRest: return "MotionRest";
     case pico::EventKind::SetMotionConfig: return "SetMotionConfig";
+    case pico::EventKind::SetVolume: return "SetVolume";
+    case pico::EventKind::OpenSettings: return "OpenSettings";
     case pico::EventKind::Boot:
         return "Boot";
     case pico::EventKind::Tick:
@@ -213,7 +215,7 @@ std::string event_name(pico::EventKind kind)
 
 std::optional<pico::EventKind> parse_event_kind(const std::string &token)
 {
-    constexpr std::array<pico::EventKind, 48> kinds{
+    constexpr std::array<pico::EventKind, 50> kinds{
         pico::EventKind::Boot,          pico::EventKind::Tick,
         pico::EventKind::PrimaryPressed, pico::EventKind::SecondaryPressed,
         pico::EventKind::Connected,     pico::EventKind::Disconnected,
@@ -254,6 +256,9 @@ std::optional<pico::EventKind> parse_event_kind(const std::string &token)
         pico::EventKind::MotionRock,
         pico::EventKind::MotionRest,
         pico::EventKind::SetMotionConfig,
+        pico::EventKind::SetVolume,
+        pico::EventKind::OpenSettings,
+
 
 
 
@@ -552,6 +557,11 @@ public:
                << "\"screen\":" << static_cast<unsigned>(state.screen) << ','
                << "\"menu_index\":" << static_cast<unsigned>(state.menu_index) << ','
                << "\"eyes_closed\":" << (state.eyes_closed ? "true" : "false") << ','
+               << "\"settings_index\":" << static_cast<unsigned>(state.settings_index) << ','
+               << "\"setting_key\":" << static_cast<unsigned>(state.setting_key) << ','
+               << "\"setting_draft\":" << state.setting_draft << ','
+               << "\"setting_action\":" << static_cast<unsigned>(state.setting_action) << ','
+               << "\"sound_volume_percent\":" << static_cast<unsigned>(state.sound_volume_percent) << ','
                << "\"draft_duration_seconds\":" << state.draft_duration_seconds << ','
                << "\"editing_break_duration\":" << (state.editing_break_duration ? "true" : "false") << ','
                << "\"duration_action\":" << static_cast<unsigned>(state.duration_action) << ','

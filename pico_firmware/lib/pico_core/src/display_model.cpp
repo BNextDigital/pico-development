@@ -183,9 +183,57 @@ void render_screen(const State &state, MonoSurface &surface)
         }
         return;
     }
+    if (state.screen == Screen::Settings) {
+        constexpr const char *names[]{"FACE THEME","MUTE","VOLUME","WORK/TIMER","BREAK","MOTION","TEST SOUND","BACK"};
+        text(surface,"SETTINGS",4,2,2);
+        const unsigned first = (state.settings_index/4)*4;
+        for (unsigned row=0; row<4; ++row) {
+            const auto i=first+row;
+            text(surface,i == state.settings_index ? ">" : " ",2,20+row*10);
+            text(surface,names[i],10,20+row*10);
+            char value[24]{};
+            if (i == 0) std::snprintf(value,sizeof(value),"%u",static_cast<unsigned>(state.theme)+1);
+            else if (i == 1) std::snprintf(value,sizeof(value),"%s",state.sound_muted ? "ON" : "OFF");
+            else if (i == 2) std::snprintf(value,sizeof(value),"%u",static_cast<unsigned>(state.sound_volume_percent));
+            else if (i == 3 || i == 4) duration(value,sizeof(value),i == 3 ? state.configured_duration_seconds : state.break_duration_seconds);
+            else if (i == 5) std::snprintf(value,sizeof(value),"%s",state.motion_config ? "ON" : "OFF");
+            text(surface,value,88,20+row*10);
+        }
+        return;
+    }
+    if (state.screen == Screen::SettingEdit) {
+        if (state.setting_key == SettingKey::Theme) {
+            const auto index = state.setting_draft % 8;
+            text(surface,assets::theme_names[index],2,1);
+            const auto &face = assets::faces[index][0];
+            bitmap(surface,face.brow_left,42,11); bitmap(surface,face.brow_right,86,11);
+            bitmap(surface,face.left,42,23); bitmap(surface,face.right,86,23);
+            bitmap(surface,face.mouth,64,34);
+        } else if (state.setting_key == SettingKey::Motion) {
+            text(surface,"MOTION REACTIONS",20,1);
+            text(surface,state.setting_draft & motion::kPickup ? "PICKUP ON" : "PICKUP OFF",24,13);
+            text(surface,state.setting_draft & motion::kRock ? "ROCK ON" : "ROCK OFF",24,23);
+            text(surface,state.setting_draft & motion::kRest ? "REST ON" : "REST OFF",24,33);
+        } else {
+            text(surface,state.setting_key == SettingKey::Mute ? "SOUND MUTE" : "VOLUME",24,2);
+            char value[24];
+            if (state.setting_key == SettingKey::Mute)
+                std::snprintf(value,sizeof(value),"%s",state.setting_draft ? "MUTED" : "SOUND ON");
+            else std::snprintf(value,sizeof(value),"%u PERCENT",static_cast<unsigned>(state.setting_draft));
+            text(surface,value,12,21,2);
+        }
+        constexpr const char *actions[]{"-","+","SAVE","CANCEL"};
+        for (unsigned i=0; i<4; ++i) {
+            const unsigned x=2+(i%2)*64,y=43+(i/2)*10;
+            if (state.setting_action == i) outline_rect(surface,x,y,60,9);
+            text(surface,actions[i],x+10,y+2);
+        }
+        return;
+    }
     if (state.screen == Screen::DurationEdit) {
         char buffer[24];
         text(surface,state.editing_break_duration ? "BREAK DURATION" :
+                     state.duration_return_screen == Screen::Settings ? "WORK/TIMER DURATION" :
                      state.mode == Mode::Focus ? "WORK DURATION" : "TIMER DURATION",8,2);
         std::snprintf(buffer,sizeof(buffer),"%u MIN",static_cast<unsigned>(state.draft_duration_seconds/60U));
         text(surface,buffer,20,17,2);
@@ -257,11 +305,12 @@ void render_screen(const State &state, MonoSurface &surface)
     }
     if (state.screen == Screen::Menu) {
         constexpr const char *items[]{"FOCUS TIMER","COOKING TIMER","HOME","MUSIC",
-                                      "WAYFINDING","NOTES","FACE THEMES","BACK"};
+                                      "WAYFINDING","NOTES","FACE THEMES","SETTINGS","BACK"};
         text(surface, "PICO MENU", 2, 2, 2);
         const auto first = (state.menu_index / 4) * 4;
         for (unsigned i = 0; i < 4; ++i) {
             const auto index = first + i;
+            if (index >= 9) break;
             text(surface, index == state.menu_index ? ">" : " ", 2, 20 + i * 10);
             text(surface, items[index], 10, 20 + i * 10);
         }

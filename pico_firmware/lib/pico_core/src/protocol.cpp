@@ -97,6 +97,7 @@ DecodeResult decode_command(const std::uint8_t *data, std::size_t size)
     case Command::NextFocusPhase:
     case Command::PauseTimer:
     case Command::ResumeTimer:
+    case Command::OpenSettings:
     case Command::OpenMenu:
     case Command::NavigateNext:
     case Command::NavigatePrevious:
@@ -114,6 +115,7 @@ DecodeResult decode_command(const std::uint8_t *data, std::size_t size)
         case Command::NextFocusPhase: kind = EventKind::NextFocusPhase; break;
         case Command::PauseTimer: kind = EventKind::PauseTimer; break;
         case Command::ResumeTimer: kind = EventKind::ResumeTimer; break;
+        case Command::OpenSettings: kind = EventKind::OpenSettings; break;
         case Command::OpenMenu: kind = EventKind::OpenMenu; break;
         case Command::NavigateNext: kind = EventKind::NavigateNext; break;
         case Command::NavigatePrevious: kind = EventKind::NavigatePrevious; break;
@@ -134,6 +136,10 @@ DecodeResult decode_command(const std::uint8_t *data, std::size_t size)
         if (size != 2U) return wrong_length();
         if (data[1] < 1U || data[1] > 8U) return {DecodeStatus::InvalidValue, {}};
         return {DecodeStatus::Ok, {EventKind::SetMetronomeBeats, data[1]}};
+    case Command::SetVolume:
+        if (size != 2U) return wrong_length();
+        if (data[1] > 100) return {DecodeStatus::InvalidValue, {}};
+        return {DecodeStatus::Ok,{EventKind::SetVolume,data[1]}};
     case Command::TestSound:
     case Command::SetMuted:
         if (size != 2U) return wrong_length();
