@@ -83,8 +83,8 @@ bool decode(const Blob &data, PersistedState &state)
     state = {
         mode,
         mood,
-        theme,
         read_u32_le(&data[8]),
+        theme,
     };
 
     return true;

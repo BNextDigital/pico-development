@@ -15,6 +15,7 @@ public:
 private:
     Effects set_mode(Mode mode);
     Effects set_mood(Mood mood);
+    Effects set_theme(FaceTheme theme);
     Effects on_tick(std::uint32_t now_seconds);
 
     State state_{};

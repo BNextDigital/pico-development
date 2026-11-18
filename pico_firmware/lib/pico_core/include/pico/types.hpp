@@ -36,6 +36,19 @@ enum class Dock : std::uint8_t {
     Count,
 };
 
+// Stored in persistence byte 7. Keep these IDs stable when adding themes.
+enum class FaceTheme : std::uint8_t {
+    Modern = 0,
+    Chibi,
+    Anime,
+    RetroIbm,
+    Mecha,
+    VintageCartoon,
+    MinimalEmoticon,
+    KawaiiMascot,
+    Count,
+};
+
 enum class EventKind : std::uint8_t {
     Boot = 0,
     Tick,
@@ -50,6 +63,8 @@ enum class EventKind : std::uint8_t {
     StartTimer,
     CancelTimer,
     RequestStatus,
+    SetTheme,
+    CycleTheme,
 };
 
 struct Event {
@@ -100,12 +115,14 @@ struct State {
     std::uint32_t timer_total_seconds{0};
     std::uint32_t timer_remaining_seconds{0};
     std::uint32_t interaction_count{0};
+    FaceTheme theme{FaceTheme::Modern};
 };
 
 struct PersistedState {
     Mode mode{Mode::Companion};
     Mood mood{Mood::Neutral};
     std::uint32_t interaction_count{0};
+    FaceTheme theme{FaceTheme::Modern};
 };
 
 } // namespace pico

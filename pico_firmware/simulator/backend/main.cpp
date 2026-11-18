@@ -157,13 +157,17 @@ std::string event_name(pico::EventKind kind)
         return "CancelTimer";
     case pico::EventKind::RequestStatus:
         return "RequestStatus";
+    case pico::EventKind::SetTheme:
+        return "SetTheme";
+    case pico::EventKind::CycleTheme:
+        return "CycleTheme";
     }
     return "Event" + std::to_string(static_cast<unsigned int>(kind));
 }
 
 std::optional<pico::EventKind> parse_event_kind(const std::string &token)
 {
-    constexpr std::array<pico::EventKind, 13> kinds{
+    constexpr std::array<pico::EventKind, 15> kinds{
         pico::EventKind::Boot,          pico::EventKind::Tick,
         pico::EventKind::PrimaryPressed, pico::EventKind::SecondaryPressed,
         pico::EventKind::Connected,     pico::EventKind::Disconnected,
@@ -171,6 +175,7 @@ std::optional<pico::EventKind> parse_event_kind(const std::string &token)
         pico::EventKind::SetMood,       pico::EventKind::SetBattery,
         pico::EventKind::StartTimer,    pico::EventKind::CancelTimer,
         pico::EventKind::RequestStatus,
+        pico::EventKind::SetTheme,      pico::EventKind::CycleTheme,
     };
     for (const auto kind : kinds) {
         if (token == event_name(kind)) {

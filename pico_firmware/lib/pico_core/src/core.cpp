@@ -106,9 +106,13 @@ Effects Core::handle(const Event &event)
         }
 
         return Effect::Render | Effect::Notify | Effect::Persist;
+    }
 
     case EventKind::SetTheme:
-    return set_theme(static_cast<FaceTheme>(event.value));
+        if (event.value >= static_cast<std::uint32_t>(FaceTheme::Count)) {
+            return effect(Effect::None);
+        }
+        return set_theme(static_cast<FaceTheme>(event.value));
 
     case EventKind::CycleTheme: {
         const auto current = static_cast<std::uint8_t>(state_.theme);
@@ -118,8 +122,7 @@ Effects Core::handle(const Event &event)
         const auto next =
             static_cast<std::uint8_t>((current + 1U) % theme_count);
 
-    return set_theme(static_cast<FaceTheme>(next));
-        }
+        return set_theme(static_cast<FaceTheme>(next));
     }
 
     case EventKind::SetMode:

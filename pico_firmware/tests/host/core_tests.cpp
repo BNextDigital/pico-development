@@ -215,6 +215,49 @@ void test_persistence_codec_round_trip_and_validation()
     CHECK(!pico::persistence::decode(driving, restored));
 }
 
+void test_theme_events_and_persistence()
+{
+    pico::Core core;
+    CHECK(core.state().theme == pico::FaceTheme::Modern);
+    const auto changed = core.handle({pico::EventKind::SetTheme,
+        static_cast<std::uint32_t>(pico::FaceTheme::KawaiiMascot)});
+    CHECK(core.state().theme == pico::FaceTheme::KawaiiMascot);
+    CHECK(pico::has_effect(changed, pico::Effect::Render));
+    CHECK(pico::has_effect(changed, pico::Effect::Persist));
+    core.handle({pico::EventKind::PrimaryPressed, 0});
+
+    const auto blob = pico::persistence::encode(core.persistent_state());
+    pico::PersistedState persisted{};
+    CHECK(pico::persistence::decode(blob, persisted));
+    pico::Core restored;
+    CHECK(restored.restore(persisted));
+    CHECK(restored.state().theme == pico::FaceTheme::KawaiiMascot);
+    CHECK(restored.state().interaction_count == 1U);
+
+    core.handle({pico::EventKind::CycleTheme, 0});
+    CHECK(core.state().theme == pico::FaceTheme::Modern);
+    for (const auto invalid : {static_cast<std::uint32_t>(pico::FaceTheme::Count),
+                               256U, UINT32_MAX}) {
+        CHECK(core.handle({pico::EventKind::SetTheme, invalid}) ==
+              pico::effect(pico::Effect::None));
+        CHECK(core.state().theme == pico::FaceTheme::Modern);
+    }
+
+    persisted.theme = pico::FaceTheme::Count;
+    CHECK(!restored.restore(persisted));
+    CHECK(!pico::persistence::decode(pico::persistence::encode(persisted), persisted));
+
+    // A real version-1 record: Companion, Neutral, reserved byte 0,
+    // interaction count 42, followed by its original FNV-1a checksum.
+    const pico::persistence::Blob legacy{
+        0x50, 0x49, 0x43, 0x4f, 0x01, 0x00, 0x00, 0x00,
+        0x2a, 0x00, 0x00, 0x00, 0xaf, 0x6c, 0x55, 0xef,
+    };
+    CHECK(pico::persistence::decode(legacy, persisted));
+    CHECK(persisted.theme == pico::FaceTheme::Modern);
+    CHECK(persisted.interaction_count == 42U);
+}
+
 } // namespace
 
 int main()
@@ -229,6 +272,7 @@ int main()
     test_decoder_handles_arbitrary_short_packets();
     test_display_model_is_layout_independent();
     test_persistence_codec_round_trip_and_validation();
+    test_theme_events_and_persistence();
 
     if (failures != 0) {
         std::cerr << failures << " test(s) failed\n";
