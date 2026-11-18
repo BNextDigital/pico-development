@@ -38,12 +38,18 @@ The decisions distilled from the wider Pico project are recorded in
 hardware ledger is in
 [`docs/hardware-bringup.md`](docs/hardware-bringup.md).
 
+## Deadline-based sleeping
+
+The main loop now waits for timer, personality, music and sensor deadlines,
+instead of a fixed 20 ms timeout. GPIO/BLE events wake it early. Active tuner
+and motion retain their service bounds. See [design and hardware checks](docs/deadline-sleep.md).
+Current draw and target timing still need physical validation.
+
 ## Interrupt-driven controls
 
 Interaction buttons now use GPIO edges with deferred debounce/hold deadlines,
 removing idle button polling while preserving the current controls. See
-[design, tests and hardware checks](docs/interrupt-buttons.md). The main loop
-still retains its 20 ms service cadence; battery-life gains are unmeasured.
+[design, tests and hardware checks](docs/interrupt-buttons.md). The main loop now uses the deadline policy above; battery-life gains are unmeasured.
 
 ## Icon root menu
 

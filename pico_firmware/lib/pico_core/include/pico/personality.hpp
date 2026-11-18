@@ -10,6 +10,7 @@ public:
     std::uint32_t inactive_for(std::uint32_t now_ms) const { return now_ms-last_activity_; }
     void rest(State &state);
     bool advance(State &state, std::uint32_t now_ms);
+    std::uint32_t next_update_ms(const State &state, std::uint32_t now_ms) const;
 private:
     std::uint32_t random();
     std::uint32_t rng_, last_activity_{0}, next_blink_, blink_end_{0};

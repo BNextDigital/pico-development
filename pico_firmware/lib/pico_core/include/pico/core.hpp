@@ -12,6 +12,10 @@ public:
     explicit Core(std::uint32_t seed = 0x5049434fU) : personality_(seed) {}
     const State &state() const { return state_; }
     Effects handle(const Event &event);
+    std::uint32_t next_animation_ms(std::uint32_t now) const
+    { return personality_.next_update_ms(state_, now); }
+    std::uint32_t next_music_ms(std::uint32_t now) const
+    { return metronome_.next_update_ms(now); }
 
     PersistedState persistent_state() const;
     bool restore(const PersistedState &persisted);

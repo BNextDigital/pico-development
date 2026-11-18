@@ -1,4 +1,5 @@
 #include <pico/personality.hpp>
+#include <algorithm>
 namespace pico {
 namespace {
 bool due(std::uint32_t now, std::uint32_t deadline)
@@ -63,4 +64,23 @@ bool Personality::advance(State &s, std::uint32_t now)
     }
     return mood != s.mood || closed != s.eyes_closed || gaze != s.gaze_x;
 }
+std::uint32_t Personality::next_update_ms(const State &s, std::uint32_t now) const
+{
+    auto delay = UINT32_MAX;
+    const auto include = [&](std::uint32_t deadline) {
+        delay = std::min(delay, due(now, deadline) ? 0U : deadline - now);
+    };
+    if (temporary_) include(temporary_end_);
+    if (s.eyes_closed) include(blink_end_);
+    if (!s.eyes_closed && !temporary_ && s.mood != Mood::Sleepy && s.screen == Screen::Home)
+        include(next_blink_);
+    const bool busy = s.timer_running || s.timer_paused || s.screen != Screen::Home;
+    if (!temporary_ && !busy && s.mood != Mood::Sleepy) {
+        include(next_idle_);
+        const auto inactive = now - last_activity_;
+        delay = std::min(delay, inactive >= 300000U ? 0U : 300000U - inactive);
+    }
+    return delay;
+}
+
 }
