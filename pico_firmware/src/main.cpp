@@ -5,6 +5,7 @@
 
 #include <pico/core.hpp>
 
+#include "platform/pico_audio.hpp"
 #include "platform/pico_ble.hpp"
 #include "platform/pico_display.hpp"
 #include "platform/pico_hardware.hpp"
@@ -28,19 +29,21 @@ bool queue_event(const pico::Event &event)
 }
 
 void apply_effects(pico::Effects effects, pico::Core &core,
-                   pico::platform::Hardware &hardware,
+                   pico::platform::Hardware &hardware, pico::platform::Audio &audio,
                    pico::platform::Display &display,
                    pico::platform::Storage &storage,
                    pico::platform::Ble &ble, pico::Capabilities capabilities)
 {
+    audio.set_muted(core.state().sound_muted);
     if (pico::has_effect(effects, pico::Effect::Persist)) {
         storage.save(core.persistent_state());
     }
     if (pico::has_effect(effects, pico::Effect::Render)) {
         display.render(core.state());
     }
-    if (pico::has_effect(effects, pico::Effect::Chirp)) {
-        hardware.chirp();
+    if (pico::has_effect(effects, pico::Effect::Chirp) && !core.state().sound_muted) {
+        if (audio.ready()) audio.play(core.state().sound_cue);
+        else hardware.chirp();
     }
     if (pico::has_effect(effects, pico::Effect::Notify)) {
         ble.publish(core.state(), capabilities);
@@ -55,6 +58,7 @@ int main()
 
     pico::Core core;
     pico::platform::Hardware hardware;
+    pico::platform::Audio audio;
     pico::platform::Display display;
     pico::platform::Storage storage;
     pico::platform::Ble ble;
@@ -67,15 +71,17 @@ int main()
         core.restore(persisted);
     }
 
+    audio.init();
     display.init();
     hardware.init(queue_event);
-    const auto capabilities = hardware.capabilities() | display.capabilities();
+    const auto capabilities = hardware.capabilities() | display.capabilities() |
+        (audio.ready() ? pico::capability(pico::Capability::Speaker) : 0U);
 
     if (ble_ready) {
         ble.start_advertising();
     }
 
-    apply_effects(core.handle({pico::EventKind::Boot, 0}), core, hardware,
+    apply_effects(core.handle({pico::EventKind::Boot, 0}), core, hardware, audio,
                   display, storage, ble, capabilities);
     hardware.reflect(core.state());
 
@@ -85,7 +91,7 @@ int main()
         pico::Event event{};
         if (k_msgq_get(&event_queue, &event, K_MSEC(20)) == 0) {
             const auto effects = core.handle(event);
-            apply_effects(effects, core, hardware, display, storage, ble,
+            apply_effects(effects, core, hardware, audio, display, storage, ble,
                           capabilities);
             hardware.reflect(core.state());
         }
@@ -96,7 +102,7 @@ int main()
         if (now_ms - last_animation_ms >= 100U) {
             last_animation_ms = now_ms;
             apply_effects(core.handle({pico::EventKind::AnimationTick, now_ms}),
-                          core, hardware, display, storage, ble, capabilities);
+                          core, hardware, audio, display, storage, ble, capabilities);
         }
 
         const auto now_seconds = static_cast<std::uint32_t>(
@@ -104,7 +110,7 @@ int main()
         if (now_seconds != last_tick) {
             last_tick = now_seconds;
             const auto effects = core.handle({pico::EventKind::Tick, now_seconds});
-            apply_effects(effects, core, hardware, display, storage, ble,
+            apply_effects(effects, core, hardware, audio, display, storage, ble,
                           capabilities);
             hardware.reflect(core.state());
 #if defined(CONFIG_PICO_BRINGUP_DIAGNOSTICS)
