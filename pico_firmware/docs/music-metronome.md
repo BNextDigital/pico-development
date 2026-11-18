@@ -16,11 +16,14 @@ action. START is selected initially.
 | START / STOP | Toggle metronome; start immediately flashes beat 1 |
 | TAP | Tap D0 repeatedly along with a song to estimate BPM |
 | BAR | Cycle 1–8 beats per bar; default 4 |
+| TUNER | Open optional onboard microphone tuner; stops metronome |
 | HOME | Stop and return to Companion/Home |
 
 The screen shows BPM, numbered beat position and one box per beat. The current
 box fills briefly on each beat. The first beat gets a higher-pitched accent if
 I2S audio is fitted/enabled. Runtime mute preserves visual beats.
+
+For the tuner profile see [music-tuner.md](music-tuner.md).
 
 Holding either button goes back to the menu and stops the metronome. Leaving
 Music through another mode, opening the menu, changing dock context, or rebooting
@@ -143,7 +146,7 @@ On hardware:
 6. Set tempo/bar, reboot and confirm Companion/Home with playback stopped;
    durable face theme/work duration should still survive.
 
-Music follow-ups: reference pitches once audio is physically verified; rhythmic
-subdivisions after onset/jitter measurement; chromatic tuner after PDM microphone
-capture and pitch detection are implemented. No tuner or recording is claimed
-by this metronome revision.
+Music follow-ups: reference pitches once audio is physically verified, and rhythmic
+subdivisions after onset/jitter measurement. The optional tuner implementation
+is documented separately in [music-tuner.md](music-tuner.md); physical PDM
+capture and acoustic accuracy remain unverified. No recording feature is implemented.

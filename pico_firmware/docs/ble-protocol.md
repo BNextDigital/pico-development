@@ -43,6 +43,8 @@ All integers are little-endian. There is no packed C struct on the wire.
 | `32 bb bb` | Set BPM, 16-bit little-endian, 30–240 |
 | `33 nn` | Set beats per bar, 1–8 |
 | `34` | Tap tempo at processing time |
+| `35` | Open/start onboard microphone tuner |
+| `36` | Stop tuner listening |
 
 Mode IDs are companion `0`, focus `1`, music `2`, cooking `3`, wayfinding `4`,
 notes `5`, and driving `6`. Driving cannot be requested remotely; the car dock
@@ -60,7 +62,7 @@ The status characteristic is always exactly 16 bytes.
 | 1 | 1 | Mode ID |
 | 2 | 1 | Mood ID |
 | 3 | 1 | Dock ID: none `0`, home `1`, car `2` |
-| 4 | 1 | Flags: bit 0 connected, bit 1 timer running, bit 2 timer paused, bit 3 cycle waiting, bit 4 muted, bit 5 metronome running |
+| 4 | 1 | Flags: bit 0 connected, bit 1 timer running, bit 2 timer paused, bit 3 cycle waiting, bit 4 muted, bit 5 metronome running, bit 6 tuner listening |
 | 5 | 1 | Battery percentage, or `255` when unknown |
 | 6 | 4 | Timer seconds remaining |
 | 10 | 4 | Lifetime interaction count |
@@ -117,3 +119,12 @@ bits. Tempo/bar settings are volatile; reboot stops playback and restores
 120 BPM/four beats. Start refuses in a car dock; duplicate Start does not reset
 phase. Beats do not send notifications; start/stop/settings changes do.
 See [music-metronome.md](music-metronome.md) for controls and timing limits.
+
+## Tuner additions
+
+Commands 35/36 and flag bit 6 are additive. Microphone readiness uses the existing
+capability bit 2; the unchanged status packet does not encode note/cents/level.
+A start without a configured microphone opens an unavailable screen and leaves
+listening clear. Back, mode/dock changes and timer completion stop listening.
+Pico's sound output is suppressed while listening; the user mute flag is unchanged.
+No audio or pitch readings are streamed over BLE. See [music-tuner.md](music-tuner.md).

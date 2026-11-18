@@ -138,3 +138,17 @@ button mappings. Audio click/accent IDs append after the original cues, and
 busy audio drops stale beats. Main enqueues sound before potentially blocking
 OLED rendering. Millisecond phase correctness is host-tested; physical jitter
 remains unmeasured. Details: [music-metronome.md](music-metronome.md).
+
+## Onboard microphone tuner
+
+`pitch::Detector` owns allocation-free period detection, note/cents conversion,
+energy/periodicity/clipping gates and short confirmation/median filtering.
+`Microphone` owns regulator/PDM control, a DMA slab and FPU worker, delivering
+only compact readings through a latest-result mailbox. Session tokens discard
+late results after exit/re-entry. Core owns capture intent and Tuner screen.
+
+Capture is opt-in and active only while listening. Pico sound is temporarily
+suppressed to avoid feedback. STOP drains DMA before removing microphone power;
+errors clear readiness without preventing Companion/Timer use. Raw samples are
+never persisted or sent to the phone. See [music-tuner.md](music-tuner.md) for
+sample-clock details, resource budgets and the outstanding hardware checks.
