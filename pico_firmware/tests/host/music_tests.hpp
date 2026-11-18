@@ -67,7 +67,7 @@ void test_music_menu_controls_and_cues()
     core.handle({E::NavigatePrevious,0}); core.handle({E::Select,0});
     CHECK(core.state().metronome_bpm == 120);
     core.handle({E::NavigatePrevious,0}); // wraps to HOME
-    CHECK(core.state().music_index == 5);
+    CHECK(core.state().music_index == 6);
     core.handle({E::Select,0});
     CHECK(!core.state().metronome_running && core.state().mode == pico::Mode::Companion);
 }

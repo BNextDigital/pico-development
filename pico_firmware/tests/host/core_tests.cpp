@@ -1,3 +1,4 @@
+#include <cmath>
 #include <vector>
 #include <pico/core.hpp>
 #include <pico/button.hpp>
@@ -343,6 +344,7 @@ void test_focus_button_standalone_controls()
 #include "sprint01_tests.hpp"
 #include "sprint02_tests.hpp"
 #include "music_tests.hpp"
+#include "tuner_tests.hpp"
 
 } // namespace
 
@@ -362,6 +364,7 @@ int main()
     run_sprint01_tests();
     run_sprint02_tests();
     run_music_tests();
+    run_tuner_tests();
     test_button_debounce_and_hold();
     test_focus_button_standalone_controls();
 

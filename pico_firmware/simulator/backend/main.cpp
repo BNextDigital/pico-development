@@ -1,3 +1,4 @@
+#include <cmath>
 #include <pico/core.hpp>
 #include <pico/display_model.hpp>
 #include <pico/features.hpp>
@@ -142,6 +143,10 @@ std::string event_name(pico::EventKind kind)
     case pico::EventKind::SetMetronomeBpm: return "SetMetronomeBpm";
     case pico::EventKind::SetMetronomeBeats: return "SetMetronomeBeats";
     case pico::EventKind::TapTempo: return "TapTempo";
+    case pico::EventKind::StartTuner: return "StartTuner";
+    case pico::EventKind::StopTuner: return "StopTuner";
+    case pico::EventKind::MicrophoneReady: return "MicrophoneReady";
+    case pico::EventKind::TunerReading: return "TunerReading";
     case pico::EventKind::Boot:
         return "Boot";
     case pico::EventKind::Tick:
@@ -201,7 +206,7 @@ std::string event_name(pico::EventKind kind)
 
 std::optional<pico::EventKind> parse_event_kind(const std::string &token)
 {
-    constexpr std::array<pico::EventKind, 37> kinds{
+    constexpr std::array<pico::EventKind, 41> kinds{
         pico::EventKind::Boot,          pico::EventKind::Tick,
         pico::EventKind::PrimaryPressed, pico::EventKind::SecondaryPressed,
         pico::EventKind::Connected,     pico::EventKind::Disconnected,
@@ -231,6 +236,11 @@ std::optional<pico::EventKind> parse_event_kind(const std::string &token)
         pico::EventKind::SetMetronomeBpm,
         pico::EventKind::SetMetronomeBeats,
         pico::EventKind::TapTempo,
+        pico::EventKind::StartTuner,
+        pico::EventKind::StopTuner,
+        pico::EventKind::MicrophoneReady,
+        pico::EventKind::TunerReading,
+
 
 
 
@@ -318,6 +328,7 @@ public:
         : core_(seed), seed_(seed), state_path_(std::move(state_path))
     {
         load_state();
+        core_.handle({pico::EventKind::MicrophoneReady,1});
         last_result_ = dispatch({pico::EventKind::Boot, 0});
         last_result_.message = restored_ ? "Booted with saved state"
                                          : "Booted with default state";
@@ -357,6 +368,17 @@ public:
     Result advance(std::uint32_t seconds)
     { return advance_ms(static_cast<std::uint64_t>(seconds) * 1000U); }
 
+    Result tone(unsigned millihz)
+    {
+        pico::pitch::Detector detector;
+        std::array<std::int16_t,pico::pitch::kFrameSamples> samples{};
+        for (std::size_t i=0; i<samples.size(); ++i)
+            samples[i] = static_cast<std::int16_t>(6000.0 * std::sin(6.283185307179586 *
+                static_cast<double>(millihz) * static_cast<double>(i) / (1000.0 * pico::pitch::kSampleRate)));
+        detector.analyze(samples.data(),samples.size());
+        const auto reading = detector.analyze(samples.data(),samples.size());
+        return dispatch({pico::EventKind::TunerReading,pico::pitch::pack(reading,core_.state().tuner_session)});
+    }
     Result ble_command(const std::vector<std::uint8_t> &bytes)
     {
         const auto decoded = pico::protocol::decode_command(bytes.data(), bytes.size());
@@ -391,6 +413,7 @@ public:
             load_state();
         }
 
+        core_.handle({pico::EventKind::MicrophoneReady,1});
         auto result = dispatch({pico::EventKind::Boot, 0});
         result.event = factory_reset ? "FactoryReset" : "PowerCycle";
         result.message = factory_reset
@@ -458,6 +481,12 @@ public:
                << "\"screen\":" << static_cast<unsigned>(state.screen) << ','
                << "\"menu_index\":" << static_cast<unsigned>(state.menu_index) << ','
                << "\"eyes_closed\":" << (state.eyes_closed ? "true" : "false") << ','
+               << "\"microphone_ready\":" << (state.microphone_ready ? "true" : "false") << ','
+               << "\"tuner_running\":" << (state.tuner_running ? "true" : "false") << ','
+               << "\"tuner_signal\":" << static_cast<unsigned>(state.tuner.signal) << ','
+               << "\"tuner_note\":" << static_cast<unsigned>(state.tuner.note) << ','
+               << "\"tuner_cents\":" << static_cast<int>(state.tuner.cents) << ','
+               << "\"tuner_level\":" << static_cast<unsigned>(state.tuner.level) << ','
                << "\"metronome_running\":" << (state.metronome_running ? "true" : "false") << ','
                << "\"metronome_bpm\":" << state.metronome_bpm << ','
                << "\"beats_per_bar\":" << static_cast<unsigned>(state.beats_per_bar) << ','
@@ -681,6 +710,12 @@ int main(int argc, char **argv)
             result = !seconds.has_value()
                          ? command_error("Usage: advance SECONDS")
                          : simulator.advance(*seconds);
+        } else if (command == "tone") {
+            std::string token;
+            input >> token;
+            const auto frequency = parse_u32(token);
+            result = frequency && *frequency <= 2000000 ? simulator.tone(*frequency) :
+                command_error("Usage: tone MILLIHZ (0..2000000)");
         } else if (command == "advance_ms") {
             std::string token; input >> token;
             const auto milliseconds = parse_u32(token);

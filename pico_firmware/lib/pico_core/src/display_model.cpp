@@ -101,7 +101,7 @@ constexpr Glyph font[]{
  {'Y',{5,5,2,2,2}}, {'Z',{7,1,2,4,7}}, {'0',{7,5,5,5,7}}, {'1',{2,6,2,2,7}},
  {'2',{6,1,2,4,7}}, {'3',{6,1,2,1,6}}, {'4',{5,5,7,1,1}}, {'5',{7,4,6,1,6}},
  {'6',{3,4,6,5,2}}, {'7',{7,1,2,2,2}}, {'8',{2,5,2,5,2}}, {'9',{2,5,3,1,6}},
- {'+',{0,2,7,2,0}}, {':',{0,2,0,2,0}}, {'-',{0,0,7,0,0}}, {'>',{4,2,1,2,4}}, {'/',{1,1,2,4,4}}
+ {'#',{5,7,5,7,5}}, {'+',{0,2,7,2,0}}, {':',{0,2,0,2,0}}, {'-',{0,0,7,0,0}}, {'>',{4,2,1,2,4}}, {'/',{1,1,2,4,4}}
 };
 void text(MonoSurface &surface, const char *str, unsigned x, unsigned y, unsigned scale = 1)
 {
@@ -179,6 +179,39 @@ void render_screen(const State &state, MonoSurface &surface)
         }
         return;
     }
+    if (state.screen == Screen::Tuner) {
+        text(surface,"TUNER",2,2);
+        text(surface,state.tuner_running ? "MIC ON" : "MIC OFF",96,2);
+        outline_rect(surface,2,10,124,6);
+        fill_rect(surface,4,12,state.tuner.level * 120U / 100U,2);
+        if (!state.microphone_ready) {
+            text(surface,"MIC UNAVAILABLE",4,25,2);
+            text(surface,"CHECK BUILD / LOGS",20,43);
+        } else if (!state.tuner_running) {
+            text(surface,"STOPPED",28,25,2);
+            text(surface,"D0 TO LISTEN",24,43);
+        } else if (state.tuner.signal == pitch::Signal::Detected) {
+            char note[12], cents[20];
+            std::snprintf(note,sizeof(note),"%s%d",pitch::note_name(state.tuner.note),static_cast<int>(state.tuner.note)/12-1);
+            text(surface,note,42,21,3);
+            const int offset = state.tuner.cents;
+            text(surface,offset < -5 ? "FLAT" : offset > 5 ? "SHARP" : "IN TUNE",44,40);
+            fill_rect(surface,14,53,102,1);
+            outline_rect(surface,59,49,11,9);
+            fill_rect(surface,static_cast<unsigned>(64+offset),50,2,8);
+            std::snprintf(cents,sizeof(cents),"%+d CENTS",offset);
+            text(surface,cents,2,59);
+            text(surface,"D0 STOP",96,59);
+            return;
+        } else {
+            const char *message = state.tuner.signal == pitch::Signal::Quiet ? "TOO QUIET" :
+                state.tuner.signal == pitch::Signal::Clipping ? "TOO LOUD" :
+                state.tuner.signal == pitch::Signal::Noisy ? "HOLD ONE NOTE" : "PLUCK ONE NOTE";
+            text(surface,message,12,28,2);
+        }
+        text(surface,"HOLD TO GO BACK",28,59);
+        return;
+    }
     if (state.screen == Screen::Music) {
         char buffer[24];
         std::snprintf(buffer, sizeof(buffer), "%u BPM", static_cast<unsigned>(state.metronome_bpm));
@@ -195,11 +228,11 @@ void render_screen(const State &state, MonoSurface &surface)
         text(surface, buffer, 4, 32);
         text(surface, state.metronome_running ? "RUN" : "STOPPED", 88, 32);
         const char *labels[]{"BPM-", "BPM+", state.metronome_running ? "STOP" : "START",
-                             "TAP", "BAR", "HOME"};
-        for (unsigned i = 0; i < 6; ++i) {
-            const auto x = 2 + (i % 3) * 42, y = 41 + (i / 3) * 12;
-            if (i == state.music_index) outline_rect(surface, x, y, 40, 11);
-            text(surface, labels[i], x + 6, y + 3);
+                             "TAP", "BAR", "TUNER", "HOME"};
+        for (unsigned i = 0; i < 7; ++i) {
+            const auto x = 1 + (i % 4) * 32, y = 41 + (i / 4) * 12;
+            if (i == state.music_index) outline_rect(surface, x, y, 30, 11);
+            text(surface, labels[i], x + 3, y + 3);
         }
         return;
     }
