@@ -1,6 +1,8 @@
 #pragma once
 
 #include <pico/types.hpp>
+#include <pico/display_power.hpp>
+#include <algorithm>
 #include <pico/timer.hpp>
 #include <pico/personality.hpp>
 #include <pico/metronome.hpp>
@@ -13,7 +15,16 @@ public:
     const State &state() const { return state_; }
     Effects handle(const Event &event);
     std::uint32_t next_animation_ms(std::uint32_t now) const
-    { return personality_.next_update_ms(state_, now); }
+    {
+        if (state_.display_asleep) return UINT32_MAX;
+        auto delay = personality_.next_update_ms(state_, now);
+        if (display::auto_sleep_allowed(state_)) {
+            const auto elapsed = now - display_activity_ms_;
+            const auto timeout = state_.display_timeout_minutes * 60000U;
+            delay = std::min(delay, elapsed >= timeout ? 0U : timeout - elapsed);
+        }
+        return delay;
+    }
     std::uint32_t next_music_ms(std::uint32_t now) const
     { return metronome_.next_update_ms(now); }
 
@@ -46,6 +57,7 @@ private:
     FocusSession focus_{};
     Personality personality_;
     std::uint32_t animation_ms_{0};
+    std::uint32_t display_activity_ms_{0};
 };
 
 } // namespace pico

@@ -16,6 +16,7 @@
 #endif
 
 #include <pico/display_model.hpp>
+#include <pico/display_power.hpp>
 
 LOG_MODULE_REGISTER(pico_display, CONFIG_PICO_LOG_LEVEL);
 
@@ -37,6 +38,10 @@ display_capabilities display_caps{};
 std::array<std::uint8_t, kFrameBufferSize> frame_buffer{};
 std::array<std::uint8_t, kFrameBufferSize> last_frame{};
 bool frame_sent;
+bool blanked;
+bool blanking_supported = true;
+bool contrast_supported = true;
+int last_contrast = -1;
 
 pico::display::MonoLayout display_layout()
 {
@@ -82,7 +87,8 @@ bool Display::init()
     }
 
     ready_ = true;
-    frame_sent = false;
+    frame_sent = false; blanked = false;
+    blanking_supported = true; contrast_supported = true; last_contrast = -1;
     LOG_INF("Display ready: %ux%u", display_caps.x_resolution,
             display_caps.y_resolution);
     return true;
@@ -97,6 +103,23 @@ bool Display::render(const State &state)
 #if PICO_HAS_DISPLAY
     if (!ready_) {
         return false;
+    }
+
+    if (state.display_asleep && !blanked && blanking_supported) {
+        const int error = display_blanking_on(display_device);
+        if (!error) { blanked = true; frame_sent = false; return true; }
+        LOG_WRN("OLED blanking unavailable (%d); using black frame until restart", error);
+        blanking_supported = false;
+    }
+    if (state.display_asleep && blanked) return true;
+    const auto requested_contrast = display::contrast(state);
+    if (!state.display_asleep && contrast_supported && last_contrast != requested_contrast) {
+        const int error = display_set_contrast(display_device, requested_contrast);
+        if (!error) last_contrast = requested_contrast;
+        else {
+            LOG_WRN("OLED contrast unavailable (%d); keeping driver setting until restart", error);
+            contrast_supported = false;
+        }
     }
 
     display::MonoSurface surface{
@@ -127,6 +150,12 @@ bool Display::render(const State &state)
     }
     std::memcpy(last_frame.data(), frame_buffer.data(), size);
     frame_sent = true;
+    if (blanked) {
+        // Refresh RAM before enabling output, so an old menu cannot flash on wake.
+        const int error = display_blanking_off(display_device);
+        if (error) { frame_sent = false; LOG_WRN("OLED wake failed (%d)",error); return false; }
+        blanked = false;
+    }
     return true;
 #else
     ARG_UNUSED(state);
@@ -144,10 +173,11 @@ Capabilities Display::capabilities() const
 void Display::diagnose(const State &state)
 {
     const bool frame_written = render(state);
-    printk("[Pico diag] uptime=%u display_ready=%u frame_written=%u\n",
+    printk("[Pico diag] uptime=%u display_ready=%u frame_written=%u display_asleep=%u\n",
            static_cast<unsigned int>(state.uptime_seconds),
            static_cast<unsigned int>(ready_),
-           static_cast<unsigned int>(frame_written));
+           static_cast<unsigned int>(frame_written),
+           static_cast<unsigned int>(state.display_asleep));
 #if PICO_HAS_DISPLAY
 #if DT_ON_BUS(DT_CHOSEN(zephyr_display), i2c)
     const device *bus = DEVICE_DT_GET(DT_BUS(DT_CHOSEN(zephyr_display)));

@@ -374,6 +374,7 @@ void test_focus_button_standalone_controls()
 #include "settings_tests.hpp"
 #include "menu_tests.hpp"
 #include "schedule_tests.hpp"
+#include "oled_tests.hpp"
 
 } // namespace
 
@@ -399,6 +400,8 @@ int main()
     run_settings_tests();
     test_icon_menu_frames();
     run_schedule_tests();
+    test_oled_settings_and_power_policy();
+    test_oled_timeout_wrap_preview_and_rendering();
     test_button_debounce_and_hold();
     test_button_deadline_schedule();
     test_focus_button_standalone_controls();

@@ -100,7 +100,7 @@ class PicoSimulatorApp:
         self.backend = backend
         self.snapshot = backend.snapshot
         self.closed = False
-        self._last_frame_hex: str | None = None
+        self._last_frame_hex: tuple[str, int] | None = None
         self.display_image: tk.PhotoImage | None = None
         self.display_scaled: tk.PhotoImage | None = None
         self.mode_lookup: dict[str, int] = {}
@@ -496,7 +496,7 @@ class PicoSimulatorApp:
             if snapshot["storage_pending"]
             else "Flash idle"
         )
-        self._render_display(snapshot["frame_hex"])
+        self._render_display(snapshot["frame_hex"], state.get("display_preview_percent", 50))
         self._update_inspector(snapshot)
 
         effects = snapshot.get("effect_names", [])
@@ -515,10 +515,11 @@ class PicoSimulatorApp:
         ):
             self._append_log(snapshot)
 
-    def _render_display(self, frame_hex: str) -> None:
-        if frame_hex == self._last_frame_hex:
+    def _render_display(self, frame_hex: str, brightness: int = 50) -> None:
+        key = (frame_hex, brightness)
+        if key == self._last_frame_hex:
             return
-        self._last_frame_hex = frame_hex
+        self._last_frame_hex = key
         try:
             frame = bytes.fromhex(frame_hex)
         except ValueError:
@@ -529,9 +530,12 @@ class PicoSimulatorApp:
 
         image = tk.PhotoImage(width=DISPLAY_WIDTH, height=DISPLAY_HEIGHT)
         rows = []
+        # Illustrative brightness preview, not a calibrated OLED luminance model.
+        factor = 0.2 + 0.8 * max(5, min(100, brightness)) / 100
+        lit_color = "#" + "".join(f"{int(channel * factor):02x}" for channel in (165, 255, 188))
         for y in range(DISPLAY_HEIGHT):
             colors = [
-                "#a5ffbc" if pixel_is_on(frame, x, y) else "#0c1710"
+                lit_color if pixel_is_on(frame, x, y) else "#0c1710"
                 for x in range(DISPLAY_WIDTH)
             ]
             rows.append("{" + " ".join(colors) + "}")

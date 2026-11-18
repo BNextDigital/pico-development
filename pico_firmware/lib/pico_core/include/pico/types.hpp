@@ -104,11 +104,14 @@ enum class EventKind : std::uint8_t {
     SetMotionConfig,
     SetVolume,
     OpenSettings,
+    SetBrightness,
+    SetDisplayTimeout,
+    SleepDisplay,
 };
 
 enum class Screen : std::uint8_t { Home, Menu, Utility, Themes, Unavailable, Music, Tuner, DurationEdit, Settings, SettingEdit };
 
-enum class SettingKey : std::uint8_t { Theme, Mute, Volume, Motion };
+enum class SettingKey : std::uint8_t { Theme, Mute, Volume, Motion, Brightness, DisplayTimeout };
 
 struct Event {
     EventKind kind{EventKind::Boot};
@@ -193,6 +196,9 @@ struct State {
     SettingKey setting_key{SettingKey::Theme};
     std::uint32_t setting_draft{0};
     std::uint8_t setting_action{1};
+    std::uint8_t display_brightness_percent{50};
+    std::uint8_t display_timeout_minutes{0};
+    bool display_asleep{false};
     std::uint8_t sound_volume_percent{25};
     std::uint8_t duration_action{1}; // -1 minute, +1 minute, Save, Cancel
 };
@@ -207,6 +213,8 @@ struct PersistedState {
     bool sound_muted{false};
     std::uint8_t sound_volume_percent{25};
     std::uint8_t motion_config{motion::kAll};
+    std::uint8_t display_brightness_percent{50};
+    std::uint8_t display_timeout_minutes{0};
 };
 
 } // namespace pico

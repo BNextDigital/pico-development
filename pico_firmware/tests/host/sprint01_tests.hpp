@@ -147,7 +147,7 @@ void test_sprint_protocol_and_persistence()
     pico::protocol::encode_status(core.state(),0,status);
     CHECK(status[0] == 1 && (status[4] & 4) && !(status[4] & 2));
     const auto blob = pico::persistence::encode(core.persistent_state());
-    CHECK(blob.size() == 28 && blob[4] == 4);
+    CHECK(blob.size() == 32 && blob[4] == 5);
     pico::PersistedState saved{};
     CHECK(pico::persistence::decode(blob,saved));
     CHECK(saved.theme == pico::FaceTheme::KawaiiMascot && saved.configured_duration_seconds == 300);
