@@ -6,7 +6,8 @@ namespace pico {
 
 enum class ButtonAction { None, Tap, Hold };
 
-// Sample at least every 20 ms. Unsigned subtraction also handles uptime wrap.
+// Call on raw input edges and at next_update_ms() deadlines. Periodic sampling
+// remains supported. Unsigned subtraction also handles uptime wrap.
 class Button {
 public:
     ButtonAction update(bool pressed, std::uint32_t now_ms)
@@ -38,6 +39,20 @@ public:
             return ButtonAction::Hold;
         }
         return ButtonAction::None;
+    }
+
+    // UINT32_MAX means idle: no sample is needed until the next GPIO edge.
+    std::uint32_t next_update_ms(std::uint32_t now_ms) const
+    {
+        if (raw_pressed_ != stable_pressed_) {
+            const auto elapsed = now_ms - raw_changed_ms_;
+            return elapsed >= kDebounceMs ? 0U : kDebounceMs - elapsed;
+        }
+        if (stable_pressed_ && !hold_sent_) {
+            const auto elapsed = now_ms - pressed_ms_;
+            return elapsed >= kHoldMs ? 0U : kHoldMs - elapsed;
+        }
+        return UINT32_MAX;
     }
 
 private:

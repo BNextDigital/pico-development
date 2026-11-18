@@ -1,5 +1,5 @@
 #include "pico_hardware.hpp"
-#include <pico/button.hpp>
+#include "pico_button.hpp"
 
 #include <zephyr/devicetree.h>
 #include <zephyr/drivers/gpio.h>
@@ -37,20 +37,17 @@ std::uint32_t last_secondary_press_ms;
 
 #if PICO_HAS_FOCUS_BUTTON
 const gpio_dt_spec focus_button = GPIO_DT_SPEC_GET(FOCUS_BUTTON_NODE, gpios);
-pico::Button focus_button_state;
-bool focus_button_ready;
+pico::platform::GpioButton focus_button_input;
 #endif
 
 #if PICO_HAS_NAV_BUTTON
 const gpio_dt_spec nav_button = GPIO_DT_SPEC_GET(NAV_BUTTON_NODE, gpios);
-pico::Button nav_button_state;
-bool nav_button_ready;
+pico::platform::GpioButton nav_button_input;
 #endif
 
 #if PICO_HAS_BACK_BUTTON
 const gpio_dt_spec back_button = GPIO_DT_SPEC_GET(BACK_BUTTON_NODE, gpios);
-pico::Button back_button_state;
-bool back_button_ready;
+pico::platform::GpioButton back_button_input;
 #endif
 
 #if PICO_HAS_PRIMARY_BUTTON
@@ -183,29 +180,22 @@ bool Hardware::init(EventSink sink)
     bool ready = true;
 
 #if PICO_HAS_FOCUS_BUTTON
-    focus_button_ready = gpio_is_ready_dt(&focus_button) &&
-                         gpio_pin_configure_dt(&focus_button, GPIO_INPUT) == 0;
-    ready &= focus_button_ready;
-    if (focus_button_ready) {
-        LOG_INF("Focus button ready: D0 to GND; tap=start/pat, hold=cancel");
-    } else {
-        LOG_ERR("Focus button GPIO could not be configured");
-    }
+    const bool focus_ready = focus_button_input.init(focus_button, sink,
+        EventKind::FocusButtonTapped, EventKind::FocusButtonHeld);
+    ready &= focus_ready;
+    if (focus_ready) LOG_INF("Focus button interrupt ready: D0 to GND; tap=start/pat, hold=cancel");
+    else LOG_ERR("Focus button GPIO/interrupt could not be configured");
 #endif
-
 #if PICO_HAS_NAV_BUTTON
-    nav_button_ready = gpio_is_ready_dt(&nav_button) &&
-                      gpio_pin_configure_dt(&nav_button, GPIO_INPUT) == 0;
-    ready &= nav_button_ready;
-    if (nav_button_ready) LOG_INF("Navigation button ready: D1 to GND");
-    else LOG_ERR("Navigation button GPIO could not be configured");
+    const bool nav_ready = nav_button_input.init(nav_button, sink,
+        EventKind::NavigateNext, EventKind::Back);
+    ready &= nav_ready;
+    if (nav_ready) LOG_INF("Navigation button interrupt ready: D1 to GND");
+    else LOG_ERR("Navigation button GPIO/interrupt could not be configured");
 #endif
-
 #if PICO_HAS_BACK_BUTTON
-    back_button_ready = gpio_is_ready_dt(&back_button) &&
-                        gpio_pin_configure_dt(&back_button, GPIO_INPUT) == 0;
-    ready &= back_button_ready;
-    if (back_button_ready) LOG_INF("Optional Back/Cancel button ready");
+    if (back_button_input.init(back_button, sink, EventKind::Back, EventKind::Back))
+        LOG_INF("Optional Back/Cancel button interrupt ready");
     else LOG_WRN("Optional Back button unavailable; hold-to-back remains available");
 #endif
 
@@ -257,34 +247,6 @@ bool Hardware::init(EventSink sink)
 #endif
 
     return ready;
-}
-
-void Hardware::poll()
-{
-#if PICO_HAS_FOCUS_BUTTON || PICO_HAS_NAV_BUTTON || PICO_HAS_BACK_BUTTON
-    const auto sample = [](const gpio_dt_spec &pin, pico::Button &button,
-                           bool ready, EventKind tap, EventKind hold) {
-        if (!ready) return;
-        const int pressed = gpio_pin_get_dt(&pin);
-        if (pressed < 0) return;
-        switch (button.update(pressed != 0, k_uptime_get_32())) {
-        case ButtonAction::Tap: emit(tap); break;
-        case ButtonAction::Hold: emit(hold); break;
-        case ButtonAction::None: break;
-        }
-    };
-#if PICO_HAS_FOCUS_BUTTON
-    sample(focus_button, focus_button_state, focus_button_ready,
-           EventKind::FocusButtonTapped, EventKind::FocusButtonHeld);
-#endif
-#if PICO_HAS_BACK_BUTTON
-    sample(back_button, back_button_state, back_button_ready, EventKind::Back, EventKind::Back);
-#endif
-#if PICO_HAS_NAV_BUTTON
-    sample(nav_button, nav_button_state, nav_button_ready,
-           EventKind::NavigateNext, EventKind::Back);
-#endif
-#endif
 }
 
 void Hardware::reflect(const State &state)

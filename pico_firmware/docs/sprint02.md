@@ -183,7 +183,9 @@ review, not a successful target build.
 ## Next priorities
 
 1. Complete the target/physical checklist and address any I2S/USB regressions.
-2. Replace button polling with GPIO interrupts plus deferred debounce; measure
+2. Button GPIO interrupts plus deferred debounce are implemented in
+   [interrupt-buttons.md](interrupt-buttons.md), pending target/physical checks.
+   Next make main-loop waits deadline-aware; measure
    sleep/current and add controllable amplifier shutdown before battery work.
 3. Refine work/break UI from actual use, expose break duration/mute locally,
    then bring these additive BLE commands into the companion app.

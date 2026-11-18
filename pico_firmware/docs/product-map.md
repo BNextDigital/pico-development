@@ -15,16 +15,16 @@ when a feature genuinely needs them.
 
 ## Modes and contexts
 
-| Mode/context | Intended behavior | Firmware status in 0.1 |
+| Mode/context | Intended behavior | Current firmware status |
 | --- | --- | --- |
-| Companion | Face, mood, interactions, lightweight local memory | Core behavior implemented |
-| Study/focus | Tomato-style focus timer, water breaks, later quizzes | Reliable general timer implemented |
-| Music | Chromatic tuner from microphone; speaker metronome | Stable mode ID; audio hardware pending |
-| Cooking | Egg/general timer and concise cooking reference | Stable mode ID; timer foundation ready |
+| Companion | Face, mood, interactions, lightweight local memory | Themes, deterministic idle expressions, blinking and motion reactions implemented |
+| Study/focus | Tomato-style focus timer, water breaks, later quizzes | Work/break cycles, pause/resume and local minute-duration controls implemented |
+| Music | Chromatic tuner from microphone; speaker metronome | Visual metronome and optional Sense microphone tuner implemented; physical validation remains profile-specific |
+| Cooking | Egg/general timer and concise cooking reference | Local configurable timer implemented; cooking references remain future work |
 | Wayfinding | Compass/GPS or phone-assisted direction cues | Stable mode ID; sensors pending |
-| Notes | Local capture with later local speech-to-text handoff | Stable mode ID; microphone pending |
+| Notes | Local capture with later local speech-to-text handoff | Stable mode ID; capture/storage/handoff not implemented |
 | Car dock | Driving-safe behavior and privacy-conscious parking pin | Dock transition implemented; location flow pending |
-| Home dock | Reminders, timers, voice notes, internal dock illumination | Dock identity implemented; dock electronics pending |
+| Home dock | Reminders, timers, voice notes, internal dock illumination | Dock identity implemented; reminders/capture and dock electronics pending |
 | Pico peer | Nearby-Pico detection and playful generated interaction logs | Later BLE observer/privacy design |
 
 ## Guardrails
@@ -48,3 +48,21 @@ Feature activation is data sent over the versioned protocol; feature code is
 part of a signed firmware build. This preserves the “card slash” feel discussed
 for the app/device relationship while keeping executable code, memory limits,
 and hardware access under firmware control.
+
+## Next development priorities
+
+The icon root menu and Local Settings are merged. Interrupt-driven interaction
+buttons are the next power-foundation change; target/physical checks are in
+[interrupt-buttons.md](interrupt-buttons.md). After button acceptance:
+
+1. Replace the fixed main-loop wait with service deadlines, preserving metronome,
+   microphone, timer and motion response. Measure idle/active current.
+2. Add peripheral idle/shutdown policy with confirmed wiring and wake/alert tests.
+3. Extend local display settings (contrast and explicit display sleep) once wake
+   behavior and power measurements are reliable.
+4. Scope Notes capture/storage or Wayfinding hardware separately. Neither is
+   unlocked merely by its existing menu icon.
+
+Existing implemented services and optional hardware profiles still require their
+individual target and physical acceptance checks; host success alone is not
+hardware validation.

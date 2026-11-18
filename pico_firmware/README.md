@@ -38,6 +38,13 @@ The decisions distilled from the wider Pico project are recorded in
 hardware ledger is in
 [`docs/hardware-bringup.md`](docs/hardware-bringup.md).
 
+## Interrupt-driven controls
+
+Interaction buttons now use GPIO edges with deferred debounce/hold deadlines,
+removing idle button polling while preserving the current controls. See
+[design, tests and hardware checks](docs/interrupt-buttons.md). The main loop
+still retains its 20 ms service cadence; battery-life gains are unmeasured.
+
 ## Icon root menu
 
 The root menu now uses a large icon with a caption underneath and position dots.

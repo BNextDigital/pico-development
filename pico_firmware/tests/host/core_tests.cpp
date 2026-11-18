@@ -298,6 +298,29 @@ void test_button_debounce_and_hold()
     CHECK(wrap.update(false, 1030U) == ButtonAction::None);
 }
 
+void test_button_deadline_schedule()
+{
+    pico::Button button;
+    CHECK(button.next_update_ms(0) == UINT32_MAX);
+    button.update(true, 100);
+    CHECK(button.next_update_ms(100) == 30);
+    CHECK(button.next_update_ms(129) == 1);
+    CHECK(button.next_update_ms(130) == 0);
+    button.update(true, 130);
+    CHECK(button.next_update_ms(130) == 1000);
+    CHECK(button.next_update_ms(1129) == 1);
+    button.update(false, 1129); // release just before hold must remain a tap
+    CHECK(button.next_update_ms(1130) == 29);
+    CHECK(button.update(false, 1159) == pico::ButtonAction::Tap);
+    CHECK(button.next_update_ms(1159) == UINT32_MAX);
+    button.update(true, UINT32_MAX - 10U);
+    CHECK(button.next_update_ms(0) == 19);
+    button.update(true, 19);
+    CHECK(button.next_update_ms(20) == 999);
+    CHECK(button.update(true, 1019) == pico::ButtonAction::Hold);
+    CHECK(button.next_update_ms(1020) == UINT32_MAX);
+}
+
 void test_focus_button_standalone_controls()
 {
     pico::Core core;
@@ -374,6 +397,7 @@ int main()
     run_settings_tests();
     test_icon_menu_frames();
     test_button_debounce_and_hold();
+    test_button_deadline_schedule();
     test_focus_button_standalone_controls();
 
     if (failures != 0) {
