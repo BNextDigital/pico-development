@@ -69,6 +69,24 @@ class BackendTests(unittest.TestCase):
         self.harness.close()
         self.temporary.cleanup()
 
+    def test_root_icon_menu_cycles_and_selects_music(self) -> None:
+        first = self.harness.send("event OpenMenu")
+        frames = [first["frame_hex"]]
+        for index in range(1, 9):
+            current = self.harness.send("event NavigateNext")
+            self.assertEqual(current["state"]["menu_index"], index)
+            frames.append(current["frame_hex"])
+        self.assertEqual(len(set(frames)), 9)
+        wrapped = self.harness.send("event NavigateNext")
+        self.assertEqual(wrapped["frame_hex"], first["frame_hex"])
+        for _ in range(3):
+            self.harness.send("event NavigateNext")
+        selected = self.harness.send("event Select")
+        self.assertEqual(selected["state"]["screen"], 5)
+        returned = self.harness.send("event Back")
+        self.assertEqual(returned["state"]["menu_index"], 3)
+        self.assertEqual(returned["frame_hex"], frames[3])
+
     def test_boot_and_interaction_use_real_core_and_renderer(self) -> None:
         boot = self.harness.initial
         self.assertEqual(boot["state"]["mode_name"], "companion")

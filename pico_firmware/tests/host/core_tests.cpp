@@ -348,6 +348,7 @@ void test_focus_button_standalone_controls()
 #include "motion_tests.hpp"
 #include "duration_tests.hpp"
 #include "settings_tests.hpp"
+#include "menu_tests.hpp"
 
 } // namespace
 
@@ -371,6 +372,7 @@ int main()
     run_motion_tests();
     run_duration_tests();
     run_settings_tests();
+    test_icon_menu_frames();
     test_button_debounce_and_hold();
     test_focus_button_standalone_controls();
 

@@ -6,7 +6,7 @@ menu "Pico"
 
 config PICO_FIRMWARE_VERSION
     string "Firmware version"
-    default "0.7.0-local-settings"
+    default "0.7.1-icon-menu"
 
 config PICO_DISPLAY
     bool "Render Pico on the chosen monochrome display"
