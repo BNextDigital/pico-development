@@ -10,6 +10,8 @@ target_include_directories(app PRIVATE
 
 target_sources(app PRIVATE
     src/main.cpp
+    src/platform/pico_motion.cpp
+    lib/pico_core/src/motion.cpp
     src/platform/pico_microphone.cpp
     lib/pico_core/src/pitch.cpp
     src/platform/pico_audio.cpp

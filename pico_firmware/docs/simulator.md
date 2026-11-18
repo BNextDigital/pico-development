@@ -157,3 +157,13 @@ not host microphone acquisition. Start with `event StartTuner` or BLE `35`.
 `event MicrophoneReady 0` simulates unavailable capture; reboot restores the
 virtual adapter. JSON exposes tuner state, signal, MIDI note, cents and level.
 Details and validation limits: [music-tuner.md](music-tuner.md).
+
+## Motion traces
+
+Set down / Pick up / Rock / Leave still replay timestamped acceleration traces
+through the production classifier. The Motion reactions toggle controls runtime
+mask 7/0. Backend `motion_test still|pickup|rock|rest|bump` offers repeatable
+scenarios; `motion X_MG Y_MG Z_MG DELTA_MS` accepts explicit samples. Large sample
+gaps clear arming. Virtual time advances alone do not synthesize accelerometer
+data. JSON includes motion readiness, settled state and mask. See
+[motion-personality.md](motion-personality.md) for examples and limitations.

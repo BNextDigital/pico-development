@@ -7,6 +7,8 @@ public:
     void activity(State &state, std::uint32_t now_ms);
     void react(State &state, Mood mood, std::uint32_t now_ms,
                std::uint32_t duration_ms = 4000);
+    std::uint32_t inactive_for(std::uint32_t now_ms) const { return now_ms-last_activity_; }
+    void rest(State &state);
     bool advance(State &state, std::uint32_t now_ms);
 private:
     std::uint32_t random();

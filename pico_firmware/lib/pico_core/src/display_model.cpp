@@ -152,6 +152,10 @@ void render_face(const State &state, MonoSurface &surface)
 }
 void render_status(const State &state, MonoSurface &surface)
 {
+    if (state.motion_ready && state.motion_config) {
+        outline_rect(surface,10,3,3,3);
+        if (state.motion_settled) fill_rect(surface,11,4,1,1);
+    }
     if (state.connected) fill_rect(surface, 3, 3, 3, 3);
     else outline_rect(surface, 3, 3, 3, 3);
     if (state.dock != Dock::None) outline_rect(surface, surface.width - 10, 3, 7, 6);

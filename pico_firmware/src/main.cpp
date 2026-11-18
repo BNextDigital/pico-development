@@ -5,6 +5,7 @@
 
 #include <pico/core.hpp>
 
+#include "platform/pico_motion.hpp"
 #include "platform/pico_audio.hpp"
 #include "platform/pico_microphone.hpp"
 #include "platform/pico_ble.hpp"
@@ -52,7 +53,10 @@ void apply_effects(pico::Effects effects, pico::Core &core,
         const auto microphone_bit = pico::capability(pico::Capability::Microphone);
         const auto current = static_cast<pico::Capabilities>((capabilities & ~microphone_bit) |
             (core.state().microphone_ready ? microphone_bit : 0U));
-        ble.publish(core.state(), current);
+        const auto motion_bit = pico::capability(pico::Capability::Motion);
+        const auto available = static_cast<pico::Capabilities>((current & ~motion_bit) |
+            (core.state().motion_ready ? motion_bit : 0U));
+        ble.publish(core.state(), available);
     }
 }
 
@@ -64,6 +68,7 @@ int main()
 
     pico::Core core;
     pico::platform::Hardware hardware;
+    pico::platform::Motion motion;
     pico::platform::Audio audio;
     pico::platform::Microphone microphone;
     pico::platform::Display display;
@@ -78,6 +83,7 @@ int main()
         core.restore(persisted);
     }
 
+    core.handle({pico::EventKind::MotionReady,motion.init(queue_event) ? 1U : 0U});
     audio.init();
     core.handle({pico::EventKind::MicrophoneReady, microphone.init(queue_event) ? 1U : 0U});
     display.init();
@@ -108,6 +114,11 @@ int main()
         }
 
         hardware.poll();
+        motion.poll(core.state().motion_config);
+        if (core.state().motion_ready != motion.ready()) {
+            apply_effects(core.handle({pico::EventKind::MotionReady,motion.ready() ? 1U : 0U}),
+                          core,hardware,audio,microphone,display,storage,ble,capabilities);
+        }
         microphone.poll();
         if (core.state().microphone_ready != microphone.ready()) {
             apply_effects(core.handle({pico::EventKind::MicrophoneReady,microphone.ready() ? 1U : 0U}),

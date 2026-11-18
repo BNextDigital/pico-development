@@ -84,6 +84,10 @@ DecodeResult decode_command(const std::uint8_t *data, std::size_t size)
         if (!read_u32_le(data + 1) || read_u32_le(data + 1) > kMaxTimerSeconds)
             return {DecodeStatus::InvalidValue, {}};
         return {DecodeStatus::Ok, {static_cast<Command>(data[0]) == Command::SetBreakDuration ? EventKind::SetBreakDuration : EventKind::SetTimerDuration, read_u32_le(data + 1)}};
+    case Command::SetMotionConfig:
+        if (size != 2U) return wrong_length();
+        if (data[1] > motion::kAll) return {DecodeStatus::InvalidValue, {}};
+        return {DecodeStatus::Ok, {EventKind::SetMotionConfig,data[1]}};
     case Command::StartTuner:
     case Command::StopTuner:
     case Command::StartMetronome:
@@ -158,7 +162,8 @@ void encode_status(const State &state, Capabilities capabilities,
                 (state.focus_waiting ? 1U << 3U : 0U) |
                 (state.sound_muted ? 1U << 4U : 0U) |
                 (state.metronome_running ? 1U << 5U : 0U) |
-                (state.tuner_running ? 1U << 6U : 0U);
+                (state.tuner_running ? 1U << 6U : 0U) |
+                (state.motion_ready && state.motion_config ? 1U << 7U : 0U);
     output[5] = state.battery_percent;
     write_u32_le(state.timer_remaining_seconds, &output[6]);
     write_u32_le(state.interaction_count, &output[10]);

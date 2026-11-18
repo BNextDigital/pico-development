@@ -152,3 +152,18 @@ suppressed to avoid feedback. STOP drains DMA before removing microphone power;
 errors clear readiness without preventing Companion/Timer use. Raw samples are
 never persisted or sent to the phone. See [music-tuner.md](music-tuner.md) for
 sample-clock details, resource budgets and the outstanding hardware checks.
+
+## Motion-aware personality
+
+`motion::Detector` classifies timestamped milli-g samples using integer state
+and bounded time windows. The optional `Motion` adapter reads the SDK Sense
+accelerometer, owns ODR/error handling, and emits sparse classifier events.
+Core filters reactions by screen, mode, dock, active utility, expression
+priority, event age and runtime behavior mask. The shared Personality engine
+owns the resulting expression timing and rest state.
+
+Motion never starts/advances/cancels a timer, increments pat count, chirps or
+writes flash. Rest requires both classifier stillness and user inactivity.
+The implementation polls at ~25 Hz inside the existing loop; it does not yet
+provide hardware sleep/wakeup. See [motion-personality.md](motion-personality.md)
+for timing thresholds, compatibility and physical validation limits.

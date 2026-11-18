@@ -345,6 +345,13 @@ class PicoSimulatorApp:
         ttk.Button(timer_box, text="Silence", command=lambda: self._send("tone 0")).grid(row=6, column=2)
         ttk.Button(timer_box, text="Stop mic", command=lambda: self._send("event StopTuner")).grid(row=6, column=3)
 
+        for column, (label, trace) in enumerate((("Set down","still"),("Pick up","pickup"),("Rock","rock"),("Leave still","rest"))):
+            ttk.Button(timer_box, text=label, command=lambda name=trace: self._send(
+                "motion_test " + name)).grid(row=7, column=column)
+        self.motion_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(timer_box, text="Motion reactions", variable=self.motion_var, command=lambda: self._send(
+            "event SetMotionConfig " + ("7" if self.motion_var.get() else "0"))).grid(row=8,column=0,columnspan=2)
+
         time_box = ttk.LabelFrame(parent, text="Simulation clock", padding=10)
         time_box.grid(row=4, column=0, sticky="ew", pady=(0, 8))
         self.paused_var = tk.BooleanVar(value=False)
@@ -467,6 +474,7 @@ class PicoSimulatorApp:
         self.mode_var.set(state["mode_name"].upper())
         self.mood_var.set(state["mood_name"].upper())
         self.muted_var.set(state.get("sound_muted", False))
+        self.motion_var.set(bool(state.get("motion_config", 0)))
         self.timer_var.set(format_duration(state["timer_remaining_seconds"]) + (" PAUSED" if state.get("timer_paused") else ""))
         self.interactions_var.set(str(state["interaction_count"]))
         self.dock_var.set(state["dock"])

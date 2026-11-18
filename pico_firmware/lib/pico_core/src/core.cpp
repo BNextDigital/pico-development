@@ -179,6 +179,7 @@ Effects Core::handle(const Event &event)
         state_.screen = Screen::Home;
         state_.timer_completed = false;
         state_.tuner_running = false;
+        state_.motion_settled = false; state_.motion_config = motion::kAll;
         timer_.cancel(); focus_.cancel(); metronome_ = Metronome{}; sync_metronome(); sync_timer(); sync_focus(); activity();
         return Effect::Render | Effect::Notify;
     case EventKind::Tick: return on_tick(event.value);
@@ -360,6 +361,40 @@ Effects Core::handle(const Event &event)
             return effect(Effect::None);
         state_.tuner = reading;
         return effect(Effect::Render);
+    }
+    case EventKind::MotionReady:
+        if (event.value > 1) return effect(Effect::None);
+        state_.motion_ready = event.value != 0;
+        state_.motion_settled = false;
+        return Effect::Render | Effect::Notify;
+    case EventKind::SetMotionConfig:
+        if (event.value > motion::kAll || state_.motion_config == event.value) return effect(Effect::None);
+        state_.motion_config = static_cast<std::uint8_t>(event.value);
+        state_.motion_settled = false;
+        return Effect::Render | Effect::Notify;
+    case EventKind::MotionSettled: case EventKind::MotionActive:
+        if (!state_.motion_ready || !state_.motion_config) return effect(Effect::None);
+        state_.motion_settled = event.kind == EventKind::MotionSettled;
+        return Effect::Render | Effect::Notify;
+    case EventKind::MotionPickup: case EventKind::MotionRock: case EventKind::MotionRest: {
+        const unsigned flag = event.kind == EventKind::MotionPickup ? motion::kPickup :
+            event.kind == EventKind::MotionRock ? motion::kRock : motion::kRest;
+        if (!state_.motion_ready || !(state_.motion_config & flag) || state_.dock != Dock::None ||
+            state_.mode != Mode::Companion || state_.screen != Screen::Home ||
+            state_.timer_running || state_.timer_paused || state_.timer_completed || state_.focus_waiting ||
+            state_.tuner_running || state_.metronome_running || state_.mood == Mood::Happy || state_.mood == Mood::Alert ||
+            static_cast<std::int32_t>(animation_ms_-event.value) > 500) return effect(Effect::None);
+        animation_ms_ = event.value;
+        if (event.kind == EventKind::MotionRest) {
+            if (state_.mood == Mood::Sleepy || personality_.inactive_for(animation_ms_) < 60000U)
+                return effect(Effect::None);
+            personality_.rest(state_);
+        } else {
+            activity();
+            personality_.react(state_,event.kind == EventKind::MotionRock ? Mood::Happy : Mood::Curious,
+                               animation_ms_,event.kind == EventKind::MotionRock ? 3000U : 2000U);
+        }
+        return Effect::Render | Effect::Notify;
     }
     case EventKind::RequestStatus: return effect(Effect::Notify);
     }

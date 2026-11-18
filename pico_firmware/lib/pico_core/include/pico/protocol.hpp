@@ -38,6 +38,7 @@ enum class Command : std::uint8_t {
     TapTempo = 0x34,
     StartTuner = 0x35,
     StopTuner = 0x36,
+    SetMotionConfig = 0x40,
 };
 
 enum class DecodeStatus : std::uint8_t {
