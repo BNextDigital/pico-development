@@ -100,6 +100,20 @@ wiring, power-cycle the board to rerun initialization.
 
 Set `CONFIG_PICO_BRINGUP_DIAGNOSTICS=n` in the XIAO configuration when done.
 
+### Pairing troubleshooting build
+
+The XIAO fragment now uses phone-initiated pairing: connect in nRF Connect
+for Mobile, then choose Bond once and accept any Android pairing prompt.
+Pico does not send an automatic security request immediately on connection.
+The encrypted GATT permissions remain in force and Secure Connections pairing
+remains required. This change tests a possible initiation/timing conflict; it
+does not establish the cause of an earlier timeout.
+
+Temporary SMP debug logging and pairing-complete/failure callbacks provide
+more detail if this attempt fails. Capture the log from connection through
+failure. `BLE pairing complete; bonded=1` and `BLE link security level 2`
+are the expected success indications. Send command `01` only after pairing.
+
 ## SDK references
 
 - [XIAO board definitions](https://github.com/nrfconnect/sdk-zephyr/tree/ncs-v3.4.2/boards/seeed/xiao_ble)

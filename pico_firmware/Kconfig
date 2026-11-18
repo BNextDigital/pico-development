@@ -18,6 +18,14 @@ config PICO_SETTINGS
     depends on SETTINGS
     default y
 
+config PICO_BLE_AUTO_SECURITY
+    bool "Request BLE encryption immediately on connection"
+    depends on BT_SMP
+    default y
+    help
+      Disable to let the central initiate pairing. Encrypted GATT
+      permissions still prevent unencrypted command and status access.
+
 config PICO_BRINGUP_DIAGNOSTICS
     bool "Repeat display and I2C diagnostics on the console"
     depends on I2C && PRINTK
