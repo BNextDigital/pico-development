@@ -55,8 +55,9 @@ The icon root menu and Local Settings are merged. Interrupt-driven interaction
 buttons are the next power-foundation change; target/physical checks are in
 [interrupt-buttons.md](interrupt-buttons.md). After button acceptance:
 
-1. Replace the fixed main-loop wait with service deadlines, preserving metronome,
-   microphone, timer and motion response. Measure idle/active current.
+1. [Deadline-based main-loop waits](deadline-sleep.md) are implemented on the
+   next feature branch, pending target/physical checks. Measure idle/active
+   current and validate metronome, microphone, timer and motion response.
 2. Add peripheral idle/shutdown policy with confirmed wiring and wake/alert tests.
 3. Extend local display settings (contrast and explicit display sleep) once wake
    behavior and power measurements are reliable.

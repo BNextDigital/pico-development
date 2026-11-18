@@ -187,3 +187,8 @@ settings/edit state and volume; see [local-settings.md](local-settings.md).
 The root menu uses the same icon carousel as firmware: Navigate cycles the
 nine icons and Action selects, with the caption beneath the icon. See
 [icon root menu](icon-root-menu.md) for layout and hardware checks.
+
+Snapshots include `next_core_wake_ms` for timer/personality/music deadlines.
+This excludes motion polling, tuner drain and platform worker activity; it is
+not a power estimate. Explicit time jumps retain their existing behavior. See
+[deadline sleep](deadline-sleep.md) for the host scheduling model and checks.

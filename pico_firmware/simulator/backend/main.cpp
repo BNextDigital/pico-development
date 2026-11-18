@@ -1,5 +1,6 @@
 #include <cmath>
 #include <pico/core.hpp>
+#include <pico/service_schedule.hpp>
 #include <pico/display_model.hpp>
 #include <pico/features.hpp>
 #include <pico/persistence.hpp>
@@ -530,6 +531,9 @@ public:
                << "\"storage_pending\":"
                << (pending_dirty_ ? "true" : "false") << ','
                << "\"save_due_seconds\":" << save_due_seconds_ << ','
+               << "\"next_core_wake_ms\":" << pico::schedule::wait_ms(now_ms_, now_seconds_,
+                    core_.next_animation_ms(static_cast<std::uint32_t>(now_ms_)),
+                    core_.next_music_ms(static_cast<std::uint32_t>(now_ms_)), UINT32_MAX, false) << ','
                << "\"led_on\":"
                << (state.connected || state.uptime_seconds % 4U == 0U ? "true"
                                                                       : "false")

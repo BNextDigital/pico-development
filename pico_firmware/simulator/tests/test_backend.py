@@ -87,6 +87,21 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(returned["state"]["menu_index"], 3)
         self.assertEqual(returned["frame_hex"], frames[3])
 
+    def test_core_deadlines_follow_expression_and_metronome(self) -> None:
+        self.assertEqual(self.harness.initial["next_core_wake_ms"], 1000)
+        self.harness.send("event PrimaryPressed")
+        before = self.harness.send("advance_ms 3999")
+        self.assertEqual(before["state"]["mood_name"], "happy")
+        self.assertEqual(before["next_core_wake_ms"], 1)
+        after = self.harness.send("advance_ms 1")
+        self.assertEqual(after["state"]["mood_name"], "neutral")
+        music = self.harness.send("event StartMetronome")
+        self.assertEqual(music["next_core_wake_ms"], 80)
+        pulse_end = self.harness.send("advance_ms 80")
+        self.assertEqual(pulse_end["next_core_wake_ms"], 420)
+        beat = self.harness.send("advance_ms 420")
+        self.assertEqual(beat["next_core_wake_ms"], 80)
+
     def test_boot_and_interaction_use_real_core_and_renderer(self) -> None:
         boot = self.harness.initial
         self.assertEqual(boot["state"]["mode_name"], "companion")

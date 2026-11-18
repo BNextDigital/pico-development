@@ -54,6 +54,19 @@ bool Motion::ready() const
     return false;
 #endif
 }
+std::uint32_t Motion::next_poll_ms(std::uint8_t config, std::uint32_t now) const
+{
+#if defined(CONFIG_PICO_MOTION) && DT_NODE_HAS_STATUS(DT_ALIAS(pico_imu), okay)
+    if (!sensor_ready) return UINT32_MAX;
+    if (config != last_config) return 0;
+    if (!config) return UINT32_MAX;
+    const auto elapsed = now - last_poll;
+    return elapsed >= 40U ? 0U : 40U - elapsed;
+#else
+    ARG_UNUSED(config); ARG_UNUSED(now);
+    return UINT32_MAX;
+#endif
+}
 void Motion::poll(std::uint8_t config)
 {
 #if defined(CONFIG_PICO_MOTION) && DT_NODE_HAS_STATUS(DT_ALIAS(pico_imu), okay)
