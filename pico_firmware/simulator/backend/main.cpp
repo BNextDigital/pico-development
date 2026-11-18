@@ -147,6 +147,13 @@ std::string event_name(pico::EventKind kind)
     case pico::EventKind::StopTuner: return "StopTuner";
     case pico::EventKind::MicrophoneReady: return "MicrophoneReady";
     case pico::EventKind::TunerReading: return "TunerReading";
+    case pico::EventKind::MotionReady: return "MotionReady";
+    case pico::EventKind::MotionSettled: return "MotionSettled";
+    case pico::EventKind::MotionActive: return "MotionActive";
+    case pico::EventKind::MotionPickup: return "MotionPickup";
+    case pico::EventKind::MotionRock: return "MotionRock";
+    case pico::EventKind::MotionRest: return "MotionRest";
+    case pico::EventKind::SetMotionConfig: return "SetMotionConfig";
     case pico::EventKind::Boot:
         return "Boot";
     case pico::EventKind::Tick:
@@ -206,7 +213,7 @@ std::string event_name(pico::EventKind kind)
 
 std::optional<pico::EventKind> parse_event_kind(const std::string &token)
 {
-    constexpr std::array<pico::EventKind, 41> kinds{
+    constexpr std::array<pico::EventKind, 48> kinds{
         pico::EventKind::Boot,          pico::EventKind::Tick,
         pico::EventKind::PrimaryPressed, pico::EventKind::SecondaryPressed,
         pico::EventKind::Connected,     pico::EventKind::Disconnected,
@@ -240,6 +247,14 @@ std::optional<pico::EventKind> parse_event_kind(const std::string &token)
         pico::EventKind::StopTuner,
         pico::EventKind::MicrophoneReady,
         pico::EventKind::TunerReading,
+        pico::EventKind::MotionReady,
+        pico::EventKind::MotionSettled,
+        pico::EventKind::MotionActive,
+        pico::EventKind::MotionPickup,
+        pico::EventKind::MotionRock,
+        pico::EventKind::MotionRest,
+        pico::EventKind::SetMotionConfig,
+
 
 
 
@@ -328,6 +343,7 @@ public:
         : core_(seed), seed_(seed), state_path_(std::move(state_path))
     {
         load_state();
+        core_.handle({pico::EventKind::MotionReady,1});
         core_.handle({pico::EventKind::MicrophoneReady,1});
         last_result_ = dispatch({pico::EventKind::Boot, 0});
         last_result_.message = restored_ ? "Booted with saved state"
@@ -340,7 +356,10 @@ public:
     {
         Result result;
         result.event = event_name(event.kind);
+        const auto old_motion_config = core_.state().motion_config;
         result.effects = core_.handle(event);
+        if (old_motion_config != core_.state().motion_config || !core_.state().motion_ready)
+            motion_detector_.reset();
         apply_effects(result);
         result.storage_saved = flush_if_due();
         last_result_ = result;
@@ -368,6 +387,56 @@ public:
     Result advance(std::uint32_t seconds)
     { return advance_ms(static_cast<std::uint64_t>(seconds) * 1000U); }
 
+    Result motion_sample(pico::motion::Sample sample,std::uint32_t elapsed)
+    {
+        auto advanced = advance_ms(elapsed);
+        Result result;
+        result.event = "MotionSample";
+        if (!core_.state().motion_ready || !core_.state().motion_config) motion_detector_.reset();
+        else {
+            const auto signals = motion_detector_.sample(sample,static_cast<std::uint32_t>(now_ms_));
+            const struct { pico::motion::Signal signal; pico::EventKind event; } mapping[]{
+                {pico::motion::Settled,pico::EventKind::MotionSettled},{pico::motion::Active,pico::EventKind::MotionActive},
+                {pico::motion::Pickup,pico::EventKind::MotionPickup},{pico::motion::Rock,pico::EventKind::MotionRock},
+                {pico::motion::Rest,pico::EventKind::MotionRest}};
+            for (const auto &entry:mapping) if (signals & entry.signal)
+                result.effects |= core_.handle({entry.event,static_cast<std::uint32_t>(now_ms_)});
+        }
+        apply_effects(result);
+        result.effects |= advanced.effects;
+        result.rendered |= advanced.rendered;
+        result.notified |= advanced.notified;
+        result.chirped |= advanced.chirped;
+        result.persist_queued |= advanced.persist_queued;
+        result.storage_saved = advanced.storage_saved;
+        last_result_ = result;
+        return result;
+    }
+    Result motion_test(const std::string &name)
+    {
+        motion_detector_.reset();
+        Result result;
+        const auto hold = [&](pico::motion::Sample sample,unsigned ms) {
+            for (unsigned i=0; i<ms; i+=40) {
+                const auto step = motion_sample(sample,40);
+                result.effects |= step.effects;
+                result.rendered |= step.rendered;
+                result.notified |= step.notified;
+                result.chirped |= step.chirped;
+                result.persist_queued |= step.persist_queued;
+                result.storage_saved |= step.storage_saved;
+            }
+        };
+        hold({0,0,1000},2200);
+        if (name == "pickup") hold({450,0,893},320);
+        else if (name == "rock") {
+            hold({500,0,866},240); hold({-500,0,866},240); hold({0,0,1000},240);
+        } else if (name == "rest") hold({0,0,1000},61000);
+        else if (name == "bump") { hold({2500,0,1000},40); hold({0,0,1000},240); }
+        result.event = "MotionTest:"+name;
+        last_result_ = result;
+        return result;
+    }
     Result tone(unsigned millihz)
     {
         pico::pitch::Detector detector;
@@ -405,6 +474,7 @@ public:
         now_seconds_ = 0;
         now_ms_ = 0;
         core_ = pico::Core{seed_};
+        motion_detector_.reset();
         restored_ = false;
         if (factory_reset) {
             std::error_code error;
@@ -413,6 +483,7 @@ public:
             load_state();
         }
 
+        core_.handle({pico::EventKind::MotionReady,1});
         core_.handle({pico::EventKind::MicrophoneReady,1});
         auto result = dispatch({pico::EventKind::Boot, 0});
         result.event = factory_reset ? "FactoryReset" : "PowerCycle";
@@ -457,7 +528,7 @@ public:
                << "\"led_on\":"
                << (state.connected || state.uptime_seconds % 4U == 0U ? "true"
                                                                       : "false")
-               << ',' << "\"capabilities\":" << kSimulatedCapabilities << ','
+               << ',' << "\"capabilities\":" << capabilities() << ','
                << "\"state_path\":" << quoted(state_path_.string()) << ','
                << "\"status_hex\":" << quoted(hex_string(status_packet_)) << ','
                << "\"frame_hex\":" << quoted(hex_string(frame_buffer_)) << ','
@@ -481,6 +552,9 @@ public:
                << "\"screen\":" << static_cast<unsigned>(state.screen) << ','
                << "\"menu_index\":" << static_cast<unsigned>(state.menu_index) << ','
                << "\"eyes_closed\":" << (state.eyes_closed ? "true" : "false") << ','
+               << "\"motion_ready\":" << (state.motion_ready ? "true" : "false") << ','
+               << "\"motion_settled\":" << (state.motion_settled ? "true" : "false") << ','
+               << "\"motion_config\":" << static_cast<unsigned>(state.motion_config) << ','
                << "\"microphone_ready\":" << (state.microphone_ready ? "true" : "false") << ','
                << "\"tuner_running\":" << (state.tuner_running ? "true" : "false") << ','
                << "\"tuner_signal\":" << static_cast<unsigned>(state.tuner.signal) << ','
@@ -507,6 +581,13 @@ public:
     }
 
 private:
+    pico::motion::Detector motion_detector_;
+    pico::Capabilities capabilities() const
+    {
+        return static_cast<pico::Capabilities>(kSimulatedCapabilities |
+            (core_.state().microphone_ready ? pico::capability(pico::Capability::Microphone) : 0U) |
+            (core_.state().motion_ready ? pico::capability(pico::Capability::Motion) : 0U));
+    }
     void apply_effects(Result &result)
     {
         if (pico::has_effect(result.effects, pico::Effect::Persist)) {
@@ -527,7 +608,7 @@ private:
 
         if (pico::has_effect(result.effects, pico::Effect::Notify)) {
             std::uint8_t encoded[pico::protocol::kStatusSize]{};
-            pico::protocol::encode_status(core_.state(), kSimulatedCapabilities,
+            pico::protocol::encode_status(core_.state(), capabilities(),
                                           encoded);
             std::copy(std::begin(encoded), std::end(encoded), status_packet_.begin());
             result.notified = true;
@@ -710,6 +791,16 @@ int main(int argc, char **argv)
             result = !seconds.has_value()
                          ? command_error("Usage: advance SECONDS")
                          : simulator.advance(*seconds);
+        } else if (command == "motion") {
+            std::int32_t x,y,z; std::uint32_t elapsed;
+            if (input >> x >> y >> z >> elapsed && x>=-4000 && x<=4000 && y>=-4000 && y<=4000 &&
+                z>=-4000 && z<=4000 && elapsed<=60000)
+                result = simulator.motion_sample({x,y,z},elapsed);
+            else result = command_error("Usage: motion X_MG Y_MG Z_MG DELTA_MS");
+        } else if (command == "motion_test") {
+            std::string name; input >> name;
+            result = name == "pickup" || name == "rock" || name == "rest" || name == "bump" || name == "still" ?
+                simulator.motion_test(name) : command_error("Usage: motion_test still|pickup|rock|rest|bump");
         } else if (command == "tone") {
             std::string token;
             input >> token;

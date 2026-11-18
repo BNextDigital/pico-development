@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <pico/audio.hpp>
 #include <pico/pitch.hpp>
+#include <pico/motion.hpp>
 #include <pico/focus_session.hpp>
 
 namespace pico {
@@ -94,6 +95,13 @@ enum class EventKind : std::uint8_t {
     StopTuner,
     MicrophoneReady,
     TunerReading,
+    MotionReady,
+    MotionSettled,
+    MotionActive,
+    MotionPickup,
+    MotionRock,
+    MotionRest,
+    SetMotionConfig,
 };
 
 enum class Screen : std::uint8_t { Home, Menu, Utility, Themes, Unavailable, Music, Tuner };
@@ -171,6 +179,9 @@ struct State {
     bool tuner_running{false};
     std::uint8_t tuner_session{0};
     pitch::Reading tuner{};
+    bool motion_ready{false};
+    bool motion_settled{false};
+    std::uint8_t motion_config{motion::kAll};
 };
 
 struct PersistedState {

@@ -29,6 +29,11 @@ void Personality::react(State &s, Mood mood, std::uint32_t now, std::uint32_t du
     temporary_ = true;
     temporary_end_ = now + duration;
 }
+void Personality::rest(State &s)
+{
+    temporary_ = false;
+    s.mood = Mood::Sleepy; s.eyes_closed = false; s.gaze_x = 0;
+}
 bool Personality::advance(State &s, std::uint32_t now)
 {
     const auto mood = s.mood;
@@ -42,7 +47,7 @@ bool Personality::advance(State &s, std::uint32_t now)
     const bool busy = s.timer_running || s.timer_paused || s.screen != Screen::Home;
     if (!temporary_ && !busy && now - last_activity_ >= 300000U) {
         s.mood = Mood::Sleepy;
-    } else if (!temporary_ && !busy && due(now, next_idle_)) {
+    } else if (!temporary_ && !busy && s.mood != Mood::Sleepy && due(now, next_idle_)) {
         react(s, Mood::Curious, now, 2000);
         s.gaze_x = (random() & 1U) ? 1 : -1;
         next_idle_ = now + 20000U + random() % 20000U;
