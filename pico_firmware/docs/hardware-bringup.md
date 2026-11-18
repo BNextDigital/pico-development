@@ -1,76 +1,64 @@
-# Prototype hardware bring-up
+# Prototype hardware bring-up — current source
 
-For the current Sprint 01 build, wiring, compatibility and acceptance steps,
-see [Sprint 01](sprint01.md). The historical DK example below is a separate board.
+**Reviewed November 18, 2026.** This is a wiring and acceptance ledger for the purchased Seeed Studio XIAO nRF52840 **Sense**, not a claim of current board validation. The original OLED/BLE/D0 baseline was physically checked; later optional adapters remain to be validated.
 
-## Decision ledger
+## Decision and readiness ledger
 
-| Area | Current prototype decision | Confidence |
+| Component | Wiring/profile and state | Validation |
 | --- | --- | --- |
-| MCU/radio | Nordic nRF52 family using nRF Connect SDK and BLE | Confirmed |
-| Development board | Seeed Studio XIAO nRF52840 Sense; target `xiao_ble/nrf52840/sense` | Confirmed |
-| Display | Small monochrome OLED with layered bitmap components | Confirmed concept |
-| Display controller | 128x64 SSD1306 at `0x3c`, SDA D4 / SCL D5; baseline hardware rendered successfully | Confirmed baseline |
-| Input | D0 tap/hold Focus controls; optional D1 menu controls in Sprint 01 | D0 physically confirmed on baseline; D1 pending |
-| Indicators | XIAO onboard red LED for connection/heartbeat | Confirmed baseline |
-| Audio output | 8-ohm/1 W speaker + MAX98357 I2S breakout; PWM adapter is only an optional alternative | I2S driver pending |
-| Audio input | XIAO Sense onboard PDM microphone for future tuner/notes | Hardware known; capture adapter pending |
-| Haptics | No vibration motor | Explicitly excluded |
-| Docks | Home and car context; GPIO aliases supported now | Confirmed behavior, electrical ID method pending |
-| GPS/compass | Wayfinding extension | Future optional hardware |
-| Fitness sensing | None | Explicitly out of scope |
-| Power | USB/dev-board power for first bring-up; final user-serviceable battery circuit pending | Prototype-safe default |
+| MCU | XIAO nRF52840 Sense; nRF Connect SDK 3.4.2; target `xiao_ble/nrf52840/sense` | Target confirmed; current combined build pending |
+| OLED | 128×64 SSD1306 at I2C `0x3c`; 3V3/GND, SDA **D4/P0.04**, SCL **D5/P0.05** | Earlier baseline shown; brightness/sleep pending |
+| D0 Action | Switch between **D0/P0.02** and GND; internal pull-up, active-low | Earlier baseline checked; new IRQ adapter pending |
+| D1 Navigate | Switch between **D1/P0.03** and GND; internal pull-up | Source configured; physical validation pending |
+| D2 Back (optional) | Switch between **D2/P0.28** and GND; append `xiao_third_button.overlay` | Not required or assumed installed |
+| Indicator | XIAO board `led0` heartbeat | Earlier baseline checked |
+| Speaker | 8 Ω / 1 W moving-coil speaker via external **MAX98357A I2S** amplifier and optional profile | Source driver implemented; I2S/electrical tests pending |
+| Microphone | Sense onboard PDM mic; optional tuner overlay/config | Capture adapter implemented; target/acoustic tests pending |
+| Motion | Sense onboard IMU; optional motion overlay/config | Classifier/adapter implemented; thresholds/power pending |
+| Docks | Home/car devicetree aliases and software context changes | Dock electronics/ID wiring pending |
+| GPS/compass, haptic | Wayfinding sensors future; no vibration motor | Not part of current board |
+| Battery | USB prototype power; final user-serviceable cell/ADC policy pending | Consumption and safety design outstanding |
 
-## Safe first boot
+The D0/D1/D2 inputs are **active-low** (`GPIO_ACTIVE_LOW` with internal pull-ups): wire the contact to GND, not 3V3. GPIO edges now schedule deferred debounce/hold work instead of 20 ms idle input polling. The legacy `sw0`/`sw1` GPIO-key path on other boards is separate.
 
-1. Flash the firmware to the development board with no loose speaker connected.
-2. Confirm a boot log, a slow heartbeat on the board's `led0`, and a `Pico` BLE
-   advertisement.
-3. Press the board's `sw0`; the interaction counter should advance. `sw1`, when
-   present, cycles modes.
-4. Pair from a BLE utility, subscribe to the status characteristic, and send
-   command `01` to the command characteristic.
-5. Add the OLED after its controller and I2C address have been confirmed.
-6. Add dock and audio circuits only after the purchased board's GPIO numbering
-   and voltage levels are mapped.
+## Safe initial upload
 
-## Speaker warning
+Unplug USB before changing breadboard wiring. Do not connect a loose 8-ohm speaker, amplifier supply, dock circuit or unverified battery for the OLED-only boot. Use an nRF Connect SDK **3.4.2 terminal** in `pico_firmware/`:
 
-Do not connect an 8-ohm dynamic speaker directly to an nRF GPIO. The included
-firmware expects a `pico-buzzer` PWM devicetree alias, but the physical speaker
-needs a suitable transistor/MOSFET driver and power/current design. A piezo
-buzzer is a different load and needs its own confirmed wiring. Until an alias
-exists, chirps degrade safely to debug logs.
-
-## OLED build on an nRF52840 DK
-
-The development kit already supplies `sw0`, `sw1`, and `led0`. For a common
-SSD1306 board connected to its Arduino I2C pins:
-
-```sh
-west build -p always -b nrf52840dk/nrf52840 . -- \
-  -DDTC_OVERLAY_FILE=overlays/nrf52840dk_ssd1306.overlay
-west flash
+```powershell
+west build --no-sysbuild -p always -b xiao_ble/nrf52840/sense -d build-xiao . -- -DDTC_OVERLAY_FILE=overlays/xiao_ble_ssd1306.overlay -DEXTRA_CONF_FILE=configs/xiao_ble.conf
 ```
 
-Older nRF Connect SDK releases use board name `nrf52840dk_nrf52840`.
+Only after a successful build, double-tap reset and copy `build-xiao/zephyr/zephyr.uf2` to the XIAO BLE bootloader drive. [The first-boot guide](xiao-first-boot.md) covers serial output, pairing and display troubleshooting.
 
-If the module is SH1106, 128x32, address `0x3d`, SPI, or uses different pins,
-do not force this overlay. Make a board-specific overlay once the label and
-listing are available.
+## Optional profiles and electrical precautions
 
-## Custom-board aliases
+- **PDM + motion:** `overlays/xiao_ble_motion_tuner.overlay` with `configs/xiao_ble.conf;configs/xiao_tuner.conf;configs/xiao_motion.conf` (OLED included).
+- **D2 Back:** append `overlays/xiao_third_button.overlay` to your existing overlay list; D0/D1 hold-to-back still works.
+- **I2S:** follow the dedicated [MAX98357A wiring and build instructions](sprint02.md). It uses an external amp and separately chosen pins; don't blindly combine profiles.
+- **Quiet:** append `configs/xiao_quiet.conf` after initial diagnostics for meaningful power comparisons. Current draw is not yet measured.
 
-The adapters discover hardware through devicetree instead of source edits:
+**Never drive the moving-coil speaker directly from an nRF GPIO.** On the MAX98357A, attach the speaker across **OUT+** and **OUT−** (neither to GND). The USB/VBUS prototype amplifier supply is not an appropriate assumed battery rail. PWM `pico-buzzer` is a distinct optional fallback circuit, not an alternative direct drive for this speaker.
 
-| Alias/chosen node | Function | Required? |
-| --- | --- | --- |
-| `sw0` | Primary interaction button | No |
-| `sw1` | Mode-cycle button | No |
-| `led0` | Connection/advertising status | No |
-| `pico-dock-home` | Active home-dock input | No |
-| `pico-dock-car` | Active car-dock input | No |
-| `pico-buzzer` | PWM speaker output | No |
-| `zephyr,display` | Monochrome OLED | No |
+## Current-board acceptance checklist (pending)
 
-Missing optional nodes produce a log message and leave the rest of Pico alive.
+1. Confirm clean boot, LED heartbeat, OLED output and a Pico BLE advertisement.
+2. Verify D0/D1 tap/hold, icon navigation, minute editors and asleep-display wake-only first input; test D2 only if fitted.
+3. Pair/bond from a phone and verify encrypted GATT read/write/notify and reconnect.
+4. Save theme/duration/sound/motion/brightness/timeout, wait for coalesced storage and power-cycle; verify restored v5 settings and retained bond.
+5. Test optional IMU pickup/rock/rest behavior and PDM tuner against known inputs.
+6. Separately validate MAX98357A wiring, conservative loudness, DMA/stream recovery and lack of BLE regressions.
+7. Measure power by display/audio/sensor/BLE profile with the same supply and instrumentation.
+
+## Devicetree adapters
+
+| Alias / chosen node | Purpose |
+| --- | --- |
+| `pico-focus-button`, `pico-nav-button`, `pico-back-button` | D0, D1, optional D2 |
+| `sw0`, `sw1`, `led0` | Legacy buttons, onboard status LED |
+| `pico-dock-home`, `pico-dock-car` | Optional dock detection inputs |
+| `pico-buzzer`, `pico-i2s` | Optional PWM fallback and I2S |
+| `pico-dmic`, `pico-mic-power`, `pico-imu` | Optional PDM and IMU hardware |
+| `zephyr,display` | Selected OLED |
+
+The [nRF52840 DK overlay](../overlays/nrf52840dk_ssd1306.overlay) is historical/separate hardware, not a XIAO flash target. Do not infer success on a DK or simulator proves physical XIAO behavior.
