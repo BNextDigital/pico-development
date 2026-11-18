@@ -6,12 +6,17 @@ menu "Pico"
 
 config PICO_FIRMWARE_VERSION
     string "Firmware version"
-    default "0.5.0-tuner"
+    default "0.6.0-motion"
 
 config PICO_DISPLAY
     bool "Render Pico on the chosen monochrome display"
     depends on DISPLAY
     default y
+
+config PICO_MOTION
+    bool "Optional Sense IMU motion personality"
+    depends on SENSOR && LSM6DSL && REGULATOR
+    default n
 
 config PICO_MICROPHONE
     bool "Sense onboard PDM microphone for local tuning"

@@ -1,0 +1,3 @@
+/* Sense onboard IMU uses i2c0; OLED remains on i2c1. */
+#include "xiao_ble_ssd1306.overlay"
+/ { aliases { pico-imu = &lsm6ds3tr_c; }; };
