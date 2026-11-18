@@ -1,0 +1,12 @@
+/* Sense onboard PDM microphone. OLED/D0/D1 remain unchanged. */
+#include "xiao_ble_ssd1306.overlay"
+&pdm0 {
+    status = "okay";
+    clock-source = "PCLK32M_HFXO";
+};
+/ {
+    aliases {
+        pico-dmic = &pdm0;
+        pico-mic-power = &{/msm261d3526hicpm-c-en};
+    };
+};

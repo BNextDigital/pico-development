@@ -6,6 +6,7 @@
 #include <pico/core.hpp>
 
 #include "platform/pico_audio.hpp"
+#include "platform/pico_microphone.hpp"
 #include "platform/pico_ble.hpp"
 #include "platform/pico_display.hpp"
 #include "platform/pico_hardware.hpp"
@@ -29,17 +30,18 @@ bool queue_event(const pico::Event &event)
 }
 
 void apply_effects(pico::Effects effects, pico::Core &core,
-                   pico::platform::Hardware &hardware, pico::platform::Audio &audio,
+                   pico::platform::Hardware &hardware, pico::platform::Audio &audio, pico::platform::Microphone &microphone,
                    pico::platform::Display &display,
                    pico::platform::Storage &storage,
                    pico::platform::Ble &ble, pico::Capabilities capabilities)
 {
-    audio.set_muted(core.state().sound_muted);
+    microphone.sync(core.state().tuner_running,core.state().tuner_session);
+    audio.set_muted(core.state().sound_muted || core.state().tuner_running);
     audio.set_metronome_running(core.state().metronome_running);
     if (pico::has_effect(effects, pico::Effect::Persist)) {
         storage.save(core.persistent_state());
     }
-    if (pico::has_effect(effects, pico::Effect::Chirp) && !core.state().sound_muted) {
+    if (pico::has_effect(effects, pico::Effect::Chirp) && !core.state().sound_muted && !core.state().tuner_running) {
         if (audio.ready()) audio.play(core.state().sound_cue);
         else if (core.state().sound_cue < pico::audio::Cue::MetronomeClick) hardware.chirp();
     }
@@ -47,7 +49,10 @@ void apply_effects(pico::Effects effects, pico::Core &core,
         display.render(core.state());
     }
     if (pico::has_effect(effects, pico::Effect::Notify)) {
-        ble.publish(core.state(), capabilities);
+        const auto microphone_bit = pico::capability(pico::Capability::Microphone);
+        const auto current = static_cast<pico::Capabilities>((capabilities & ~microphone_bit) |
+            (core.state().microphone_ready ? microphone_bit : 0U));
+        ble.publish(core.state(), current);
     }
 }
 
@@ -60,6 +65,7 @@ int main()
     pico::Core core;
     pico::platform::Hardware hardware;
     pico::platform::Audio audio;
+    pico::platform::Microphone microphone;
     pico::platform::Display display;
     pico::platform::Storage storage;
     pico::platform::Ble ble;
@@ -73,16 +79,18 @@ int main()
     }
 
     audio.init();
+    core.handle({pico::EventKind::MicrophoneReady, microphone.init(queue_event) ? 1U : 0U});
     display.init();
     hardware.init(queue_event);
     const auto capabilities = hardware.capabilities() | display.capabilities() |
-        (audio.ready() ? pico::capability(pico::Capability::Speaker) : 0U);
+        (audio.ready() ? pico::capability(pico::Capability::Speaker) : 0U) |
+        (microphone.ready() ? pico::capability(pico::Capability::Microphone) : 0U);
 
     if (ble_ready) {
         ble.start_advertising();
     }
 
-    apply_effects(core.handle({pico::EventKind::Boot, 0}), core, hardware, audio,
+    apply_effects(core.handle({pico::EventKind::Boot, 0}), core, hardware, audio, microphone,
                   display, storage, ble, capabilities);
     hardware.reflect(core.state());
 
@@ -92,22 +100,27 @@ int main()
         pico::Event event{};
         if (k_msgq_get(&event_queue, &event, K_MSEC(20)) == 0) {
             apply_effects(core.handle({pico::EventKind::MusicTick, k_uptime_get_32()}),
-                          core, hardware, audio, display, storage, ble, capabilities);
+                          core, hardware, audio, microphone, display, storage, ble, capabilities);
             const auto effects = core.handle(event);
-            apply_effects(effects, core, hardware, audio, display, storage, ble,
+            apply_effects(effects, core, hardware, audio, microphone, display, storage, ble,
                           capabilities);
             hardware.reflect(core.state());
         }
 
         hardware.poll();
+        microphone.poll();
+        if (core.state().microphone_ready != microphone.ready()) {
+            apply_effects(core.handle({pico::EventKind::MicrophoneReady,microphone.ready() ? 1U : 0U}),
+                          core,hardware,audio,microphone,display,storage,ble,capabilities);
+        }
 
         apply_effects(core.handle({pico::EventKind::MusicTick, k_uptime_get_32()}),
-                      core, hardware, audio, display, storage, ble, capabilities);
+                      core, hardware, audio, microphone, display, storage, ble, capabilities);
         const auto now_ms = k_uptime_get_32();
         if (now_ms - last_animation_ms >= 100U) {
             last_animation_ms = now_ms;
             apply_effects(core.handle({pico::EventKind::AnimationTick, now_ms}),
-                          core, hardware, audio, display, storage, ble, capabilities);
+                          core, hardware, audio, microphone, display, storage, ble, capabilities);
         }
 
         const auto now_seconds = static_cast<std::uint32_t>(
@@ -115,7 +128,7 @@ int main()
         if (now_seconds != last_tick) {
             last_tick = now_seconds;
             const auto effects = core.handle({pico::EventKind::Tick, now_seconds});
-            apply_effects(effects, core, hardware, audio, display, storage, ble,
+            apply_effects(effects, core, hardware, audio, microphone, display, storage, ble,
                           capabilities);
             hardware.reflect(core.state());
 #if defined(CONFIG_PICO_BRINGUP_DIAGNOSTICS)
