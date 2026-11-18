@@ -38,6 +38,13 @@ The decisions distilled from the wider Pico project are recorded in
 hardware ledger is in
 [`docs/hardware-bringup.md`](docs/hardware-bringup.md).
 
+## Onboard microphone tuner
+
+The optional Sense microphone profile adds a local chromatic tuner with note,
+cents, sharp/flat meter and signal-level guidance. No extra wiring or speaker.
+See [tuner build and physical validation](docs/music-tuner.md). Target capture
+and acoustic accuracy remain unverified; host/simulator tests pass.
+
 ## Music metronome
 
 The Music menu now opens an offline visual metronome with 30–240 BPM,

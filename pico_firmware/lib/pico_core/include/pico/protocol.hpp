@@ -36,6 +36,8 @@ enum class Command : std::uint8_t {
     SetMetronomeBpm = 0x32,
     SetMetronomeBeats = 0x33,
     TapTempo = 0x34,
+    StartTuner = 0x35,
+    StopTuner = 0x36,
 };
 
 enum class DecodeStatus : std::uint8_t {

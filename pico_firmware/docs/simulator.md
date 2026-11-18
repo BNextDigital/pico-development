@@ -147,3 +147,13 @@ can be set through `event SetMetronomeBeats 3` or BLE `33 03`. The GUI uses
 exact boundaries; large advances skip stale beats instead of replaying them.
 Music JSON fields and test examples are in [music-metronome.md](music-metronome.md).
 The preview remains visual; Chirp effects do not play desktop audio.
+
+## Tuner input simulation
+
+Tuner / A4 input / Silence / Stop mic exercise the actual portable pitch detector.
+Backend `tone MILLIHZ` generates two-plus analysis frames: `tone 440000` for A4,
+`tone 65406` for C2, and `tone 0` for silence. Input is explicit synthesized PCM,
+not host microphone acquisition. Start with `event StartTuner` or BLE `35`.
+`event MicrophoneReady 0` simulates unavailable capture; reboot restores the
+virtual adapter. JSON exposes tuner state, signal, MIDI note, cents and level.
+Details and validation limits: [music-tuner.md](music-tuner.md).

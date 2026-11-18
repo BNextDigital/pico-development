@@ -340,6 +340,11 @@ class PicoSimulatorApp:
         ttk.Button(timer_box, text="Set BPM", command=lambda: self._send(
             "event SetMetronomeBpm " + self.bpm_var.get())).grid(row=5, column=1)
 
+        ttk.Button(timer_box, text="Tuner", command=lambda: self._send("event StartTuner")).grid(row=6, column=0)
+        ttk.Button(timer_box, text="A4 input", command=lambda: self._send("tone 440000")).grid(row=6, column=1)
+        ttk.Button(timer_box, text="Silence", command=lambda: self._send("tone 0")).grid(row=6, column=2)
+        ttk.Button(timer_box, text="Stop mic", command=lambda: self._send("event StopTuner")).grid(row=6, column=3)
+
         time_box = ttk.LabelFrame(parent, text="Simulation clock", padding=10)
         time_box.grid(row=4, column=0, sticky="ew", pady=(0, 8))
         self.paused_var = tk.BooleanVar(value=False)

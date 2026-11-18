@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <pico/audio.hpp>
+#include <pico/pitch.hpp>
 #include <pico/focus_session.hpp>
 
 namespace pico {
@@ -89,9 +90,13 @@ enum class EventKind : std::uint8_t {
     SetMetronomeBpm,
     SetMetronomeBeats,
     TapTempo,
+    StartTuner,
+    StopTuner,
+    MicrophoneReady,
+    TunerReading,
 };
 
-enum class Screen : std::uint8_t { Home, Menu, Utility, Themes, Unavailable, Music };
+enum class Screen : std::uint8_t { Home, Menu, Utility, Themes, Unavailable, Music, Tuner };
 
 struct Event {
     EventKind kind{EventKind::Boot};
@@ -162,6 +167,10 @@ struct State {
     std::uint8_t beats_per_bar{4};
     std::uint8_t current_beat{1};
     std::uint8_t music_index{2};
+    bool microphone_ready{false};
+    bool tuner_running{false};
+    std::uint8_t tuner_session{0};
+    pitch::Reading tuner{};
 };
 
 struct PersistedState {
