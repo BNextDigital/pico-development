@@ -1,0 +1,101 @@
+#include <pico/protocol.hpp>
+
+namespace pico::protocol {
+namespace {
+
+std::uint32_t read_u32_le(const std::uint8_t *data)
+{
+    return static_cast<std::uint32_t>(data[0]) |
+           (static_cast<std::uint32_t>(data[1]) << 8U) |
+           (static_cast<std::uint32_t>(data[2]) << 16U) |
+           (static_cast<std::uint32_t>(data[3]) << 24U);
+}
+
+void write_u32_le(std::uint32_t value, std::uint8_t *output)
+{
+    output[0] = static_cast<std::uint8_t>(value);
+    output[1] = static_cast<std::uint8_t>(value >> 8U);
+    output[2] = static_cast<std::uint8_t>(value >> 16U);
+    output[3] = static_cast<std::uint8_t>(value >> 24U);
+}
+
+DecodeResult wrong_length()
+{
+    return {DecodeStatus::WrongLength, {}};
+}
+
+} // namespace
+
+DecodeResult decode_command(const std::uint8_t *data, std::size_t size)
+{
+    if (data == nullptr || size == 0U) {
+        return {DecodeStatus::Empty, {}};
+    }
+
+    switch (static_cast<Command>(data[0])) {
+    case Command::Interact:
+        return size == 1U
+                   ? DecodeResult{DecodeStatus::Ok, {EventKind::PrimaryPressed, 0}}
+                   : wrong_length();
+
+    case Command::SetMode:
+        if (size != 2U) {
+            return wrong_length();
+        }
+        if (data[1] >= static_cast<std::uint8_t>(Mode::Count) ||
+            data[1] == static_cast<std::uint8_t>(Mode::Driving)) {
+            return {DecodeStatus::InvalidValue, {}};
+        }
+        return {DecodeStatus::Ok, {EventKind::SetMode, data[1]}};
+
+    case Command::SetMood:
+        if (size != 2U) {
+            return wrong_length();
+        }
+        if (data[1] >= static_cast<std::uint8_t>(Mood::Count)) {
+            return {DecodeStatus::InvalidValue, {}};
+        }
+        return {DecodeStatus::Ok, {EventKind::SetMood, data[1]}};
+
+    case Command::StartTimer:
+        if (size != 5U) {
+            return wrong_length();
+        }
+        if (read_u32_le(&data[1]) == 0U ||
+            read_u32_le(&data[1]) > kMaxTimerSeconds) {
+            return {DecodeStatus::InvalidValue, {}};
+        }
+        return {DecodeStatus::Ok,
+                {EventKind::StartTimer, read_u32_le(&data[1])}};
+
+    case Command::CancelTimer:
+        return size == 1U
+                   ? DecodeResult{DecodeStatus::Ok, {EventKind::CancelTimer, 0}}
+                   : wrong_length();
+
+    case Command::RequestStatus:
+        return size == 1U
+                   ? DecodeResult{DecodeStatus::Ok, {EventKind::RequestStatus, 0}}
+                   : wrong_length();
+    }
+
+    return {DecodeStatus::UnknownCommand, {}};
+}
+
+void encode_status(const State &state, Capabilities capabilities,
+                   std::uint8_t (&output)[kStatusSize])
+{
+    output[0] = kProtocolVersion;
+    output[1] = static_cast<std::uint8_t>(state.mode);
+    output[2] = static_cast<std::uint8_t>(state.mood);
+    output[3] = static_cast<std::uint8_t>(state.dock);
+    output[4] = (state.connected ? 1U : 0U) |
+                (state.timer_running ? 1U << 1U : 0U);
+    output[5] = state.battery_percent;
+    write_u32_le(state.timer_remaining_seconds, &output[6]);
+    write_u32_le(state.interaction_count, &output[10]);
+    output[14] = static_cast<std::uint8_t>(capabilities);
+    output[15] = static_cast<std::uint8_t>(capabilities >> 8U);
+}
+
+} // namespace pico::protocol

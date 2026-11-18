@@ -1,0 +1,11 @@
+{
+  "ExpandedNodes": [
+    "",
+    "\\pico-firmware",
+    "\\pico-firmware\\docs",
+    "\\pico-firmware\\overlays",
+    "\\pico-firmware\\simulator"
+  ],
+  "SelectedNode": "\\pico-firmware\\docs\\ble-protocol.md",
+  "PreviewInSolutionExplorer": false
+}

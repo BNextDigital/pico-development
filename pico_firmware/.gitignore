@@ -1,0 +1,6 @@
+/build*/
+/simulator/build/
+/.cache/
+/.vscode/
+*.pyc
+__pycache__/

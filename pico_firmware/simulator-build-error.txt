@@ -1,0 +1,65 @@
+core.cpp
+display_model.cpp
+C:\Users\brayd\Documents\Pico Development\pico-firmware-v0.1.0\pico-firmware\lib\pico_core\src\display_model.cpp(138): error C2220: the following warning is treated as an error
+C:\Users\brayd\Documents\Pico Development\pico-firmware-v0.1.0\pico-firmware\lib\pico_core\src\display_model.cpp(138): warning C4244: 'argument': conversion from 'unsigned int' to 'uint16_t', possible loss of data
+C:\Users\brayd\Documents\Pico Development\pico-firmware-v0.1.0\pico-firmware\lib\pico_core\src\display_model.cpp(138): warning C4244: 'argument': conversion from 'unsigned int' to 'uint16_t', possible loss of data
+C:\Users\brayd\Documents\Pico Development\pico-firmware-v0.1.0\pico-firmware\lib\pico_core\src\display_model.cpp(139): warning C4244: 'argument': conversion from 'unsigned int' to 'uint16_t', possible loss of data
+C:\Users\brayd\Documents\Pico Development\pico-firmware-v0.1.0\pico-firmware\lib\pico_core\src\display_model.cpp(139): warning C4244: 'argument': conversion from 'unsigned int' to 'uint16_t', possible loss of data
+C:\Users\brayd\Documents\Pico Development\pico-firmware-v0.1.0\pico-firmware\lib\pico_core\src\display_model.cpp(142): warning C4244: 'argument': conversion from 'unsigned int' to 'uint16_t', possible loss of data
+C:\Users\brayd\Documents\Pico Development\pico-firmware-v0.1.0\pico-firmware\lib\pico_core\src\display_model.cpp(142): warning C4244: 'argument': conversion from 'unsigned int' to 'uint16_t', possible loss of data
+C:\Users\brayd\Documents\Pico Development\pico-firmware-v0.1.0\pico-firmware\lib\pico_core\src\display_model.cpp(144): warning C4244: 'argument': conversion from 'unsigned int' to 'uint16_t', possible loss of data
+C:\Users\brayd\Documents\Pico Development\pico-firmware-v0.1.0\pico-firmware\lib\pico_core\src\display_model.cpp(144): warning C4244: 'argument': conversion from 'unsigned int' to 'uint16_t', possible loss of data
+C:\Users\brayd\Documents\Pico Development\pico-firmware-v0.1.0\pico-firmware\lib\pico_core\src\display_model.cpp(146): warning C4244: 'argument': conversion from 'unsigned int' to 'uint16_t', possible loss of data
+C:\Users\brayd\Documents\Pico Development\pico-firmware-v0.1.0\pico-firmware\lib\pico_core\src\display_model.cpp(146): warning C4244: 'argument': conversion from 'unsigned int' to 'uint16_t', possible loss of data
+C:\Users\brayd\Documents\Pico Development\pico-firmware-v0.1.0\pico-firmware\lib\pico_core\src\display_model.cpp(147): warning C4244: 'argument': conversion from 'unsigned int' to 'uint16_t', possible loss of data
+C:\Users\brayd\Documents\Pico Development\pico-firmware-v0.1.0\pico-firmware\lib\pico_core\src\display_model.cpp(147): warning C4244: 'argument': conversion from 'unsigned int' to 'uint16_t', possible loss of data
+C:\Users\brayd\Documents\Pico Development\pico-firmware-v0.1.0\pico-firmware\lib\pico_core\src\display_model.cpp(148): warning C4244: 'argument': conversion from 'unsigned int' to 'uint16_t', possible loss of data
+C:\Users\brayd\Documents\Pico Development\pico-firmware-v0.1.0\pico-firmware\lib\pico_core\src\display_model.cpp(148): warning C4244: 'argument': conversion from 'unsigned int' to 'uint16_t', possible loss of data
+C:\Users\brayd\Documents\Pico Development\pico-firmware-v0.1.0\pico-firmware\lib\pico_core\src\display_model.cpp(150): warning C4244: 'argument': conversion from 'unsigned int' to 'uint16_t', possible loss of data
+C:\Users\brayd\Documents\Pico Development\pico-firmware-v0.1.0\pico-firmware\lib\pico_core\src\display_model.cpp(150): warning C4244: 'argument': conversion from 'unsigned int' to 'uint16_t', possible loss of data
+C:\Users\brayd\Documents\Pico Development\pico-firmware-v0.1.0\pico-firmware\lib\pico_core\src\display_model.cpp(164): warning C4244: 'argument': conversion from 'const unsigned int' to 'uint16_t', possible loss of data
+C:\Users\brayd\Documents\Pico Development\pico-firmware-v0.1.0\pico-firmware\lib\pico_core\src\display_model.cpp(166): warning C4244: 'argument': conversion from 'unsigned int' to 'uint16_t', possible loss of data
+C:\Users\brayd\Documents\Pico Development\pico-firmware-v0.1.0\pico-firmware\lib\pico_core\src\display_model.cpp(167): warning C4244: 'argument': conversion from 'unsigned int' to 'uint16_t', possible loss of data
+C:\Users\brayd\Documents\Pico Development\pico-firmware-v0.1.0\pico-firmware\lib\pico_core\src\display_model.cpp(177): warning C4244: 'argument': conversion from 'const unsigned int' to 'uint16_t', possible loss of data
+C:\Users\brayd\Documents\Pico Development\pico-firmware-v0.1.0\pico-firmware\lib\pico_core\src\display_model.cpp(177): warning C4244: 'argument': conversion from 'unsigned int' to 'uint16_t', possible loss of data
+C:\Users\brayd\Documents\Pico Development\pico-firmware-v0.1.0\pico-firmware\lib\pico_core\src\display_model.cpp(179): warning C4244: 'argument': conversion from 'unsigned int' to 'uint16_t', possible loss of data
+C:\Users\brayd\Documents\Pico Development\pico-firmware-v0.1.0\pico-firmware\lib\pico_core\src\display_model.cpp(179): warning C4244: 'argument': conversion from 'unsigned int' to 'uint16_t', possible loss of data
+C:\Users\brayd\Documents\Pico Development\pico-firmware-v0.1.0\pico-firmware\lib\pico_core\src\display_model.cpp(189): warning C4244: 'argument': conversion from 'const unsigned int' to 'uint16_t', possible loss of data
+C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Tools\MSVC\14.51.36231\include\xutility(5604): warning C4244: '=': conversion from 'const _Ty' to 'uint8_t', possible loss of data
+        with
+        [
+            _Ty=unsigned int
+        ]
+C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Tools\MSVC\14.51.36231\include\xutility(5604): note: the template instantiation context (the oldest one first) is
+C:\Users\brayd\Documents\Pico Development\pico-firmware-v0.1.0\pico-firmware\lib\pico_core\src\display_model.cpp(215): note: see reference to function template instantiation 'void std::fill<uint8_t*,unsigned int>(const _FwdIt,const _FwdIt,const _Ty &)' being compiled
+        with
+        [
+            _FwdIt=uint8_t *,
+            _Ty=unsigned int
+        ]
+C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Tools\MSVC\14.51.36231\include\xutility(5547): warning C4244: 'initializing': conversion from 'const _Ty' to 'unsigned char', possible loss of data
+        with
+        [
+            _Ty=unsigned int
+        ]
+C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Tools\MSVC\14.51.36231\include\xutility(5547): note: the template instantiation context (the oldest one first) is
+C:\Users\brayd\Documents\Pico Development\pico-firmware-v0.1.0\pico-firmware\lib\pico_core\src\display_model.cpp(215): note: see reference to function template instantiation 'void std::fill<uint8_t*,unsigned int>(const _FwdIt,const _FwdIt,const _Ty &)' being compiled
+        with
+        [
+            _FwdIt=uint8_t *,
+            _Ty=unsigned int
+        ]
+C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\VC\Tools\MSVC\14.51.36231\include\xutility(5593): note: see reference to function template instantiation 'void std::_Fill_memset<_FwdIt,_Ty>(_CtgIt,const _Ty,const size_t)' being compiled
+        with
+        [
+            _FwdIt=uint8_t *,
+            _Ty=unsigned int,
+            _CtgIt=uint8_t *
+        ]
+features.cpp
+persistence.cpp
+protocol.cpp
+main.cpp
+Generating Code...
+Simulator build failed: Command '['C:\\Program Files (x86)\\Microsoft Visual Studio\\18\\BuildTools\\VC\\Tools\\MSVC\\14.51.36231\\bin\\HostX64\\x64\\cl.EXE', '/nologo', '/std:c++17', '/EHsc', '/W4', '/WX', '/IC:\\Users\\brayd\\Documents\\Pico Development\\pico-firmware-v0.1.0\\pico-firmware\\lib\\pico_core\\include', 'C:\\Users\\brayd\\Documents\\Pico Development\\pico-firmware-v0.1.0\\pico-firmware\\lib\\pico_core\\src\\core.cpp', 'C:\\Users\\brayd\\Documents\\Pico Development\\pico-firmware-v0.1.0\\pico-firmware\\lib\\pico_core\\src\\display_model.cpp', 'C:\\Users\\brayd\\Documents\\Pico Development\\pico-firmware-v0.1.0\\pico-firmware\\lib\\pico_core\\src\\features.cpp', 'C:\\Users\\brayd\\Documents\\Pico Development\\pico-firmware-v0.1.0\\pico-firmware\\lib\\pico_core\\src\\persistence.cpp', 'C:\\Users\\brayd\\Documents\\Pico Development\\pico-firmware-v0.1.0\\pico-firmware\\lib\\pico_core\\src\\protocol.cpp', 'C:\\Users\\brayd\\Documents\\Pico Development\\pico-firmware-v0.1.0\\pico-firmware\\simulator\\backend\\main.cpp', '/Fe:C:\\Users\\brayd\\Documents\\Pico Development\\pico-firmware-v0.1.0\\pico-firmware\\simulator\\build\\pico_sim_backend.exe']' returned non-zero exit status 2.
+Building Pico simulator backend from lib/pico_core...

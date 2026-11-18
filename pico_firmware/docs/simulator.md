@@ -1,0 +1,110 @@
+# Pico desktop hardware simulator
+
+## Purpose
+
+The simulator is a permanent host platform for Pico firmware, not a second
+implementation of Pico's behavior. Its native backend compiles the production
+files in `lib/pico_core/src` and exposes them to a small Tk desktop shell.
+
+The shared portable layer now owns:
+
+- the `Core` event/state/effect machine;
+- feature descriptors and mode order;
+- BLE command decoding and status encoding;
+- the monochrome display compositor; and
+- the 16-byte persisted-state codec.
+
+The simulator owns only host representations of hardware: windows, buttons,
+an enlarged OLED, a status LED, an audible chirp, a flash file, and a virtual
+BLE control panel.
+
+## Run it
+
+### Windows
+
+Double-click `simulator/run.bat`, or from PowerShell:
+
+```powershell
+py -3 simulator/pico_sim.py
+```
+
+The first launch needs a desktop C++ compiler. Visual Studio Build Tools with
+the **Desktop development with C++** workload is the most direct Windows route.
+Python must include Tk support; normal python.org Windows installations do.
+
+### macOS or Linux
+
+```sh
+./simulator/run.sh
+```
+
+The first launch needs `clang++` or `g++` and Python 3 with Tk.
+
+The launcher rebuilds the native backend when any core `.cpp` or `.hpp` is
+newer than the executable. Set `PICO_SIM_CXX` if a specific host compiler
+should be used.
+
+## What can be exercised
+
+- Primary and secondary physical buttons, including firmware mood/mode rules.
+- Home, car, and absent dock contacts.
+- Battery readings, including the firmware's unknown value.
+- BLE connection state and arbitrary command-characteristic packets.
+- Timers at 1x, 10x, or 60x speed.
+- The exact portable 128x64 monochrome framebuffer.
+- LED heartbeat/connected behavior and 2.4 kHz chirp requests.
+- Delayed flash writes, power loss before a save, reboot restoration, and
+  factory reset.
+- Raw numeric event injection for early feature development.
+
+Keyboard shortcuts are Space for the primary button and M for mode cycling.
+
+## Maintenance contract
+
+Most firmware iterations require no simulator changes:
+
+1. Put product behavior in `lib/pico_core`.
+2. Add portable `.cpp` files anywhere under `lib/pico_core/src`; the simulator
+   build discovers them automatically.
+3. Put OLED composition changes in `display_model.cpp`, which both the Zephyr
+   display adapter and simulator call.
+4. Put wire-format changes in `protocol.cpp` and persistent-format changes in
+   `persistence.cpp` so both targets exercise the same codec.
+5. Reopen the simulator. It rebuilds its backend when shared code changed.
+
+A simulator UI change is only needed when a new feature requires a genuinely
+new kind of virtual hardware control or when `State` gains fields that should
+appear in the friendly dashboard. The generic event injector and BLE packet
+writer remain available before that specialized control exists.
+
+## Tests
+
+Run both suites before firmware changes are considered healthy:
+
+```sh
+./tests/host/run.sh
+./simulator/run-tests.sh
+```
+
+The simulator tests launch the real native backend and verify interaction,
+docking, BLE decoding, timer completion, framebuffer generation, flash delay,
+and reboot restoration. They do not require a display server.
+
+## Process protocol
+
+`simulator/backend/main.cpp` uses newline-delimited commands and JSON snapshots.
+This boundary is intentionally simple enough that another UI, automated test
+runner, or future game-engine front end can drive the same executable.
+
+Supported commands include:
+
+```text
+event PrimaryPressed 0
+event DockChanged 2
+advance 30
+ble 04 1e 00 00 00
+status
+power_cycle
+factory_reset
+quit
+```

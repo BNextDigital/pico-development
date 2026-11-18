@@ -1,0 +1,12 @@
+{
+	"folders": [
+		{
+			"path": "pico-firmware"
+		}
+	],
+	"settings": {
+		"nrf-connect.applications": [
+			"${workspaceFolder}\\pico_firmware"
+		]
+	}
+}

@@ -1,0 +1,39 @@
+mainmenu "Pico firmware"
+
+source "Kconfig.zephyr"
+
+menu "Pico"
+
+config PICO_FIRMWARE_VERSION
+    string "Firmware version"
+    default "0.1.0"
+
+config PICO_DISPLAY
+    bool "Render Pico on the chosen monochrome display"
+    depends on DISPLAY
+    default y
+
+config PICO_SETTINGS
+    bool "Persist Pico state"
+    depends on SETTINGS
+    default y
+
+config PICO_SETTINGS_SAVE_DELAY_SECONDS
+    int "Delay used to coalesce flash writes"
+    depends on PICO_SETTINGS
+    range 1 60
+    default 5
+
+config PICO_EVENT_QUEUE_SIZE
+    int "Core event queue depth"
+    range 4 64
+    default 16
+
+config PICO_LOG_LEVEL
+    int "Pico module log level"
+    range 0 4
+    default 3
+    help
+      0 disables logging; 1 is error; 2 is warning; 3 is info; 4 is debug.
+
+endmenu
