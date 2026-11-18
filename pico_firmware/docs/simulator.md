@@ -125,3 +125,15 @@ Persistence accepts 16-byte v1/v2 and 20-byte v3 records. Boot always starts in
 Companion mode and keeps durable theme/count/duration. Desktop compilation
 runs in the ignored simulator build directory so MSVC objects do not dirty
 source folders. See `sprint01.md` for test results and unverified hardware.
+
+## Sprint 02 controls
+
+Work / break starts a confirmed-phase cycle; Next phase advances only after
+completion. Test cue emits a Chirp effect; Mute toggles runtime output. Sound
+is represented by effects and `sound_cue`, not desktop audio playback.
+Use raw events `SetTimerDuration 10`, `SetBreakDuration 5`, `StartFocusCycle`,
+`NextFocusPhase`, `SetMuted 1`, `TestSound 2` or BLE commands 20–24.
+JSON adds `focus_phase` (0 none/1 work/2 break), `focus_waiting`,
+`completed_work_sessions`, `break_duration_seconds`, `sound_muted`, `sound_cue`.
+Advancing time past completion never auto-starts the next phase. Power cycling
+clears session state and mute, and restores the existing durable settings.

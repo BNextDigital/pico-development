@@ -1,3 +1,4 @@
+#include <vector>
 #include <pico/core.hpp>
 #include <pico/button.hpp>
 #include <pico/display_model.hpp>
@@ -340,6 +341,7 @@ void test_focus_button_standalone_controls()
 }
 
 #include "sprint01_tests.hpp"
+#include "sprint02_tests.hpp"
 
 } // namespace
 
@@ -357,6 +359,7 @@ int main()
     test_persistence_codec_round_trip_and_validation();
     test_theme_events_and_persistence();
     run_sprint01_tests();
+    run_sprint02_tests();
     test_button_debounce_and_hold();
     test_focus_button_standalone_controls();
 

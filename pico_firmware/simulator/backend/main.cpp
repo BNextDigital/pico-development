@@ -131,6 +131,11 @@ std::string dock_name(pico::Dock dock)
 std::string event_name(pico::EventKind kind)
 {
     switch (kind) {
+    case pico::EventKind::StartFocusCycle: return "StartFocusCycle";
+    case pico::EventKind::NextFocusPhase: return "NextFocusPhase";
+    case pico::EventKind::SetBreakDuration: return "SetBreakDuration";
+    case pico::EventKind::TestSound: return "TestSound";
+    case pico::EventKind::SetMuted: return "SetMuted";
     case pico::EventKind::Boot:
         return "Boot";
     case pico::EventKind::Tick:
@@ -190,7 +195,7 @@ std::string event_name(pico::EventKind kind)
 
 std::optional<pico::EventKind> parse_event_kind(const std::string &token)
 {
-    constexpr std::array<pico::EventKind, 26> kinds{
+    constexpr std::array<pico::EventKind, 31> kinds{
         pico::EventKind::Boot,          pico::EventKind::Tick,
         pico::EventKind::PrimaryPressed, pico::EventKind::SecondaryPressed,
         pico::EventKind::Connected,     pico::EventKind::Disconnected,
@@ -209,6 +214,12 @@ std::optional<pico::EventKind> parse_event_kind(const std::string &token)
         pico::EventKind::PauseTimer,
         pico::EventKind::ResumeTimer,
         pico::EventKind::SetTimerDuration,
+        pico::EventKind::StartFocusCycle,
+        pico::EventKind::NextFocusPhase,
+        pico::EventKind::SetBreakDuration,
+        pico::EventKind::TestSound,
+        pico::EventKind::SetMuted,
+
 
     };
     for (const auto kind : kinds) {
@@ -433,6 +444,12 @@ public:
                << "\"screen\":" << static_cast<unsigned>(state.screen) << ','
                << "\"menu_index\":" << static_cast<unsigned>(state.menu_index) << ','
                << "\"eyes_closed\":" << (state.eyes_closed ? "true" : "false") << ','
+               << "\"focus_phase\":" << static_cast<unsigned>(state.focus_phase) << ','
+               << "\"focus_waiting\":" << (state.focus_waiting ? "true" : "false") << ','
+               << "\"completed_work_sessions\":" << state.completed_work_sessions << ','
+               << "\"break_duration_seconds\":" << state.break_duration_seconds << ','
+               << "\"sound_muted\":" << (state.sound_muted ? "true" : "false") << ','
+               << "\"sound_cue\":" << static_cast<unsigned>(state.sound_cue) << ','
                << "\"timer_paused\":" << (state.timer_paused ? "true" : "false") << ','
                << "\"configured_duration_seconds\":" << state.configured_duration_seconds << ','
                << "\"interaction_count\":" << state.interaction_count << "},"

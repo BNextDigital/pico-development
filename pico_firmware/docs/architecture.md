@@ -104,3 +104,22 @@ Durable records now use v3 (20 bytes) and include theme and next-timer duration.
 The reader migrates v1/v2 records; the platform accepts both lengths. Automatic
 personality transitions do not save, and identical OLED frames skip transfer.
 Boot enters Companion/Home even if a legacy record saved another user mode.
+
+## Sprint 02: session sequencing and I2S audio
+
+`FocusSession` owns Work/Break phase, confirmation state and per-cycle count.
+It does not measure time: Core uses its existing `Timer` instance for every
+phase. Completion marks a phase waiting; an explicit event starts the next.
+Changing away from Focus cancels a cycle; screen navigation alone preserves it.
+These transient values do not expand persistence v3.
+
+`pico::audio` renders deterministic, integer, bounded stereo PCM. The platform
+`Audio` adapter queues cue IDs to a sleeping I2S worker backed by a fixed slab;
+main stays responsive. Audio is opt-in via Kconfig/devicetree and visual alerts
+remain the fallback. No device clock, threads or heap enter the portable core.
+Mute clears pending cues; the current bounded cue may finish. See
+[sprint02.md](sprint02.md) for wiring, resource limits and validation status.
+
+The optional quieter profile disables diagnostic probes; button handling still
+polls every 20 ms. Interrupt-driven wakeups and battery policy remain future
+work pending physical power measurements.

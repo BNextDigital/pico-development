@@ -6,12 +6,23 @@ menu "Pico"
 
 config PICO_FIRMWARE_VERSION
     string "Firmware version"
-    default "0.2.0-sprint01"
+    default "0.3.0-sprint02"
 
 config PICO_DISPLAY
     bool "Render Pico on the chosen monochrome display"
     depends on DISPLAY
     default y
+
+config PICO_AUDIO_I2S
+    bool "Optional MAX98357 I2S sound cues"
+    depends on I2S
+    default n
+
+config PICO_AUDIO_VOLUME_PERCENT
+    int "Sound cue volume percent (bounded PCM amplitude)"
+    depends on PICO_AUDIO_I2S
+    range 0 100
+    default 25
 
 config PICO_SETTINGS
     bool "Persist Pico state"

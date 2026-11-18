@@ -38,6 +38,13 @@ The decisions distilled from the wider Pico project are recorded in
 hardware ledger is in
 [`docs/hardware-bringup.md`](docs/hardware-bringup.md).
 
+## Sprint 02
+
+Optional MAX98357A I2S sound cues and confirmed work/break cycles are implemented
+on `sprint/02-audio-and-focus`. The OLED-only build remains supported.
+See [Sprint 02 build, wiring and validation](docs/sprint02.md). Host/simulator
+checks pass; target compilation and physical audio testing remain outstanding.
+
 ## Sprint 01
 
 The dedicated `sprint/01-personality-and-utilities` branch adds eight rendered

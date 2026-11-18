@@ -24,10 +24,13 @@ private:
     void sync_timer();
     Effects timer_complete();
     void activity();
+    void sync_focus();
+    Effects start_focus_phase();
 
     State state_{};
     Mode mode_before_car_dock_{Mode::Companion};
     Timer timer_{};
+    FocusSession focus_{};
     Personality personality_;
     std::uint32_t animation_ms_{0};
 };

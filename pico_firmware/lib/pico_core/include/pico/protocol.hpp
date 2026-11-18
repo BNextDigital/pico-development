@@ -26,6 +26,11 @@ enum class Command : std::uint8_t {
     NavigatePrevious = 0x12,
     Select = 0x13,
     Back = 0x14,
+    StartFocusCycle = 0x20,
+    NextFocusPhase = 0x21,
+    SetBreakDuration = 0x22,
+    TestSound = 0x23,
+    SetMuted = 0x24,
 };
 
 enum class DecodeStatus : std::uint8_t {
