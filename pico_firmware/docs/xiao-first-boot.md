@@ -25,8 +25,8 @@ Unplug USB before moving wires. Connect by the labels on the actual modules:
 
 Leave audio and battery out of this first test. The microphone and IMU are
 onboard; they do not need external jumpers. The XIAO reset button resets the
-board; it is not the firmware's interaction button. The overlay now configures
-an optional focus pushbutton on D0; no MAX98357 audio driver is configured.
+board; it is not the firmware's interaction button. The baseline overlay
+configures D0/D1 inputs; optional MAX98357A I2S output is not enabled.
 
 ## Physical input controls: D0, D1 and optional D2
 

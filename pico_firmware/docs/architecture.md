@@ -4,7 +4,7 @@
 
 ## Purpose of this prototype
 
-Version 0.1 proves the seams that nearly every future Pico feature needs:
+The original v0.1 architecture established the seams that later features use:
 
 1. a deterministic personality and mode state machine;
 2. local physical interaction;
