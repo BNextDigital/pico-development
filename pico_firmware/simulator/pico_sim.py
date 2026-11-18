@@ -324,6 +324,13 @@ class PicoSimulatorApp:
         ttk.Button(timer_box, text="Apply theme", command=lambda: self._send(
             "event SetTheme " + self.theme_var.get())).grid(row=2, column=2, columnspan=2)
 
+        ttk.Button(timer_box, text="Work / break", command=lambda: self._send("event StartFocusCycle")).grid(row=3, column=0)
+        ttk.Button(timer_box, text="Next phase", command=lambda: self._send("event NextFocusPhase")).grid(row=3, column=1)
+        ttk.Button(timer_box, text="Test cue", command=lambda: self._send("event TestSound 1")).grid(row=3, column=2)
+        self.muted_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(timer_box, text="Mute", variable=self.muted_var, command=lambda: self._send(
+            "event SetMuted " + str(int(self.muted_var.get())))).grid(row=3, column=3)
+
         time_box = ttk.LabelFrame(parent, text="Simulation clock", padding=10)
         time_box.grid(row=4, column=0, sticky="ew", pady=(0, 8))
         self.paused_var = tk.BooleanVar(value=False)
@@ -445,6 +452,7 @@ class PicoSimulatorApp:
         state = snapshot["state"]
         self.mode_var.set(state["mode_name"].upper())
         self.mood_var.set(state["mood_name"].upper())
+        self.muted_var.set(state.get("sound_muted", False))
         self.timer_var.set(format_duration(state["timer_remaining_seconds"]) + (" PAUSED" if state.get("timer_paused") else ""))
         self.interactions_var.set(str(state["interaction_count"]))
         self.dock_var.set(state["dock"])

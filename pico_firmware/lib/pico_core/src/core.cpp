@@ -18,8 +18,25 @@ void Core::sync_timer()
     state_.timer_total_seconds = timer_.total();
     state_.timer_remaining_seconds = timer_.remaining();
 }
+void Core::sync_focus()
+{
+    state_.focus_phase = focus_.phase();
+    state_.focus_waiting = focus_.waiting();
+    state_.completed_work_sessions = focus_.completed_work();
+}
+Effects Core::start_focus_phase()
+{
+    timer_.start(focus_.phase() == FocusPhase::Work ? state_.configured_duration_seconds :
+                 state_.break_duration_seconds, state_.uptime_seconds);
+    activity(); state_.timer_completed = false; sync_timer(); sync_focus();
+    personality_.react(state_, Mood::Neutral, animation_ms_);
+    return Effect::Render | Effect::Notify;
+}
 Effects Core::timer_complete()
 {
+    state_.sound_cue = focus_.phase() == FocusPhase::Work ? audio::Cue::WorkComplete :
+                       focus_.phase() == FocusPhase::Break ? audio::Cue::BreakComplete : audio::Cue::TimerComplete;
+    focus_.complete(); sync_focus();
     state_.timer_completed = true;
     personality_.react(state_, Mood::Alert, animation_ms_);
     return Effect::Render | Effect::Notify | Effect::Chirp;
@@ -36,7 +53,11 @@ Effects Core::set_mode(Mode mode)
     if (!valid_mode(mode) || mode == Mode::Driving || state_.dock == Dock::Car ||
         mode == state_.mode) return effect(Effect::None);
     activity();
+    if (focus_.phase() != FocusPhase::None && mode != Mode::Focus) {
+        timer_.cancel(); focus_.cancel(); sync_timer(); sync_focus(); state_.timer_completed = false;
+    }
     state_.mode = mode;
+    if (mode != Mode::Focus && state_.utility_index >= 4) state_.utility_index = 1;
     return Effect::Render | Effect::Notify | Effect::Persist;
 }
 Effects Core::set_mood(Mood mood)
@@ -63,8 +84,10 @@ Effects Core::navigate(EventKind kind)
     if (kind == EventKind::NavigateNext || kind == EventKind::NavigatePrevious) {
         if (state_.screen == Screen::Menu)
             state_.menu_index = static_cast<std::uint8_t>((state_.menu_index + 8 + direction) % 8);
-        else if (state_.screen == Screen::Utility)
-            state_.utility_index = static_cast<std::uint8_t>((state_.utility_index + 4 + direction) % 4);
+        else if (state_.screen == Screen::Utility) {
+            const int count = state_.mode == Mode::Focus ? 5 : 4;
+            state_.utility_index = static_cast<std::uint8_t>((state_.utility_index + count + direction) % count);
+        }
         else if (state_.screen == Screen::Themes) {
             const auto next = (static_cast<int>(state_.theme) + 8 + direction) % 8;
             return set_theme(static_cast<FaceTheme>(next)) | Effect::Render;
@@ -80,6 +103,7 @@ Effects Core::navigate(EventKind kind)
         } else {
             const auto mode = menu_modes[state_.menu_index];
             const auto effects = set_mode(mode);
+            state_.utility_index = 1;
             state_.screen = feature_for(mode)->prototype_ready ? Screen::Utility : Screen::Unavailable;
             return effects | Effect::Render;
         }
@@ -100,6 +124,7 @@ Effects Core::navigate(EventKind kind)
                            state_.configured_duration_seconds}) | Effect::Render;
         case 2: return handle({EventKind::CancelTimer, 0}) | Effect::Render;
         case 3: state_.screen = Screen::Home; break;
+        case 4: return handle({state_.focus_waiting ? EventKind::NextFocusPhase : EventKind::StartFocusCycle, 0});
         }
     }
     return effect(Effect::Render);
@@ -111,7 +136,7 @@ Effects Core::handle(const Event &event)
         state_.mode = Mode::Companion;
         state_.screen = Screen::Home;
         state_.timer_completed = false;
-        timer_.cancel(); sync_timer(); activity();
+        timer_.cancel(); focus_.cancel(); sync_timer(); sync_focus(); activity();
         return Effect::Render | Effect::Notify;
     case EventKind::Tick: return on_tick(event.value);
     case EventKind::AnimationTick: {
@@ -127,6 +152,7 @@ Effects Core::handle(const Event &event)
         return effects;
     }
     case EventKind::PrimaryPressed:
+        state_.sound_cue = audio::Cue::Interact;
         activity();
         if (state_.interaction_count != std::numeric_limits<std::uint32_t>::max()) ++state_.interaction_count;
         personality_.react(state_, Mood::Happy, animation_ms_);
@@ -137,6 +163,7 @@ Effects Core::handle(const Event &event)
         return navigate(event.kind);
     case EventKind::FocusButtonTapped: {
         if (state_.screen != Screen::Home) return navigate(EventKind::Select);
+        if (state_.focus_waiting) return handle({EventKind::NextFocusPhase, 0});
         if (state_.timer_running || state_.timer_paused) return handle({EventKind::PrimaryPressed, 0});
         if (state_.dock == Dock::Car) return effect(Effect::None);
         Effects effects = set_mode(Mode::Focus);
@@ -147,7 +174,7 @@ Effects Core::handle(const Event &event)
     case EventKind::FocusButtonHeld: {
         if (state_.screen != Screen::Home) return navigate(EventKind::Back);
         if (state_.dock == Dock::Car || state_.mode != Mode::Focus ||
-            (!state_.timer_running && !state_.timer_paused)) return effect(Effect::None);
+            (!state_.timer_running && !state_.timer_paused && !state_.focus_waiting)) return effect(Effect::None);
         Effects effects = handle({EventKind::CancelTimer, 0});
         effects |= set_mode(Mode::Companion);
         effects |= set_mood(Mood::Neutral);
@@ -167,6 +194,9 @@ Effects Core::handle(const Event &event)
         state_.dock = dock;
         state_.screen = Screen::Home;
         if (dock == Dock::Car) {
+            if (focus_.phase() != FocusPhase::None) {
+                timer_.cancel(); focus_.cancel(); sync_timer(); sync_focus(); state_.timer_completed = false;
+            }
             mode_before_car_dock_ = state_.mode;
             state_.mode = Mode::Driving;
         } else if (previous == Dock::Car && state_.mode == Mode::Driving)
@@ -191,6 +221,7 @@ Effects Core::handle(const Event &event)
         return Effect::Render | Effect::Persist;
     case EventKind::StartTimer:
         if (!timer_.start(event.value, state_.uptime_seconds)) return effect(Effect::None);
+        focus_.cancel(); sync_focus();
         activity(); state_.timer_completed = false; sync_timer();
         return Effect::Render | Effect::Notify;
     case EventKind::PauseTimer: {
@@ -204,9 +235,29 @@ Effects Core::handle(const Event &event)
         if (!timer_.resume(state_.uptime_seconds)) return effect(Effect::None);
         activity(); sync_timer(); return Effect::Render | Effect::Notify;
     case EventKind::CancelTimer:
-        if (!timer_.running() && !timer_.paused() && !state_.timer_completed) return effect(Effect::None);
-        timer_.cancel(); sync_timer(); activity(); state_.timer_completed = false;
+        if (!timer_.running() && !timer_.paused() && !state_.timer_completed && focus_.phase() == FocusPhase::None) return effect(Effect::None);
+        timer_.cancel(); focus_.cancel(); sync_timer(); sync_focus(); activity(); state_.timer_completed = false;
         return Effect::Render | Effect::Notify;
+    case EventKind::StartFocusCycle: {
+        if (state_.dock == Dock::Car || timer_.running() || timer_.paused() ||
+            focus_.phase() != FocusPhase::None) return effect(Effect::None);
+        const auto effects = set_mode(Mode::Focus);
+        focus_.start();
+        return effects | start_focus_phase();
+    }
+    case EventKind::NextFocusPhase:
+        if (state_.dock == Dock::Car || !focus_.next()) return effect(Effect::None);
+        return start_focus_phase();
+    case EventKind::SetBreakDuration:
+        if (!event.value || event.value > kMaxTimerSeconds || event.value == state_.break_duration_seconds)
+            return effect(Effect::None);
+        state_.break_duration_seconds = event.value; activity(); return Effect::Render | Effect::Notify;
+    case EventKind::TestSound:
+        if (state_.sound_muted || event.value >= static_cast<unsigned>(audio::Cue::Count)) return effect(Effect::None);
+        state_.sound_cue = static_cast<audio::Cue>(event.value); return effect(Effect::Chirp);
+    case EventKind::SetMuted:
+        if (event.value > 1 || state_.sound_muted == (event.value != 0)) return effect(Effect::None);
+        state_.sound_muted = event.value != 0; return Effect::Render | Effect::Notify;
     case EventKind::RequestStatus: return effect(Effect::Notify);
     }
     return effect(Effect::None);

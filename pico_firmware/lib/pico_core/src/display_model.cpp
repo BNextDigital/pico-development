@@ -155,17 +155,19 @@ void render_status(const State &state, MonoSurface &surface)
     if (state.connected) fill_rect(surface, 3, 3, 3, 3);
     else outline_rect(surface, 3, 3, 3, 3);
     if (state.dock != Dock::None) outline_rect(surface, surface.width - 10, 3, 7, 6);
+    if (state.focus_waiting) text(surface, state.focus_phase == FocusPhase::Work ? "BREAK READY - TAP" : "WORK READY - TAP", 20, surface.height - 7);
     if (state.timer_running || state.timer_paused) {
         char buffer[16]; duration(buffer, sizeof(buffer), state.timer_remaining_seconds);
         text(surface, buffer, 8, surface.height - 7);
-        text(surface, state.timer_paused ? "PAUSED" : state.mode == Mode::Focus ? "FOCUS" : "TIMER", 72, surface.height - 7);
+        text(surface, state.timer_paused ? "PAUSED" : state.focus_phase == FocusPhase::Break ? "BREAK" : state.mode == Mode::Focus ? "FOCUS" : "TIMER", 72, surface.height - 7);
     }
 }
 void render_screen(const State &state, MonoSurface &surface)
 {
     if (state.timer_completed) {
         render_face(state, surface);
-        text(surface, "DONE", 56, 1);
+        text(surface, state.focus_phase == FocusPhase::Work ? "WORK DONE" :
+                      state.focus_phase == FocusPhase::Break ? "BREAK DONE" : "DONE", 44, 1);
         return;
     }
     if (state.screen == Screen::Home || state.screen == Screen::Themes) {
@@ -199,16 +201,19 @@ void render_screen(const State &state, MonoSurface &surface)
     duration(buffer, sizeof(buffer), state.timer_running || state.timer_paused ?
              state.timer_remaining_seconds : state.configured_duration_seconds);
     text(surface, buffer, 24, 1, 2);
-    text(surface, state.mode == Mode::Cooking ? "COOKING TIMER" : "FOCUS TIMER", 20, 15);
-    constexpr const char *actions[]{"DURATION", "START", "CANCEL", "HOME"};
-    for (unsigned i = 0; i < 4; ++i) {
-        text(surface, state.utility_index == i ? ">" : " ", 2, 26 + i * 9);
+    text(surface, state.focus_phase == FocusPhase::Break ? "BREAK TIMER" :
+                  state.mode == Mode::Cooking ? "COOKING TIMER" : "FOCUS TIMER", 20, 15);
+    constexpr const char *actions[]{"DURATION", "START", "CANCEL", "HOME", "WORK/BREAK"};
+    for (unsigned i = 0; i < (state.mode == Mode::Focus ? 5U : 4U); ++i) {
+        text(surface, state.utility_index == i ? ">" : " ", 2, 23 + i * 8);
         const char *label = i == 1 && state.timer_running ? "PAUSE" :
-                            i == 1 && state.timer_paused ? "RESUME" : actions[i];
-        text(surface, label, 10, 26 + i * 9);
+                            i == 1 && state.timer_paused ? "RESUME" :
+                            i == 4 && state.focus_waiting ? "NEXT PHASE" :
+                            i == 4 && state.focus_phase != FocusPhase::None ? "CYCLE ACTIVE" : actions[i];
+        text(surface, label, 10, 23 + i * 8);
         if (i == 0) {
             duration(buffer, sizeof(buffer), state.configured_duration_seconds);
-            text(surface, buffer, 64, 26);
+            text(surface, buffer, 64, 23);
         }
     }
 }

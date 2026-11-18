@@ -2,6 +2,8 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <pico/audio.hpp>
+#include <pico/focus_session.hpp>
 
 namespace pico {
 
@@ -76,6 +78,11 @@ enum class EventKind : std::uint8_t {
     PauseTimer,
     ResumeTimer,
     SetTimerDuration,
+    StartFocusCycle,
+    NextFocusPhase,
+    SetBreakDuration,
+    TestSound,
+    SetMuted,
 };
 
 enum class Screen : std::uint8_t { Home, Menu, Utility, Themes, Unavailable };
@@ -137,6 +144,12 @@ struct State {
     std::uint8_t menu_index{0};
     std::uint8_t utility_index{1};
     std::uint32_t configured_duration_seconds{1500};
+    FocusPhase focus_phase{FocusPhase::None};
+    bool focus_waiting{false};
+    std::uint32_t completed_work_sessions{0};
+    std::uint32_t break_duration_seconds{300};
+    audio::Cue sound_cue{audio::Cue::Interact};
+    bool sound_muted{false};
 };
 
 struct PersistedState {

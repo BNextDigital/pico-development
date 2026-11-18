@@ -78,11 +78,14 @@ DecodeResult decode_command(const std::uint8_t *data, std::size_t size)
         if (data[1] >= static_cast<unsigned>(FaceTheme::Count))
             return {DecodeStatus::InvalidValue, {}};
         return {DecodeStatus::Ok, {EventKind::SetTheme, data[1]}};
+    case Command::SetBreakDuration:
     case Command::SetTimerDuration:
         if (size != 5U) return wrong_length();
         if (!read_u32_le(data + 1) || read_u32_le(data + 1) > kMaxTimerSeconds)
             return {DecodeStatus::InvalidValue, {}};
-        return {DecodeStatus::Ok, {EventKind::SetTimerDuration, read_u32_le(data + 1)}};
+        return {DecodeStatus::Ok, {static_cast<Command>(data[0]) == Command::SetBreakDuration ? EventKind::SetBreakDuration : EventKind::SetTimerDuration, read_u32_le(data + 1)}};
+    case Command::StartFocusCycle:
+    case Command::NextFocusPhase:
     case Command::PauseTimer:
     case Command::ResumeTimer:
     case Command::OpenMenu:
@@ -93,6 +96,8 @@ DecodeResult decode_command(const std::uint8_t *data, std::size_t size)
         if (size != 1U) return wrong_length();
         EventKind kind = EventKind::PauseTimer;
         switch (static_cast<Command>(data[0])) {
+        case Command::StartFocusCycle: kind = EventKind::StartFocusCycle; break;
+        case Command::NextFocusPhase: kind = EventKind::NextFocusPhase; break;
         case Command::PauseTimer: kind = EventKind::PauseTimer; break;
         case Command::ResumeTimer: kind = EventKind::ResumeTimer; break;
         case Command::OpenMenu: kind = EventKind::OpenMenu; break;
@@ -105,6 +110,12 @@ DecodeResult decode_command(const std::uint8_t *data, std::size_t size)
         return {DecodeStatus::Ok, {kind, 0}};
     }
 
+    case Command::TestSound:
+    case Command::SetMuted:
+        if (size != 2U) return wrong_length();
+        if (data[1] >= (static_cast<Command>(data[0]) == Command::TestSound ? static_cast<unsigned>(audio::Cue::Count) : 2U))
+            return {DecodeStatus::InvalidValue, {}};
+        return {DecodeStatus::Ok, {static_cast<Command>(data[0]) == Command::TestSound ? EventKind::TestSound : EventKind::SetMuted, data[1]}};
     case Command::RequestStatus:
         return size == 1U
                    ? DecodeResult{DecodeStatus::Ok, {EventKind::RequestStatus, 0}}
@@ -123,7 +134,9 @@ void encode_status(const State &state, Capabilities capabilities,
     output[3] = static_cast<std::uint8_t>(state.dock);
     output[4] = (state.connected ? 1U : 0U) |
                 (state.timer_running ? 1U << 1U : 0U) |
-                (state.timer_paused ? 1U << 2U : 0U);
+                (state.timer_paused ? 1U << 2U : 0U) |
+                (state.focus_waiting ? 1U << 3U : 0U) |
+                (state.sound_muted ? 1U << 4U : 0U);
     output[5] = state.battery_percent;
     write_u32_le(state.timer_remaining_seconds, &output[6]);
     write_u32_le(state.interaction_count, &output[10]);
