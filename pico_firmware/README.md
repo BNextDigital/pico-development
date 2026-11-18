@@ -38,6 +38,14 @@ The decisions distilled from the wider Pico project are recorded in
 hardware ledger is in
 [`docs/hardware-bringup.md`](docs/hardware-bringup.md).
 
+## Motion personality
+
+The optional Sense IMU profile adds pickup-like wake, a deliberate rock/Happy
+reaction and inactivity-plus-stillness Sleepy behavior. Motion stays out of
+utility/menu/timer controls and does not write flash. See
+[motion build, controls and physical checks](docs/motion-personality.md).
+Target/physical validation is still pending; host/simulator checks pass.
+
 ## Onboard microphone tuner
 
 The optional Sense microphone profile adds a local chromatic tuner with note,

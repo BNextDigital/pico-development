@@ -45,6 +45,7 @@ All integers are little-endian. There is no packed C struct on the wire.
 | `34` | Tap tempo at processing time |
 | `35` | Open/start onboard microphone tuner |
 | `36` | Stop tuner listening |
+| `40 ff` | Runtime motion mask: pickup bit 0, rock bit 1, rest bit 2 (0–7) |
 
 Mode IDs are companion `0`, focus `1`, music `2`, cooking `3`, wayfinding `4`,
 notes `5`, and driving `6`. Driving cannot be requested remotely; the car dock
@@ -62,14 +63,14 @@ The status characteristic is always exactly 16 bytes.
 | 1 | 1 | Mode ID |
 | 2 | 1 | Mood ID |
 | 3 | 1 | Dock ID: none `0`, home `1`, car `2` |
-| 4 | 1 | Flags: bit 0 connected, bit 1 timer running, bit 2 timer paused, bit 3 cycle waiting, bit 4 muted, bit 5 metronome running, bit 6 tuner listening |
+| 4 | 1 | Flags: bit 0 connected, bit 1 timer running, bit 2 timer paused, bit 3 cycle waiting, bit 4 muted, bit 5 metronome running, bit 6 tuner listening, bit 7 motion configured and ready |
 | 5 | 1 | Battery percentage, or `255` when unknown |
 | 6 | 4 | Timer seconds remaining |
 | 10 | 4 | Lifetime interaction count |
 | 14 | 2 | Capability bit field |
 
 Capability bits are display `0`, speaker `1`, microphone `2`, home dock `3`,
-car dock `4`, position `5`, and compass `6`.
+car dock `4`, position `5`, compass `6`, and motion `7`.
 
 Unknown commands, wrong lengths, zero-duration timers, invalid enum values,
 and attempts to request driving mode are rejected at the GATT boundary.
@@ -128,3 +129,12 @@ A start without a configured microphone opens an unavailable screen and leaves
 listening clear. Back, mode/dock changes and timer completion stop listening.
 Pico's sound output is suppressed while listening; the user mute flag is unchanged.
 No audio or pitch readings are streamed over BLE. See [music-tuner.md](music-tuner.md).
+
+## Motion personality additions
+
+Command 40 configures a volatile three-bit behavior mask (default 7 after boot).
+Status flag bit 7 means the IMU is ready with a nonzero mask; capability bit 7
+means motion hardware is available. The 16-byte v1 status does not encode the
+mask or raw acceleration. Motion reactions do not control utilities, timers or
+modes and do not persist. Clients must ignore unknown flags. See
+[motion-personality.md](motion-personality.md) for context guards and tests.
