@@ -1,5 +1,9 @@
 # One-minute duration controls
 
+The subsequent [Local Settings buildout](local-settings.md) makes break duration
+durable and adds the Settings hub. Its v4 storage details supersede the original
+runtime-only break notes below.
+
 Firmware `0.6.1-minute-controls`, branch `feature/minute-duration-controls`, based
 on main `983eb56` after motion personality merged.
 

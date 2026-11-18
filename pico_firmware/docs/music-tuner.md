@@ -1,5 +1,8 @@
 # Music tuner: onboard Sense microphone
 
+[Local Settings](local-settings.md) adds saved mute/volume preferences. Listening
+still temporarily suppresses sound without changing those saved values.
+
 Firmware `0.5.0-tuner`, branch `feature/music-tuner`, based on main `7b9baea`
 after the metronome merge. Implemented portable pitch detector, tuner UI and
 optional Zephyr capture adapter. Target compilation and physical mic operation

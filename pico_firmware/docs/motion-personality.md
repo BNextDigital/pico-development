@@ -1,5 +1,9 @@
 # Motion-aware personality
 
+Local Settings now makes the behavior mask durable and configurable on-device;
+see [local-settings.md](local-settings.md). That v4 behavior supersedes the
+original runtime-only configuration notes below.
+
 Firmware `0.6.0-motion`, branch `feature/motion-personality`, based on main
 `d22830c` after the Music tuner merge. Adds optional accelerometer-based
 personality reactions. No extra wiring is needed on the XIAO nRF52840 Sense.

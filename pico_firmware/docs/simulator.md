@@ -175,3 +175,11 @@ between −1 minute / +1 minute / Save / Cancel; Select activates, Back discards
 Focus adds a Break duration row at index 5. Editor screen ID is 7, and JSON
 exposes draft seconds, break target and highlighted action. BLE continues to
 accept second-resolution durations. See [minute-duration-controls.md](minute-duration-controls.md).
+
+## Local Settings
+
+The Settings shortcut opens the same hub as BLE 15. Use virtual Navigate,
+Select and Back for all draft editors; preview is not committed until Save.
+Break, mute, volume and motion now survive power cycle after the coalesced save.
+Storage v4 reads older records through the production migration path. JSON adds
+settings/edit state and volume; see [local-settings.md](local-settings.md).

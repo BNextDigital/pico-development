@@ -38,6 +38,13 @@ The decisions distilled from the wider Pico project are recorded in
 hardware ledger is in
 [`docs/hardware-bringup.md`](docs/hardware-bringup.md).
 
+## Local Settings
+
+Menu -> Settings adds theme preview, mute/volume, work/break duration, motion
+preferences and test sound with Save/Cancel. Storage v4 migrates older records
+and preserves all confirmed preferences. Existing two-button controls remain;
+a third Back button is optional. See [Local Settings](docs/local-settings.md).
+
 ## Minute duration controls
 
 Duration presets are replaced by a ±1-minute preview editor with Save/Cancel,
