@@ -17,6 +17,7 @@ namespace {
 pico::persistence::Blob loaded_blob{};
 pico::persistence::Blob pending_blob{};
 bool loaded_blob_present;
+std::size_t loaded_blob_size;
 bool pending_blob_dirty;
 K_MUTEX_DEFINE(pending_blob_mutex);
 
@@ -63,18 +64,18 @@ int settings_set(const char *name, std::size_t length, settings_read_cb read_cb,
     if (std::strcmp(name, "state") != 0) {
         return -ENOENT;
     }
-    if (length != loaded_blob.size()) {
+    if (length != 16U && length != loaded_blob.size()) {
         LOG_WRN("Ignoring stored state with unexpected size %u",
                 static_cast<unsigned int>(length));
         return 0;
     }
 
-    const int bytes_read = read_cb(callback_argument, loaded_blob.data(),
-                                   loaded_blob.size());
+    const int bytes_read = read_cb(callback_argument, loaded_blob.data(), length);
     if (bytes_read < 0) {
         return bytes_read;
     }
-    loaded_blob_present = static_cast<std::size_t>(bytes_read) == loaded_blob.size();
+    loaded_blob_size = static_cast<std::size_t>(bytes_read);
+    loaded_blob_present = loaded_blob_size == length;
     return 0;
 }
 
@@ -118,7 +119,7 @@ bool Storage::load(PersistedState &state)
         LOG_INF("No saved Pico state; using defaults");
         return false;
     }
-    if (!persistence::decode(loaded_blob, state)) {
+    if (!persistence::decode(loaded_blob.data(), loaded_blob_size, state)) {
         LOG_WRN("Saved Pico state failed validation; using defaults");
         return false;
     }

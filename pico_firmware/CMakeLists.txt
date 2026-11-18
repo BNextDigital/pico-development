@@ -15,6 +15,8 @@ target_sources(app PRIVATE
     src/platform/pico_hardware.cpp
     src/platform/pico_storage.cpp
     lib/pico_core/src/core.cpp
+    lib/pico_core/src/timer.cpp
+    lib/pico_core/src/personality.cpp
     lib/pico_core/src/display_model.cpp
     lib/pico_core/src/features.cpp
     lib/pico_core/src/persistence.cpp

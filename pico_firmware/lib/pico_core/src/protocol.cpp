@@ -73,6 +73,38 @@ DecodeResult decode_command(const std::uint8_t *data, std::size_t size)
                    ? DecodeResult{DecodeStatus::Ok, {EventKind::CancelTimer, 0}}
                    : wrong_length();
 
+    case Command::SetTheme:
+        if (size != 2U) return wrong_length();
+        if (data[1] >= static_cast<unsigned>(FaceTheme::Count))
+            return {DecodeStatus::InvalidValue, {}};
+        return {DecodeStatus::Ok, {EventKind::SetTheme, data[1]}};
+    case Command::SetTimerDuration:
+        if (size != 5U) return wrong_length();
+        if (!read_u32_le(data + 1) || read_u32_le(data + 1) > kMaxTimerSeconds)
+            return {DecodeStatus::InvalidValue, {}};
+        return {DecodeStatus::Ok, {EventKind::SetTimerDuration, read_u32_le(data + 1)}};
+    case Command::PauseTimer:
+    case Command::ResumeTimer:
+    case Command::OpenMenu:
+    case Command::NavigateNext:
+    case Command::NavigatePrevious:
+    case Command::Select:
+    case Command::Back: {
+        if (size != 1U) return wrong_length();
+        EventKind kind = EventKind::PauseTimer;
+        switch (static_cast<Command>(data[0])) {
+        case Command::PauseTimer: kind = EventKind::PauseTimer; break;
+        case Command::ResumeTimer: kind = EventKind::ResumeTimer; break;
+        case Command::OpenMenu: kind = EventKind::OpenMenu; break;
+        case Command::NavigateNext: kind = EventKind::NavigateNext; break;
+        case Command::NavigatePrevious: kind = EventKind::NavigatePrevious; break;
+        case Command::Select: kind = EventKind::Select; break;
+        case Command::Back: kind = EventKind::Back; break;
+        default: break;
+        }
+        return {DecodeStatus::Ok, {kind, 0}};
+    }
+
     case Command::RequestStatus:
         return size == 1U
                    ? DecodeResult{DecodeStatus::Ok, {EventKind::RequestStatus, 0}}
@@ -90,7 +122,8 @@ void encode_status(const State &state, Capabilities capabilities,
     output[2] = static_cast<std::uint8_t>(state.mood);
     output[3] = static_cast<std::uint8_t>(state.dock);
     output[4] = (state.connected ? 1U : 0U) |
-                (state.timer_running ? 1U << 1U : 0U);
+                (state.timer_running ? 1U << 1U : 0U) |
+                (state.timer_paused ? 1U << 2U : 0U);
     output[5] = state.battery_percent;
     write_u32_le(state.timer_remaining_seconds, &output[6]);
     write_u32_le(state.interaction_count, &output[10]);

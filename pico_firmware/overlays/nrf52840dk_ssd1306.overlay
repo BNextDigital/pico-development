@@ -19,7 +19,7 @@
     zephyr,flash-buf-max-size = <1024>;
 
     pico_oled: ssd1306@3c {
-        compatible = "solomon,ssd1306fb";
+        compatible = "solomon,ssd1306";
         reg = <0x3c>;
         width = <128>;
         height = <64>;

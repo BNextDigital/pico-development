@@ -115,10 +115,15 @@ void connected(bt_conn *connection, std::uint8_t error)
 
     LOG_INF("BLE central connected");
     emit(pico::EventKind::Connected);
+#if defined(CONFIG_PICO_BLE_AUTO_SECURITY)
     const int security_error = bt_conn_set_security(connection, BT_SECURITY_L2);
     if (security_error != 0 && security_error != -EALREADY) {
         LOG_WRN("Could not request encrypted link (%d)", security_error);
     }
+#else
+    ARG_UNUSED(connection);
+    LOG_INF("Waiting for phone-initiated pairing; use Bond in nRF Connect");
+#endif
 }
 
 void disconnected(bt_conn *, std::uint8_t reason)
@@ -146,6 +151,39 @@ void security_changed(bt_conn *, bt_security_t level, enum bt_security_err error
     emit(pico::EventKind::RequestStatus);
 }
 
+const char *security_error_name(bt_security_err error)
+{
+    switch (error) {
+    case BT_SECURITY_ERR_SUCCESS: return "success";
+    case BT_SECURITY_ERR_AUTH_FAIL: return "authentication failed";
+    case BT_SECURITY_ERR_PIN_OR_KEY_MISSING: return "PIN or key missing";
+    case BT_SECURITY_ERR_OOB_NOT_AVAILABLE: return "OOB not available";
+    case BT_SECURITY_ERR_AUTH_REQUIREMENT: return "security requirements mismatch";
+    case BT_SECURITY_ERR_PAIR_NOT_SUPPORTED: return "pairing not supported";
+    case BT_SECURITY_ERR_PAIR_NOT_ALLOWED: return "pairing not allowed";
+    case BT_SECURITY_ERR_INVALID_PARAM: return "invalid parameter";
+    case BT_SECURITY_ERR_KEY_REJECTED: return "key rejected";
+    case BT_SECURITY_ERR_UNSPECIFIED: return "unspecified (check SMP log)";
+    default: return "unknown";
+    }
+}
+
+void pairing_complete(bt_conn *, bool bonded)
+{
+    LOG_INF("BLE pairing complete; bonded=%u", static_cast<unsigned int>(bonded));
+}
+
+void pairing_failed(bt_conn *, enum bt_security_err reason)
+{
+    LOG_WRN("BLE pairing failed: %s (%u)", security_error_name(reason),
+            static_cast<unsigned int>(reason));
+}
+
+bt_conn_auth_info_cb pairing_callbacks = {
+    .pairing_complete = pairing_complete,
+    .pairing_failed = pairing_failed,
+};
+
 BT_CONN_CB_DEFINE(connection_callbacks) = {
     .connected = connected,
     .disconnected = disconnected,
@@ -160,8 +198,14 @@ namespace pico::platform {
 bool Ble::init(EventSink sink)
 {
     event_sink = sink;
+    const int callback_error = bt_conn_auth_info_cb_register(&pairing_callbacks);
+    if (callback_error != 0) {
+        LOG_ERR("Could not register pairing diagnostics (%d)", callback_error);
+        return false;
+    }
     const int error = bt_enable(nullptr);
     if (error != 0) {
+        bt_conn_auth_info_cb_unregister(&pairing_callbacks);
         LOG_ERR("Bluetooth initialization failed (%d)", error);
         return false;
     }

@@ -6,7 +6,7 @@ menu "Pico"
 
 config PICO_FIRMWARE_VERSION
     string "Firmware version"
-    default "0.1.0"
+    default "0.2.0-sprint01"
 
 config PICO_DISPLAY
     bool "Render Pico on the chosen monochrome display"
@@ -17,6 +17,22 @@ config PICO_SETTINGS
     bool "Persist Pico state"
     depends on SETTINGS
     default y
+
+config PICO_BLE_AUTO_SECURITY
+    bool "Request BLE encryption immediately on connection"
+    depends on BT_SMP
+    default y
+    help
+      Disable to let the central initiate pairing. Encrypted GATT
+      permissions still prevent unencrypted command and status access.
+
+config PICO_BRINGUP_DIAGNOSTICS
+    bool "Repeat display and I2C diagnostics on the console"
+    depends on I2C && PRINTK
+    default n
+    help
+      Every five seconds, report display readiness and probe the two common
+      OLED I2C addresses. Disable after breadboard troubleshooting.
 
 config PICO_SETTINGS_SAVE_DELAY_SECONDS
     int "Delay used to coalesce flash writes"

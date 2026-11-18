@@ -3,12 +3,17 @@
 #include <array>
 #include <cerrno>
 #include <cstdint>
+#include <cstring>
 
 #include <zephyr/devicetree.h>
 #include <zephyr/device.h>
 #include <zephyr/drivers/display.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/util.h>
+#if defined(CONFIG_PICO_BRINGUP_DIAGNOSTICS)
+#include <zephyr/drivers/i2c.h>
+#include <zephyr/sys/printk.h>
+#endif
 
 #include <pico/display_model.hpp>
 
@@ -30,6 +35,8 @@ constexpr std::size_t kFrameBufferSize = pico::display::kDefaultBufferSize;
 const device *display_device = DEVICE_DT_GET(DT_CHOSEN(zephyr_display));
 display_capabilities display_caps{};
 std::array<std::uint8_t, kFrameBufferSize> frame_buffer{};
+std::array<std::uint8_t, kFrameBufferSize> last_frame{};
+bool frame_sent;
 
 pico::display::MonoLayout display_layout()
 {
@@ -75,6 +82,7 @@ bool Display::init()
     }
 
     ready_ = true;
+    frame_sent = false;
     LOG_INF("Display ready: %ux%u", display_caps.x_resolution,
             display_caps.y_resolution);
     return true;
@@ -100,6 +108,11 @@ bool Display::render(const State &state)
         return false;
     }
 
+    const auto size = display::required_buffer_size(surface);
+    if (frame_sent && std::memcmp(frame_buffer.data(), last_frame.data(), size) == 0) {
+        return true;
+    }
+
     display_buffer_descriptor descriptor{};
     descriptor.buf_size = display::required_buffer_size(surface);
     descriptor.width = display_caps.x_resolution;
@@ -112,6 +125,8 @@ bool Display::render(const State &state)
         LOG_WRN("Display write failed (%d)", error);
         return false;
     }
+    std::memcpy(last_frame.data(), frame_buffer.data(), size);
+    frame_sent = true;
     return true;
 #else
     ARG_UNUSED(state);
@@ -124,5 +139,36 @@ Capabilities Display::capabilities() const
     return ready_ ? capability(Capability::Display)
                   : capability(Capability::None);
 }
+
+#if defined(CONFIG_PICO_BRINGUP_DIAGNOSTICS)
+void Display::diagnose(const State &state)
+{
+    const bool frame_written = render(state);
+    printk("[Pico diag] uptime=%u display_ready=%u frame_written=%u\n",
+           static_cast<unsigned int>(state.uptime_seconds),
+           static_cast<unsigned int>(ready_),
+           static_cast<unsigned int>(frame_written));
+#if PICO_HAS_DISPLAY
+#if DT_ON_BUS(DT_CHOSEN(zephyr_display), i2c)
+    const device *bus = DEVICE_DT_GET(DT_BUS(DT_CHOSEN(zephyr_display)));
+    if (!device_is_ready(bus)) {
+        printk("[Pico diag] OLED I2C controller is not ready\n");
+        return;
+    }
+
+    // Address-only writes: no OLED commands or framebuffer data are sent.
+    std::uint8_t unused = 0;
+    const int at_3c = i2c_write(bus, &unused, 0, 0x3c);
+    const int at_3d = i2c_write(bus, &unused, 0, 0x3d);
+    printk("[Pico diag] %s: 0x3c=%d 0x3d=%d (0=ACK)\n",
+           bus->name, at_3c, at_3d);
+#else
+    printk("[Pico diag] Chosen display is not on I2C\n");
+#endif
+#else
+    printk("[Pico diag] No enabled chosen display\n");
+#endif
+}
+#endif
 
 } // namespace pico::platform

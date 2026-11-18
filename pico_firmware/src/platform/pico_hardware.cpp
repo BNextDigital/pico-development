@@ -1,4 +1,5 @@
 #include "pico_hardware.hpp"
+#include <pico/button.hpp>
 
 #include <zephyr/devicetree.h>
 #include <zephyr/drivers/gpio.h>
@@ -14,6 +15,8 @@ LOG_MODULE_REGISTER(pico_hardware, CONFIG_PICO_LOG_LEVEL);
 #define HOME_DOCK_NODE DT_ALIAS(pico_dock_home)
 #define CAR_DOCK_NODE DT_ALIAS(pico_dock_car)
 #define BUZZER_NODE DT_ALIAS(pico_buzzer)
+#define FOCUS_BUTTON_NODE DT_ALIAS(pico_focus_button)
+#define NAV_BUTTON_NODE DT_ALIAS(pico_nav_button)
 
 #define PICO_HAS_PRIMARY_BUTTON DT_NODE_HAS_STATUS(PRIMARY_BUTTON_NODE, okay)
 #define PICO_HAS_SECONDARY_BUTTON DT_NODE_HAS_STATUS(SECONDARY_BUTTON_NODE, okay)
@@ -21,12 +24,26 @@ LOG_MODULE_REGISTER(pico_hardware, CONFIG_PICO_LOG_LEVEL);
 #define PICO_HAS_HOME_DOCK DT_NODE_HAS_STATUS(HOME_DOCK_NODE, okay)
 #define PICO_HAS_CAR_DOCK DT_NODE_HAS_STATUS(CAR_DOCK_NODE, okay)
 #define PICO_HAS_BUZZER DT_NODE_HAS_STATUS(BUZZER_NODE, okay)
+#define PICO_HAS_FOCUS_BUTTON DT_NODE_HAS_STATUS(FOCUS_BUTTON_NODE, okay)
+#define PICO_HAS_NAV_BUTTON DT_NODE_HAS_STATUS(NAV_BUTTON_NODE, okay)
 
 namespace {
 
 pico::platform::EventSink event_sink;
 std::uint32_t last_primary_press_ms;
 std::uint32_t last_secondary_press_ms;
+
+#if PICO_HAS_FOCUS_BUTTON
+const gpio_dt_spec focus_button = GPIO_DT_SPEC_GET(FOCUS_BUTTON_NODE, gpios);
+pico::Button focus_button_state;
+bool focus_button_ready;
+#endif
+
+#if PICO_HAS_NAV_BUTTON
+const gpio_dt_spec nav_button = GPIO_DT_SPEC_GET(NAV_BUTTON_NODE, gpios);
+pico::Button nav_button_state;
+bool nav_button_ready;
+#endif
 
 #if PICO_HAS_PRIMARY_BUTTON
 const gpio_dt_spec primary_button = GPIO_DT_SPEC_GET(PRIMARY_BUTTON_NODE, gpios);
@@ -157,6 +174,25 @@ bool Hardware::init(EventSink sink)
     event_sink = sink;
     bool ready = true;
 
+#if PICO_HAS_FOCUS_BUTTON
+    focus_button_ready = gpio_is_ready_dt(&focus_button) &&
+                         gpio_pin_configure_dt(&focus_button, GPIO_INPUT) == 0;
+    ready &= focus_button_ready;
+    if (focus_button_ready) {
+        LOG_INF("Focus button ready: D0 to GND; tap=start/pat, hold=cancel");
+    } else {
+        LOG_ERR("Focus button GPIO could not be configured");
+    }
+#endif
+
+#if PICO_HAS_NAV_BUTTON
+    nav_button_ready = gpio_is_ready_dt(&nav_button) &&
+                      gpio_pin_configure_dt(&nav_button, GPIO_INPUT) == 0;
+    ready &= nav_button_ready;
+    if (nav_button_ready) LOG_INF("Navigation button ready: D1 to GND");
+    else LOG_ERR("Navigation button GPIO could not be configured");
+#endif
+
 #if PICO_HAS_STATUS_LED
     if (!gpio_is_ready_dt(&status_led) ||
         gpio_pin_configure_dt(&status_led, GPIO_OUTPUT_INACTIVE) != 0) {
@@ -171,14 +207,14 @@ bool Hardware::init(EventSink sink)
     ready &= configure_input(primary_button, primary_button_callback,
                              primary_button_pressed, GPIO_INT_EDGE_TO_ACTIVE);
 #else
-    LOG_WRN("No sw0 alias; primary interaction button is disabled");
+    LOG_INF("No sw0 alias; primary interaction remains available over BLE");
 #endif
 
 #if PICO_HAS_SECONDARY_BUTTON
     ready &= configure_input(secondary_button, secondary_button_callback,
                              secondary_button_pressed, GPIO_INT_EDGE_TO_ACTIVE);
 #else
-    LOG_INF("No sw1 alias; mode cycling remains available over BLE");
+    LOG_INF("No sw1 alias; menu navigation remains available over BLE");
 #endif
 
 #if PICO_HAS_HOME_DOCK
@@ -205,6 +241,31 @@ bool Hardware::init(EventSink sink)
 #endif
 
     return ready;
+}
+
+void Hardware::poll()
+{
+#if PICO_HAS_FOCUS_BUTTON || PICO_HAS_NAV_BUTTON
+    const auto sample = [](const gpio_dt_spec &pin, pico::Button &button,
+                           bool ready, EventKind tap, EventKind hold) {
+        if (!ready) return;
+        const int pressed = gpio_pin_get_dt(&pin);
+        if (pressed < 0) return;
+        switch (button.update(pressed != 0, k_uptime_get_32())) {
+        case ButtonAction::Tap: emit(tap); break;
+        case ButtonAction::Hold: emit(hold); break;
+        case ButtonAction::None: break;
+        }
+    };
+#if PICO_HAS_FOCUS_BUTTON
+    sample(focus_button, focus_button_state, focus_button_ready,
+           EventKind::FocusButtonTapped, EventKind::FocusButtonHeld);
+#endif
+#if PICO_HAS_NAV_BUTTON
+    sample(nav_button, nav_button_state, nav_button_ready,
+           EventKind::NavigateNext, EventKind::Back);
+#endif
+#endif
 }
 
 void Hardware::reflect(const State &state)

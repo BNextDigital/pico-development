@@ -38,18 +38,26 @@ The decisions distilled from the wider Pico project are recorded in
 hardware ledger is in
 [`docs/hardware-bringup.md`](docs/hardware-bringup.md).
 
+## Sprint 01
+
+The dedicated `sprint/01-personality-and-utilities` branch adds eight rendered
+face themes, deterministic blinks/idle behavior, navigation and a reusable
+pause/resume timer. Start with [the sprint delivery and XIAO validation guide](docs/sprint01.md).
+The existing D0 focus controls remain available; optional D1 adds menu navigation.
+Target build and new physical validation are pending on the local SDK/board.
+
 ## Build
 
-Open an nRF Connect SDK terminal, then build for your actual board. For the
-nRF52840 DK without an external display:
+For the purchased XIAO nRF52840 Sense and SDK 3.4.2, open an **nRF Connect
+SDK terminal** in `pico_firmware` and build the explicit XIAO overlay:
 
 ```sh
-west build -p always -b nrf52840dk/nrf52840 .
-west flash
+west build --no-sysbuild -p always -b xiao_ble/nrf52840/sense -d build-sprint01 . -- -DDTC_OVERLAY_FILE=overlays/xiao_ble_ssd1306.overlay -DEXTRA_CONF_FILE=configs/xiao_ble.conf
 ```
 
-For the common provisional SSD1306 wiring, use the explicit overlay shown in
-[`docs/hardware-bringup.md`](docs/hardware-bringup.md).
+Copy `build-sprint01/zephyr/zephyr.uf2` to the double-reset **XIAO BLE** drive.
+See [Sprint 01](docs/sprint01.md) for new-input wiring and physical validation.
+The older DK overlay is a separate example; do not flash DK output to the XIAO.
 
 Run the portable core tests with any C++17 compiler:
 

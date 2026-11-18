@@ -1,34 +1,11 @@
 #include <pico/display_model.hpp>
 
 #include <algorithm>
+#include <cstdio>
+#include <pico/face_assets.hpp>
 
 namespace pico::display {
 namespace {
-
-struct Sprite {
-    std::uint8_t width;
-    std::uint8_t height;
-    const std::uint8_t *rows;
-};
-
-constexpr std::uint8_t kEyeOpenRows[]{
-    0b01110, 0b11111, 0b11011, 0b11011, 0b11011, 0b11111, 0b01110,
-};
-constexpr std::uint8_t kEyeHappyRows[]{
-    0b00000, 0b00000, 0b10001, 0b01010, 0b00100, 0b00000, 0b00000,
-};
-constexpr std::uint8_t kEyeSleepyRows[]{
-    0b00000, 0b00000, 0b00000, 0b11111, 0b00000, 0b00000, 0b00000,
-};
-constexpr std::uint8_t kMouthNeutralRows[]{0b1111111};
-constexpr std::uint16_t kMouthSmileRows[]{
-    0b100000001, 0b010000010, 0b001000100, 0b000111000,
-};
-
-constexpr Sprite kEyeOpen{5, 7, kEyeOpenRows};
-constexpr Sprite kEyeHappy{5, 7, kEyeHappyRows};
-constexpr Sprite kEyeSleepy{5, 7, kEyeSleepyRows};
-constexpr Sprite kMouthNeutral{7, 1, kMouthNeutralRows};
 
 bool locate(const MonoSurface &surface, std::uint16_t x, std::uint16_t y,
             std::size_t &byte_index, std::uint8_t &bit)
@@ -98,97 +75,140 @@ void outline_rect(MonoSurface &surface, std::uint16_t x, std::uint16_t y,
     fill_rect(surface, x + width - 1U, y, 1, height);
 }
 
-void blit(MonoSurface &surface, const Sprite &sprite, std::uint16_t x,
-          std::uint16_t y)
+
+void bitmap(MonoSurface &surface, const assets::Bitmap &image, int center_x, int center_y)
 {
-    for (std::uint8_t row = 0; row < sprite.height; ++row) {
-        for (std::uint8_t column = 0; column < sprite.width; ++column) {
-            const auto mask = static_cast<std::uint8_t>(
-                1U << (sprite.width - column - 1U));
-            if ((sprite.rows[row] & mask) != 0U) {
-                set_pixel(surface, x + column, y + row);
-            }
+    const int left = center_x - image.width / 2;
+    const int top = center_y - image.height / 2;
+    const auto stride = (image.width + 7U) / 8U;
+    for (unsigned y = 0; y < image.height; ++y) {
+        for (unsigned x = 0; x < image.width; ++x) {
+            const int px = left + static_cast<int>(x), py = top + static_cast<int>(y);
+            if (px >= 0 && py >= 0 && px < surface.width && py < surface.height &&
+                (image.data[y * stride + x / 8U] & (0x80U >> (x % 8U))))
+                set_pixel(surface, static_cast<std::uint16_t>(px), static_cast<std::uint16_t>(py));
         }
     }
 }
-
-void blit_smile(MonoSurface &surface, std::uint16_t x, std::uint16_t y)
+struct Glyph { char ch; std::uint8_t rows[5]; };
+constexpr Glyph font[]{
+ {'A',{2,5,7,5,5}}, {'B',{6,5,6,5,6}}, {'C',{3,4,4,4,3}}, {'D',{6,5,5,5,6}},
+ {'E',{7,4,6,4,7}}, {'F',{7,4,6,4,4}}, {'G',{3,4,5,5,3}}, {'H',{5,5,7,5,5}},
+ {'I',{7,2,2,2,7}}, {'J',{1,1,1,5,2}}, {'K',{5,5,6,5,5}}, {'L',{4,4,4,4,7}},
+ {'M',{5,7,7,5,5}}, {'N',{5,7,7,7,5}}, {'O',{2,5,5,5,2}}, {'P',{6,5,6,4,4}},
+ {'Q',{2,5,5,3,1}}, {'R',{6,5,6,5,5}}, {'S',{3,4,2,1,6}}, {'T',{7,2,2,2,2}},
+ {'U',{5,5,5,5,7}}, {'V',{5,5,5,5,2}}, {'W',{5,5,7,7,5}}, {'X',{5,5,2,5,5}},
+ {'Y',{5,5,2,2,2}}, {'Z',{7,1,2,4,7}}, {'0',{7,5,5,5,7}}, {'1',{2,6,2,2,7}},
+ {'2',{6,1,2,4,7}}, {'3',{6,1,2,1,6}}, {'4',{5,5,7,1,1}}, {'5',{7,4,6,1,6}},
+ {'6',{3,4,6,5,2}}, {'7',{7,1,2,2,2}}, {'8',{2,5,2,5,2}}, {'9',{2,5,3,1,6}},
+ {':',{0,2,0,2,0}}, {'-',{0,0,7,0,0}}, {'>',{4,2,1,2,4}}, {'/',{1,1,2,4,4}}
+};
+void text(MonoSurface &surface, const char *str, unsigned x, unsigned y, unsigned scale = 1)
 {
-    for (std::uint8_t row = 0; row < 4U; ++row) {
-        for (std::uint8_t column = 0; column < 9U; ++column) {
-            if ((kMouthSmileRows[row] & (1U << (8U - column))) != 0U) {
-                set_pixel(surface, x + column, y + row);
-            }
+    for (; *str; ++str, x += 4U * scale) {
+        for (const auto &glyph : font) {
+            if (glyph.ch != *str) continue;
+            for (unsigned row = 0; row < 5; ++row)
+                for (unsigned col = 0; col < 3; ++col)
+                    if (glyph.rows[row] & (4U >> col))
+                        fill_rect(surface, x + col * scale, y + row * scale, scale, scale);
         }
     }
 }
-
+void duration(char *out, std::size_t size, std::uint32_t seconds)
+{
+    if (seconds >= 3600)
+        std::snprintf(out, size, "%u:%02u:%02u", static_cast<unsigned>(seconds / 3600),
+                      static_cast<unsigned>(seconds / 60 % 60), static_cast<unsigned>(seconds % 60));
+    else
+        std::snprintf(out, size, "%02u:%02u", static_cast<unsigned>(seconds / 60),
+                      static_cast<unsigned>(seconds % 60));
+}
 void render_face(const State &state, MonoSurface &surface)
 {
-    const auto center_x = surface.width / 2U;
-    const auto center_y = surface.height / 2U;
-
-    const Sprite *eye = &kEyeOpen;
-    if (state.mood == Mood::Happy) {
-        eye = &kEyeHappy;
-    } else if (state.mood == Mood::Sleepy) {
-        eye = &kEyeSleepy;
-    }
-
-    blit(surface, *eye, center_x - 23U, center_y - 10U);
-    blit(surface, *eye, center_x + 18U, center_y - 10U);
-
-    if (state.mood == Mood::Happy) {
-        blit_smile(surface, center_x - 4U, center_y + 7U);
-    } else if (state.mood == Mood::Alert) {
-        outline_rect(surface, center_x - 3U, center_y + 5U, 7U, 7U);
-    } else if (state.mood == Mood::Curious) {
-        fill_rect(surface, center_x - 3U, center_y + 7U, 7U, 1U);
-        set_pixel(surface, center_x + 5U, center_y + 5U);
-        set_pixel(surface, center_x + 6U, center_y + 4U);
+    const auto ti = static_cast<unsigned>(state.theme);
+    const auto mi = static_cast<unsigned>(state.mood);
+    const auto &face = assets::faces[ti < 8 ? ti : 0][mi < 5 ? mi : 0];
+    const int cx = surface.width / 2 + state.gaze_x * 2;
+    // Original face anchors are on a 128x68 canvas. Center-crop to the target;
+    // blitting clips signed coordinates and never stretches source pixels.
+    const int crop = (static_cast<int>(surface.height) - 68) / 2;
+    bitmap(surface, face.brow_left, cx - 22, 13 + crop);
+    bitmap(surface, face.brow_right, cx + 22, 13 + crop);
+    if (state.eyes_closed || state.mood == Mood::Sleepy) {
+        fill_rect(surface, static_cast<std::uint16_t>(cx - 22 - face.left.width / 2),
+                  surface.height / 2 - 6, face.left.width, 2);
+        fill_rect(surface, static_cast<std::uint16_t>(cx + 22 - face.right.width / 2),
+                  surface.height / 2 - 6, face.right.width, 2);
     } else {
-        blit(surface, kMouthNeutral, center_x - 3U, center_y + 8U);
+        bitmap(surface, face.left, cx - 22, 28 + crop);
+        bitmap(surface, face.right, cx + 22, 28 + crop);
+    }
+    bitmap(surface, face.mouth, cx, 47 + crop);
+    if (state.mood == Mood::Alert) {
+        fill_rect(surface, surface.width - 15, 25, 2, 8);
+        fill_rect(surface, surface.width - 15, 36, 2, 2);
     }
 }
-
 void render_status(const State &state, MonoSurface &surface)
 {
-    if (state.connected) {
-        fill_rect(surface, 3, 3, 3, 3);
-    } else {
-        outline_rect(surface, 3, 3, 3, 3);
+    if (state.connected) fill_rect(surface, 3, 3, 3, 3);
+    else outline_rect(surface, 3, 3, 3, 3);
+    if (state.dock != Dock::None) outline_rect(surface, surface.width - 10, 3, 7, 6);
+    if (state.timer_running || state.timer_paused) {
+        char buffer[16]; duration(buffer, sizeof(buffer), state.timer_remaining_seconds);
+        text(surface, buffer, 8, surface.height - 7);
+        text(surface, state.timer_paused ? "PAUSED" : state.mode == Mode::Focus ? "FOCUS" : "TIMER", 72, surface.height - 7);
     }
-
-    if (state.dock != Dock::None) {
-        const auto x = surface.width - 10U;
-        outline_rect(surface, x, 3, 7, 6);
-        if (state.dock == Dock::Car) {
-            fill_rect(surface, x + 1U, 7, 2, 2);
-            fill_rect(surface, x + 4U, 7, 2, 2);
+}
+void render_screen(const State &state, MonoSurface &surface)
+{
+    if (state.timer_completed) {
+        render_face(state, surface);
+        text(surface, "DONE", 56, 1);
+        return;
+    }
+    if (state.screen == Screen::Home || state.screen == Screen::Themes) {
+        render_face(state, surface);
+        if (state.screen == Screen::Home) render_status(state, surface);
+        else {
+            text(surface, "THEME", 2, 1);
+            text(surface, assets::theme_names[static_cast<unsigned>(state.theme) % 8], 22, surface.height - 7);
         }
+        return;
     }
-
-    constexpr std::uint8_t user_mode_count = 6;
-    const auto first_x = surface.width / 2U - 17U;
-    const auto y = surface.height - 4U;
-    for (std::uint8_t index = 0; index < user_mode_count; ++index) {
-        const bool selected = index == static_cast<std::uint8_t>(state.mode);
-        if (selected) {
-            fill_rect(surface, first_x + index * 6U, y, 3, 3);
-        } else {
-            set_pixel(surface, first_x + index * 6U + 1U, y + 1U);
+    if (state.screen == Screen::Menu) {
+        constexpr const char *items[]{"FOCUS TIMER","COOKING TIMER","HOME","MUSIC",
+                                      "WAYFINDING","NOTES","FACE THEMES","BACK"};
+        text(surface, "PICO MENU", 2, 2, 2);
+        const auto first = (state.menu_index / 4) * 4;
+        for (unsigned i = 0; i < 4; ++i) {
+            const auto index = first + i;
+            text(surface, index == state.menu_index ? ">" : " ", 2, 20 + i * 10);
+            text(surface, items[index], 10, 20 + i * 10);
         }
+        return;
     }
-
-    if (state.timer_running && state.timer_total_seconds > 0U) {
-        const auto bar_width = surface.width - 16U;
-        const auto filled = static_cast<std::uint16_t>(
-            (static_cast<std::uint64_t>(bar_width) *
-             state.timer_remaining_seconds) /
-            state.timer_total_seconds);
-        outline_rect(surface, 8, 12, bar_width, 5);
-        if (filled > 2U) {
-            fill_rect(surface, 9, 13, filled - 2U, 3);
+    if (state.screen == Screen::Unavailable) {
+        text(surface, "NOT READY", 8, 10, 2);
+        text(surface, "FEATURE NOT IMPLEMENTED", 4, 32);
+        text(surface, "SELECT TO GO BACK", 4, 48);
+        return;
+    }
+    char buffer[24];
+    duration(buffer, sizeof(buffer), state.timer_running || state.timer_paused ?
+             state.timer_remaining_seconds : state.configured_duration_seconds);
+    text(surface, buffer, 24, 1, 2);
+    text(surface, state.mode == Mode::Cooking ? "COOKING TIMER" : "FOCUS TIMER", 20, 15);
+    constexpr const char *actions[]{"DURATION", "START", "CANCEL", "HOME"};
+    for (unsigned i = 0; i < 4; ++i) {
+        text(surface, state.utility_index == i ? ">" : " ", 2, 26 + i * 9);
+        const char *label = i == 1 && state.timer_running ? "PAUSE" :
+                            i == 1 && state.timer_paused ? "RESUME" : actions[i];
+        text(surface, label, 10, 26 + i * 9);
+        if (i == 0) {
+            duration(buffer, sizeof(buffer), state.configured_duration_seconds);
+            text(surface, buffer, 64, 26);
         }
     }
 }
@@ -213,8 +233,7 @@ bool render(const State &state, MonoSurface surface)
     }
 
     std::fill(surface.data, surface.data + required_buffer_size(surface), 0U);
-    render_status(state, surface);
-    render_face(state, surface);
+    render_screen(state, surface);
     return true;
 }
 

@@ -80,13 +80,23 @@ int main()
     hardware.reflect(core.state());
 
     std::uint32_t last_tick = UINT32_MAX;
+    std::uint32_t last_animation_ms = 0;
     while (true) {
         pico::Event event{};
-        if (k_msgq_get(&event_queue, &event, K_MSEC(100)) == 0) {
+        if (k_msgq_get(&event_queue, &event, K_MSEC(20)) == 0) {
             const auto effects = core.handle(event);
             apply_effects(effects, core, hardware, display, storage, ble,
                           capabilities);
             hardware.reflect(core.state());
+        }
+
+        hardware.poll();
+
+        const auto now_ms = k_uptime_get_32();
+        if (now_ms - last_animation_ms >= 100U) {
+            last_animation_ms = now_ms;
+            apply_effects(core.handle({pico::EventKind::AnimationTick, now_ms}),
+                          core, hardware, display, storage, ble, capabilities);
         }
 
         const auto now_seconds = static_cast<std::uint32_t>(
@@ -97,6 +107,11 @@ int main()
             apply_effects(effects, core, hardware, display, storage, ble,
                           capabilities);
             hardware.reflect(core.state());
+#if defined(CONFIG_PICO_BRINGUP_DIAGNOSTICS)
+            if (now_seconds % 5U == 0U) {
+                display.diagnose(core.state());
+            }
+#endif
         }
     }
 

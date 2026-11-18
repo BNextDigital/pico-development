@@ -17,6 +17,15 @@ enum class Command : std::uint8_t {
     StartTimer = 0x04,
     CancelTimer = 0x05,
     RequestStatus = 0x06,
+    SetTheme = 0x07,
+    PauseTimer = 0x08,
+    ResumeTimer = 0x09,
+    SetTimerDuration = 0x0a,
+    OpenMenu = 0x10,
+    NavigateNext = 0x11,
+    NavigatePrevious = 0x12,
+    Select = 0x13,
+    Back = 0x14,
 };
 
 enum class DecodeStatus : std::uint8_t {
