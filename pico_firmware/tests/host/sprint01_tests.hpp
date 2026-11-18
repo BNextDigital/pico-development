@@ -89,6 +89,8 @@ void test_navigation_and_utility()
     CHECK(core.state().theme == pico::FaceTheme::KawaiiMascot);
     core.handle({pico::EventKind::Select, 0});
     CHECK(core.state().screen == pico::Screen::Home);
+    core.handle({pico::EventKind::OpenMenu, 0});
+    CHECK(core.state().menu_index == 0); // explicit BLE OpenMenu has a predictable start
 }
 
 void test_all_theme_frames_and_clipping()

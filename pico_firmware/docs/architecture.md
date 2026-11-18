@@ -12,7 +12,7 @@ Version 0.1 proves the seams that nearly every future Pico feature needs:
 6. dock-driven context changes; and
 7. non-blocking sound feedback.
 
-The companion and focus modes have real core behavior. Music, cooking,
+The companion, focus, and cooking timer modes have real core behavior. Music,
 wayfinding, notes, and driving are registered now so their wire IDs remain
 stable, but their specialized behavior is deliberately not faked before the
 corresponding input hardware and product rules exist.
@@ -72,7 +72,35 @@ also not persisted—docking selects it, and undocking restores the prior mode.
 ## Power posture
 
 There is no polling thread per feature. The main loop blocks on the event queue
-and wakes briefly for a one-second monotonic tick. Zephyr can idle the CPU
+with a 20 ms ceiling for the existing debounced button polling. A 100 ms
+animation sampler and one-second timer tick share this loop. Zephyr can idle the CPU
 between events. Display shutdown policy, slower advertising after a quiet
 period, microphone duty cycling, and battery ADC sampling belong in the next
 power-measurement pass after the actual board and battery circuit are known.
+
+## Sprint 01 services
+
+`Timer` owns running/paused/remaining/total state and computes elapsed time
+from caller-supplied monotonic timestamps, including missed updates and
+unsigned clock wrap. It is a reusable instance, not a global per-mode timer.
+`Personality` owns seeded scheduling for blinks, idle glances, temporary
+reactions and inactivity sleep. `Core` coordinates these services and UI
+transitions; `State` exposes snapshots for the renderer and protocol.
+
+`Tick` retains seconds for timers. Appended `AnimationTick` carries milliseconds
+for facial motion. The simulator advances the same services with subsecond
+steps. Menu/utility screens suppress idle behavior; timer completion overrides
+the screen until its temporary alert ends. See `sprint01.md` for controls,
+physical acceptance, migration and validation limits.
+
+Source BMPs remain in `bmp-primitives`. A standard-library Python tool compiles
+their actual palettes and packed pixels into `face_assets.hpp`. The C++ renderer
+blits these primitives using signed clipped coordinates, centering the 128x68
+source anchors on the 128x64 panel. Board builds do not need Python asset
+conversion or runtime files. Re-run the tool and its `--check` mode after asset
+changes. Theme IDs remain stable.
+
+Durable records now use v3 (20 bytes) and include theme and next-timer duration.
+The reader migrates v1/v2 records; the platform accepts both lengths. Automatic
+personality transitions do not save, and identical OLED frames skip transfer.
+Boot enters Companion/Home even if a legacy record saved another user mode.

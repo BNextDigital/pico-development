@@ -1,17 +1,20 @@
 # Prototype hardware bring-up
 
+For the current Sprint 01 build, wiring, compatibility and acceptance steps,
+see [Sprint 01](sprint01.md). The historical DK example below is a separate board.
+
 ## Decision ledger
 
 | Area | Current prototype decision | Confidence |
 | --- | --- | --- |
 | MCU/radio | Nordic nRF52 family using nRF Connect SDK and BLE | Confirmed |
-| Development board | Nordic-compatible development board is ordered; exact Zephyr board target/pin map needs the board listing or silkscreen | Pending identification |
+| Development board | Seeed Studio XIAO nRF52840 Sense; target `xiao_ble/nrf52840/sense` | Confirmed |
 | Display | Small monochrome OLED with layered bitmap components | Confirmed concept |
-| Display controller | Example overlay assumes 128x64 SSD1306, I2C address `0x3c` | Provisional |
-| Input | Primary interaction button; optional second mode button | Prototype baseline |
-| Indicators | Ordinary through-hole status LED(s), not addressable LED chips | Confirmed prototype simplification |
-| Audio output | Small speaker; PWM chirp adapter included | Confirmed part, driver circuit pending |
-| Audio input | Microphone for tuner/notes | Confirmed direction, module/interface pending |
+| Display controller | 128x64 SSD1306 at `0x3c`, SDA D4 / SCL D5; baseline hardware rendered successfully | Confirmed baseline |
+| Input | D0 tap/hold Focus controls; optional D1 menu controls in Sprint 01 | D0 physically confirmed on baseline; D1 pending |
+| Indicators | XIAO onboard red LED for connection/heartbeat | Confirmed baseline |
+| Audio output | 8-ohm/1 W speaker + MAX98357 I2S breakout; PWM adapter is only an optional alternative | I2S driver pending |
+| Audio input | XIAO Sense onboard PDM microphone for future tuner/notes | Hardware known; capture adapter pending |
 | Haptics | No vibration motor | Explicitly excluded |
 | Docks | Home and car context; GPIO aliases supported now | Confirmed behavior, electrical ID method pending |
 | GPS/compass | Wayfinding extension | Future optional hardware |

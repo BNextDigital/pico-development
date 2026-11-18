@@ -1,5 +1,8 @@
 # XIAO Sense + OLED first boot
 
+For Sprint 01 personality, menus, timer pause/resume, optional D1 wiring and
+updated migration/validation status, use [the Sprint 01 guide](sprint01.md).
+
 Target: Seeed Studio XIAO nRF52840 Sense, nRF Connect SDK **3.4.2**,
 128x64 I2C SSD1306 OLED at address **0x3c**.
 
