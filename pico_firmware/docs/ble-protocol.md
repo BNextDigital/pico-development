@@ -38,6 +38,11 @@ All integers are little-endian. There is no packed C struct on the wire.
 | `22 ss ss ss ss` | Configure break duration, 1–604800 seconds; runtime only |
 | `23 cc` | Test cue 0 interact, 1 timer done, 2 work done, 3 break done |
 | `24 mm` | Runtime mute: 0 unmuted, 1 muted |
+| `30` | Start metronome and open Music |
+| `31` | Stop metronome |
+| `32 bb bb` | Set BPM, 16-bit little-endian, 30–240 |
+| `33 nn` | Set beats per bar, 1–8 |
+| `34` | Tap tempo at processing time |
 
 Mode IDs are companion `0`, focus `1`, music `2`, cooking `3`, wayfinding `4`,
 notes `5`, and driving `6`. Driving cannot be requested remotely; the car dock
@@ -55,7 +60,7 @@ The status characteristic is always exactly 16 bytes.
 | 1 | 1 | Mode ID |
 | 2 | 1 | Mood ID |
 | 3 | 1 | Dock ID: none `0`, home `1`, car `2` |
-| 4 | 1 | Flags: bit 0 connected, bit 1 timer running, bit 2 timer paused, bit 3 cycle waiting, bit 4 muted |
+| 4 | 1 | Flags: bit 0 connected, bit 1 timer running, bit 2 timer paused, bit 3 cycle waiting, bit 4 muted, bit 5 metronome running |
 | 5 | 1 | Battery percentage, or `255` when unknown |
 | 6 | 4 | Timer seconds remaining |
 | 10 | 4 | Lifetime interaction count |
@@ -102,3 +107,13 @@ observe status to learn the resulting state. `05` cancels waiting cycles too.
 Break duration and mute reset on reboot, while `0A` work duration remains durable.
 The test-sound command generates the existing Chirp effect without changing
 mood/count. A muted or unavailable output may produce no audible cue.
+
+## Music metronome additions
+
+Music remains mode ID 2. Commands 30–34 are additive. Status v1 remains 16 bytes;
+flag bit 5 reports metronome running, while BPM/bar count remain on-device or
+simulator state (not encoded in this packet). Clients must ignore unknown flag
+bits. Tempo/bar settings are volatile; reboot stops playback and restores
+120 BPM/four beats. Start refuses in a car dock; duplicate Start does not reset
+phase. Beats do not send notifications; start/stop/settings changes do.
+See [music-metronome.md](music-metronome.md) for controls and timing limits.

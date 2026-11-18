@@ -118,7 +118,8 @@ class PicoSimulatorApp:
         self.root.bind("<space>", lambda _event: self._send("event PrimaryPressed"))
         self.root.bind("<Key-m>", lambda _event: self._send("event SecondaryPressed"))
         self.root.bind("<Key-M>", lambda _event: self._send("event SecondaryPressed"))
-        self.root.after(100, self._clock_tick)
+        self.clock_step_ms = 100
+        self.root.after(self.clock_step_ms, self._clock_tick)
 
     def _configure_style(self) -> None:
         style = ttk.Style(self.root)
@@ -330,6 +331,14 @@ class PicoSimulatorApp:
         self.muted_var = tk.BooleanVar(value=False)
         ttk.Checkbutton(timer_box, text="Mute", variable=self.muted_var, command=lambda: self._send(
             "event SetMuted " + str(int(self.muted_var.get())))).grid(row=3, column=3)
+
+        ttk.Button(timer_box, text="Metronome", command=lambda: self._send("event StartMetronome")).grid(row=4, column=0)
+        ttk.Button(timer_box, text="Stop beat", command=lambda: self._send("event StopMetronome")).grid(row=4, column=1)
+        ttk.Button(timer_box, text="Tap tempo", command=lambda: self._send("event TapTempo")).grid(row=4, column=2)
+        self.bpm_var = tk.StringVar(value="120")
+        ttk.Spinbox(timer_box, from_=30, to=240, textvariable=self.bpm_var, width=5).grid(row=5, column=0)
+        ttk.Button(timer_box, text="Set BPM", command=lambda: self._send(
+            "event SetMetronomeBpm " + self.bpm_var.get())).grid(row=5, column=1)
 
         time_box = ttk.LabelFrame(parent, text="Simulation clock", padding=10)
         time_box.grid(row=4, column=0, sticky="ew", pady=(0, 8))
@@ -598,8 +607,9 @@ class PicoSimulatorApp:
             return
         if not self.paused_var.get():
             speed = {"1×": 1, "10×": 10, "60×": 60}.get(self.speed_var.get(), 1)
-            self._send(f"advance_ms {speed * 100}")
-        self.root.after(100, self._clock_tick)
+            self._send(f"advance_ms {speed * self.clock_step_ms}")
+        self.clock_step_ms = 20 if self.snapshot["state"].get("metronome_running") else 100
+        self.root.after(self.clock_step_ms, self._clock_tick)
 
     def close(self) -> None:
         self.closed = True

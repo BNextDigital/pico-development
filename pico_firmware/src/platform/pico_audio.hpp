@@ -5,6 +5,7 @@ class Audio {
 public:
     bool init();
     bool ready() const;
+    void set_metronome_running(bool running);
     void set_muted(bool muted);
     void play(audio::Cue cue);
 };

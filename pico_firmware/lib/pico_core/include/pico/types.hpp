@@ -83,9 +83,15 @@ enum class EventKind : std::uint8_t {
     SetBreakDuration,
     TestSound,
     SetMuted,
+    MusicTick,
+    StartMetronome,
+    StopMetronome,
+    SetMetronomeBpm,
+    SetMetronomeBeats,
+    TapTempo,
 };
 
-enum class Screen : std::uint8_t { Home, Menu, Utility, Themes, Unavailable };
+enum class Screen : std::uint8_t { Home, Menu, Utility, Themes, Unavailable, Music };
 
 struct Event {
     EventKind kind{EventKind::Boot};
@@ -150,6 +156,12 @@ struct State {
     std::uint32_t break_duration_seconds{300};
     audio::Cue sound_cue{audio::Cue::Interact};
     bool sound_muted{false};
+    bool metronome_running{false};
+    bool beat_pulse{false};
+    std::uint16_t metronome_bpm{120};
+    std::uint8_t beats_per_bar{4};
+    std::uint8_t current_beat{1};
+    std::uint8_t music_index{2};
 };
 
 struct PersistedState {

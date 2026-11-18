@@ -31,6 +31,11 @@ enum class Command : std::uint8_t {
     SetBreakDuration = 0x22,
     TestSound = 0x23,
     SetMuted = 0x24,
+    StartMetronome = 0x30,
+    StopMetronome = 0x31,
+    SetMetronomeBpm = 0x32,
+    SetMetronomeBeats = 0x33,
+    TapTempo = 0x34,
 };
 
 enum class DecodeStatus : std::uint8_t {

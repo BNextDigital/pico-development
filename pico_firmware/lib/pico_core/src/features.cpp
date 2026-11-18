@@ -13,7 +13,7 @@ constexpr Capabilities operator|(Capability lhs, Capability rhs)
 constexpr std::array<FeatureDescriptor, 7> kFeatures{{
     {Mode::Companion, "companion", capability(Capability::Display), true},
     {Mode::Focus, "focus", Capability::Display | Capability::Speaker, true},
-    {Mode::Music, "music", Capability::Microphone | Capability::Speaker, false},
+    {Mode::Music, "music", Capability::Display | Capability::Speaker, true},
     {Mode::Cooking, "cooking", Capability::Display | Capability::Speaker, true},
     {Mode::Wayfinding, "wayfinding", Capability::Position | Capability::Compass, false},
     {Mode::Notes, "notes", capability(Capability::Microphone), false},

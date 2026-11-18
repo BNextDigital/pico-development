@@ -136,7 +136,7 @@ void test_feature_registry_and_cycle()
     CHECK(registry != nullptr);
     CHECK(count == 7U);
     CHECK(pico::feature_for(pico::Mode::Focus)->prototype_ready);
-    CHECK(!pico::feature_for(pico::Mode::Music)->prototype_ready);
+    CHECK(pico::feature_for(pico::Mode::Music)->prototype_ready);
     CHECK(pico::next_user_mode(pico::Mode::Notes) == pico::Mode::Companion);
     CHECK(pico::next_user_mode(pico::Mode::Driving) == pico::Mode::Companion);
 }
@@ -342,6 +342,7 @@ void test_focus_button_standalone_controls()
 
 #include "sprint01_tests.hpp"
 #include "sprint02_tests.hpp"
+#include "music_tests.hpp"
 
 } // namespace
 
@@ -360,6 +361,7 @@ int main()
     test_theme_events_and_persistence();
     run_sprint01_tests();
     run_sprint02_tests();
+    run_music_tests();
     test_button_debounce_and_hold();
     test_focus_button_standalone_controls();
 

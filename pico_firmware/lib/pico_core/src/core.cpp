@@ -18,6 +18,19 @@ void Core::sync_timer()
     state_.timer_total_seconds = timer_.total();
     state_.timer_remaining_seconds = timer_.remaining();
 }
+void Core::sync_metronome()
+{
+    state_.metronome_running = metronome_.running();
+    state_.metronome_bpm = static_cast<std::uint16_t>(metronome_.bpm());
+    state_.beats_per_bar = static_cast<std::uint8_t>(metronome_.beats());
+    state_.current_beat = static_cast<std::uint8_t>(metronome_.beat());
+    state_.beat_pulse = metronome_.pulse();
+}
+Effects Core::music_beat()
+{
+    state_.sound_cue = metronome_.beat() == 1 ? audio::Cue::MetronomeAccent : audio::Cue::MetronomeClick;
+    return Effect::Render | Effect::Chirp;
+}
 void Core::sync_focus()
 {
     state_.focus_phase = focus_.phase();
@@ -34,6 +47,7 @@ Effects Core::start_focus_phase()
 }
 Effects Core::timer_complete()
 {
+    metronome_.stop(); sync_metronome();
     state_.sound_cue = focus_.phase() == FocusPhase::Work ? audio::Cue::WorkComplete :
                        focus_.phase() == FocusPhase::Break ? audio::Cue::BreakComplete : audio::Cue::TimerComplete;
     focus_.complete(); sync_focus();
@@ -56,6 +70,10 @@ Effects Core::set_mode(Mode mode)
     if (focus_.phase() != FocusPhase::None && mode != Mode::Focus) {
         timer_.cancel(); focus_.cancel(); sync_timer(); sync_focus(); state_.timer_completed = false;
     }
+    if (mode != Mode::Music) {
+        metronome_.stop(); sync_metronome();
+        if (state_.screen == Screen::Music) state_.screen = Screen::Home;
+    }
     state_.mode = mode;
     if (mode != Mode::Focus && state_.utility_index >= 4) state_.utility_index = 1;
     return Effect::Render | Effect::Notify | Effect::Persist;
@@ -71,6 +89,12 @@ Effects Core::navigate(EventKind kind)
 {
     if (state_.dock == Dock::Car) return effect(Effect::None);
     activity();
+    if (state_.screen == Screen::Music &&
+        (kind == EventKind::Back || kind == EventKind::OpenMenu)) {
+        metronome_.stop(); sync_metronome();
+        state_.screen = Screen::Menu;
+        return Effect::Render | Effect::Notify;
+    }
     if (kind == EventKind::Back) {
         state_.screen = state_.screen == Screen::Menu || state_.screen == Screen::Home ? Screen::Home : Screen::Menu;
         return effect(Effect::Render);
@@ -88,6 +112,8 @@ Effects Core::navigate(EventKind kind)
             const int count = state_.mode == Mode::Focus ? 5 : 4;
             state_.utility_index = static_cast<std::uint8_t>((state_.utility_index + count + direction) % count);
         }
+        else if (state_.screen == Screen::Music)
+            state_.music_index = static_cast<std::uint8_t>((state_.music_index + 6 + direction) % 6);
         else if (state_.screen == Screen::Themes) {
             const auto next = (static_cast<int>(state_.theme) + 8 + direction) % 8;
             return set_theme(static_cast<FaceTheme>(next)) | Effect::Render;
@@ -104,8 +130,18 @@ Effects Core::navigate(EventKind kind)
             const auto mode = menu_modes[state_.menu_index];
             const auto effects = set_mode(mode);
             state_.utility_index = 1;
-            state_.screen = feature_for(mode)->prototype_ready ? Screen::Utility : Screen::Unavailable;
+            state_.screen = mode == Mode::Music ? Screen::Music :
+                feature_for(mode)->prototype_ready ? Screen::Utility : Screen::Unavailable;
             return effects | Effect::Render;
+        }
+    } else if (state_.screen == Screen::Music) {
+        switch (state_.music_index) {
+        case 0: return handle({EventKind::SetMetronomeBpm, state_.metronome_bpm > 34U ? state_.metronome_bpm - 5U : 30U});
+        case 1: return handle({EventKind::SetMetronomeBpm, state_.metronome_bpm < 236U ? state_.metronome_bpm + 5U : 240U});
+        case 2: return handle({state_.metronome_running ? EventKind::StopMetronome : EventKind::StartMetronome, 0});
+        case 3: return handle({EventKind::TapTempo, 0});
+        case 4: return handle({EventKind::SetMetronomeBeats, state_.beats_per_bar % 8U + 1U});
+        case 5: state_.screen = Screen::Home; return set_mode(Mode::Companion) | Effect::Render;
         }
     } else if (state_.screen == Screen::Themes) state_.screen = Screen::Home;
     else if (state_.screen == Screen::Unavailable) state_.screen = Screen::Menu;
@@ -136,7 +172,7 @@ Effects Core::handle(const Event &event)
         state_.mode = Mode::Companion;
         state_.screen = Screen::Home;
         state_.timer_completed = false;
-        timer_.cancel(); focus_.cancel(); sync_timer(); sync_focus(); activity();
+        timer_.cancel(); focus_.cancel(); metronome_ = Metronome{}; sync_metronome(); sync_timer(); sync_focus(); activity();
         return Effect::Render | Effect::Notify;
     case EventKind::Tick: return on_tick(event.value);
     case EventKind::AnimationTick: {
@@ -193,6 +229,7 @@ Effects Core::handle(const Event &event)
         const auto previous = state_.dock;
         state_.dock = dock;
         state_.screen = Screen::Home;
+        metronome_.stop(); sync_metronome();
         if (dock == Dock::Car) {
             if (focus_.phase() != FocusPhase::None) {
                 timer_.cancel(); focus_.cancel(); sync_timer(); sync_focus(); state_.timer_completed = false;
@@ -253,11 +290,39 @@ Effects Core::handle(const Event &event)
             return effect(Effect::None);
         state_.break_duration_seconds = event.value; activity(); return Effect::Render | Effect::Notify;
     case EventKind::TestSound:
-        if (state_.sound_muted || event.value >= static_cast<unsigned>(audio::Cue::Count)) return effect(Effect::None);
+        if (state_.sound_muted || event.value >= static_cast<unsigned>(audio::Cue::MetronomeClick)) return effect(Effect::None);
         state_.sound_cue = static_cast<audio::Cue>(event.value); return effect(Effect::Chirp);
     case EventKind::SetMuted:
         if (event.value > 1 || state_.sound_muted == (event.value != 0)) return effect(Effect::None);
         state_.sound_muted = event.value != 0; return Effect::Render | Effect::Notify;
+    case EventKind::MusicTick: {
+        music_ms_ = event.value;
+        const bool previous_pulse = state_.beat_pulse;
+        const bool due = metronome_.advance(music_ms_);
+        sync_metronome();
+        if (due) return music_beat();
+        return previous_pulse != state_.beat_pulse ? effect(Effect::Render) : effect(Effect::None);
+    }
+    case EventKind::StartMetronome: {
+        if (state_.dock == Dock::Car || metronome_.running()) return effect(Effect::None);
+        const auto effects = set_mode(Mode::Music);
+        state_.screen = Screen::Music;
+        metronome_.start(music_ms_); sync_metronome(); activity();
+        state_.timer_completed = false;
+        personality_.react(state_, Mood::Neutral, animation_ms_);
+        return effects | music_beat() | Effect::Notify;
+    }
+    case EventKind::StopMetronome:
+        if (!metronome_.running()) return effect(Effect::None);
+        metronome_.stop(); sync_metronome(); activity(); return Effect::Render | Effect::Notify;
+    case EventKind::SetMetronomeBpm:
+        if (!metronome_.set_bpm(event.value)) return effect(Effect::None);
+        sync_metronome(); activity(); return Effect::Render | Effect::Notify;
+    case EventKind::SetMetronomeBeats:
+        if (!metronome_.set_beats(event.value)) return effect(Effect::None);
+        sync_metronome(); activity(); return Effect::Render | Effect::Notify;
+    case EventKind::TapTempo:
+        metronome_.tap(music_ms_); sync_metronome(); activity(); return Effect::Render | Effect::Notify;
     case EventKind::RequestStatus: return effect(Effect::Notify);
     }
     return effect(Effect::None);

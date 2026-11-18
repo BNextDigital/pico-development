@@ -79,7 +79,7 @@ void test_navigation_and_utility()
     core.handle({pico::EventKind::OpenMenu, 0});
     for (unsigned i = 0; i < 3; ++i) core.handle({pico::EventKind::NavigateNext, 0});
     core.handle({pico::EventKind::Select, 0});
-    CHECK(core.state().screen == pico::Screen::Unavailable);
+    CHECK(core.state().screen == pico::Screen::Music);
     core.handle({pico::EventKind::Back, 0});
     CHECK(core.state().screen == pico::Screen::Menu);
     for (unsigned i = 0; i < 3; ++i) core.handle({pico::EventKind::NavigateNext, 0});

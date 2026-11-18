@@ -123,3 +123,18 @@ Mute clears pending cues; the current bounded cue may finish. See
 The optional quieter profile disables diagnostic probes; button handling still
 polls every 20 ms. Interrupt-driven wakeups and battery policy remain future
 work pending physical power measurements.
+
+## Music metronome
+
+`Metronome` owns rational beat phase and tap-tempo estimation without threads,
+allocation or platform clocks. `MusicTick` supplies monotonic milliseconds;
+Core routes its state/click effects into the renderer and audio adapter. It
+runs independently of the seconds-based Timer. Completion of a timer stops
+metronome playback before issuing the alert. Per-beat updates avoid Persist
+and Notify, while Start/Stop/settings changes notify.
+
+Music appends a dedicated screen with six local actions and reuses the existing
+button mappings. Audio click/accent IDs append after the original cues, and
+busy audio drops stale beats. Main enqueues sound before potentially blocking
+OLED rendering. Millisecond phase correctness is host-tested; physical jitter
+remains unmeasured. Details: [music-metronome.md](music-metronome.md).
