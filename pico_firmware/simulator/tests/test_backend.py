@@ -361,6 +361,97 @@ class BackendTests(unittest.TestCase):
         self.assertNotEqual(end["state"]["mood_name"],"happy")
         self.assertFalse(self.harness.send("motion 9000 0 0 40")["ok"])
 
+    def test_minute_duration_editor_confirm_cancel_and_break(self):
+        self.harness.send("ble 10"); self.harness.send("ble 13")
+        self.harness.send("ble 12")  # Duration
+        opened = self.harness.send("event FocusButtonTapped")
+        self.assertEqual(opened["state"]["screen"],7)
+        self.assertEqual(opened["state"]["draft_duration_seconds"],1500)
+        preview = self.harness.send("event FocusButtonTapped")
+        self.assertEqual(preview["state"]["draft_duration_seconds"],1560)
+        self.assertEqual(preview["state"]["configured_duration_seconds"],1500)
+        self.assertNotIn("Persist",preview["effect_names"])
+        self.assertNotEqual(opened["frame_hex"],preview["frame_hex"])
+        cancelled = self.harness.send("event FocusButtonHeld")
+        self.assertEqual(cancelled["state"]["screen"],2)
+        self.assertEqual(cancelled["state"]["configured_duration_seconds"],1500)
+        self.harness.send("ble 13"); self.harness.send("ble 13")
+        self.harness.send("ble 11")  # Save
+        saved = self.harness.send("ble 13")
+        self.assertEqual(saved["state"]["configured_duration_seconds"],1560)
+        self.harness.send("ble 12")  # Break, utility index 5
+        self.harness.send("ble 13"); self.harness.send("ble 13")
+        self.harness.send("ble 11")
+        rest = self.harness.send("ble 13")
+        self.assertEqual(rest["state"]["break_duration_seconds"],360)
+        self.harness.send("advance 5")
+        reboot = self.harness.send("power_cycle")
+        self.assertEqual(reboot["state"]["configured_duration_seconds"],1560)
+        self.assertEqual(reboot["state"]["break_duration_seconds"],360)  # durable v4 settings
+
+    def test_settings_preview_cancel_and_durable_preferences(self):
+        opened = self.harness.send("ble 15")
+        self.assertEqual(opened["state"]["screen"],8)
+        self.harness.send("ble 13") # Theme editor
+        preview = self.harness.send("event FocusButtonTapped")
+        self.assertEqual(preview["state"]["screen"],9)
+        self.assertEqual(preview["state"]["setting_draft"],1)
+        self.assertEqual(preview["state"]["theme"],0)
+        self.assertNotIn("Persist",preview["effect_names"])
+        self.harness.send("event Back")
+        self.assertEqual(self.harness.send("ble 06")["state"]["theme"],0)
+        self.harness.send("ble 13"); self.harness.send("ble 13") # preview again
+        self.harness.send("ble 11"); self.harness.send("ble 13") # Save
+        self.harness.send("ble 24 01")
+        self.harness.send("ble 25 46")
+        self.harness.send("ble 22 a4 01 00 00") # 420 s
+        self.harness.send("ble 40 01")
+        self.harness.send("advance 5")
+        reboot = self.harness.send("power_cycle")
+        self.assertEqual(reboot["state"]["theme"],1)
+        self.assertTrue(reboot["state"]["sound_muted"])
+        self.assertEqual(reboot["state"]["sound_volume_percent"],70)
+        self.assertEqual(reboot["state"]["break_duration_seconds"],420)
+        self.assertEqual(reboot["state"]["motion_config"],1)
+        self.assertEqual(reboot["state"]["screen"],0)
+        self.assertFalse(reboot["state"]["timer_running"])
+        self.assertFalse(self.harness.send("ble 25 65")["ok"])
+
+    def test_settings_duration_returns_to_settings_and_completion_wins(self):
+        self.harness.send("ble 15")
+        for _ in range(4): self.harness.send("ble 11") # Break row
+        self.harness.send("ble 13")
+        self.harness.send("ble 13") # +1 min
+        self.harness.send("ble 11")
+        saved = self.harness.send("ble 13")
+        self.assertEqual(saved["state"]["screen"],8)
+        self.assertEqual(saved["state"]["break_duration_seconds"],360)
+        self.assertIn("Persist",saved["effect_names"])
+        self.harness.send("ble 13") # open break again
+        self.harness.send("ble 13") # preview 7 min
+        self.harness.send("ble 04 01 00 00 00")
+        done = self.harness.send("advance 1")
+        self.assertEqual(done["state"]["screen"],0)
+        self.assertEqual(done["state"]["break_duration_seconds"],360)
+        self.assertEqual(done["state"]["mood_name"],"alert")
+
+    def test_legacy_v3_record_migrates_with_settings_defaults(self):
+        record = bytearray(b"PICO" + bytes([3,0,0,4]) + (42).to_bytes(4,"little") + (600).to_bytes(4,"little"))
+        checksum=2166136261
+        for value in record: checksum=((checksum ^ value)*16777619)&0xffffffff
+        record.extend(checksum.to_bytes(4,"little"))
+        (Path(self.temporary.name)/"pico-state.bin").write_bytes(record)
+        restored = self.harness.send("power_cycle")
+        self.assertEqual(restored["state"]["theme"],4)
+        self.assertEqual(restored["state"]["interaction_count"],42)
+        self.assertEqual(restored["state"]["configured_duration_seconds"],600)
+        self.assertEqual(restored["state"]["break_duration_seconds"],300)
+        self.assertEqual(restored["state"]["sound_volume_percent"],25)
+        self.assertFalse(restored["state"]["sound_muted"])
+        self.harness.send("ble 25 1e")
+        self.harness.send("advance 5")
+        self.assertEqual(len((Path(self.temporary.name)/"pico-state.bin").read_bytes()),28)
+
     def test_sprint_durable_settings_and_companion_boot(self):
         self.harness.send("ble 07 04")
         self.harness.send("ble 0a 2c 01 00 00")

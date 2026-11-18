@@ -8,8 +8,8 @@
 
 namespace pico::persistence {
 
-inline constexpr std::size_t kBlobSize = 20;
-inline constexpr std::uint8_t kStorageVersion = 3;
+inline constexpr std::size_t kBlobSize = 28;
+inline constexpr std::uint8_t kStorageVersion = 4;
 using Blob = std::array<std::uint8_t, kBlobSize>;
 
 Blob encode(const PersistedState &state);

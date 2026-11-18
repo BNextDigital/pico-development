@@ -48,6 +48,7 @@ Effects Core::start_focus_phase()
 Effects Core::timer_complete()
 {
     metronome_.stop(); sync_metronome();
+    if (state_.screen == Screen::DurationEdit || state_.screen == Screen::SettingEdit) state_.screen = Screen::Home;
     state_.tuner_running = false;
     state_.sound_cue = focus_.phase() == FocusPhase::Work ? audio::Cue::WorkComplete :
                        focus_.phase() == FocusPhase::Break ? audio::Cue::BreakComplete : audio::Cue::TimerComplete;
@@ -68,6 +69,7 @@ Effects Core::set_mode(Mode mode)
     if (!valid_mode(mode) || mode == Mode::Driving || state_.dock == Dock::Car ||
         mode == state_.mode) return effect(Effect::None);
     activity();
+    if (state_.screen == Screen::DurationEdit || state_.screen == Screen::SettingEdit) state_.screen = Screen::Home;
     if (focus_.phase() != FocusPhase::None && mode != Mode::Focus) {
         timer_.cancel(); focus_.cancel(); sync_timer(); sync_focus(); state_.timer_completed = false;
     }
@@ -91,6 +93,8 @@ Effects Core::navigate(EventKind kind)
 {
     if (state_.dock == Dock::Car) return effect(Effect::None);
     activity();
+    if (state_.screen == Screen::DurationEdit) return edit_duration(kind);
+    if (state_.screen == Screen::SettingEdit) return edit_setting(kind);
     if ((state_.screen == Screen::Music || state_.screen == Screen::Tuner) &&
         (kind == EventKind::Back || kind == EventKind::OpenMenu)) {
         metronome_.stop(); sync_metronome();
@@ -110,9 +114,11 @@ Effects Core::navigate(EventKind kind)
     const int direction = kind == EventKind::NavigatePrevious ? -1 : 1;
     if (kind == EventKind::NavigateNext || kind == EventKind::NavigatePrevious) {
         if (state_.screen == Screen::Menu)
-            state_.menu_index = static_cast<std::uint8_t>((state_.menu_index + 8 + direction) % 8);
+            state_.menu_index = static_cast<std::uint8_t>((state_.menu_index + 9 + direction) % 9);
+        else if (state_.screen == Screen::Settings)
+            state_.settings_index = static_cast<std::uint8_t>((state_.settings_index+8+direction)%8);
         else if (state_.screen == Screen::Utility) {
-            const int count = state_.mode == Mode::Focus ? 5 : 4;
+            const int count = state_.mode == Mode::Focus ? 6 : 4;
             state_.utility_index = static_cast<std::uint8_t>((state_.utility_index + count + direction) % count);
         }
         else if (state_.screen == Screen::Music)
@@ -126,7 +132,8 @@ Effects Core::navigate(EventKind kind)
     if (kind != EventKind::Select) return effect(Effect::None);
     if (state_.screen == Screen::Menu) {
         if (state_.menu_index == 6) state_.screen = Screen::Themes;
-        else if (state_.menu_index == 7 || state_.menu_index == 2) {
+        else if (state_.menu_index == 7) return handle({EventKind::OpenSettings,0});
+        else if (state_.menu_index == 8 || state_.menu_index == 2) {
             state_.screen = Screen::Home;
             return set_mode(Mode::Companion) | Effect::Render;
         } else {
@@ -136,6 +143,17 @@ Effects Core::navigate(EventKind kind)
             state_.screen = mode == Mode::Music ? Screen::Music :
                 feature_for(mode)->prototype_ready ? Screen::Utility : Screen::Unavailable;
             return effects | Effect::Render;
+        }
+    } else if (state_.screen == Screen::Settings) {
+        switch (state_.settings_index) {
+        case 0: return open_setting(SettingKey::Theme);
+        case 1: return open_setting(SettingKey::Mute);
+        case 2: return open_setting(SettingKey::Volume);
+        case 3: return open_duration_editor(false);
+        case 4: return open_duration_editor(true);
+        case 5: return open_setting(SettingKey::Motion);
+        case 6: return handle({EventKind::TestSound,static_cast<unsigned>(audio::Cue::TimerComplete)});
+        case 7: state_.screen = Screen::Menu; break;
         }
     } else if (state_.screen == Screen::Tuner) {
         return handle({state_.tuner_running ? EventKind::StopTuner : EventKind::StartTuner,0});
@@ -153,13 +171,7 @@ Effects Core::navigate(EventKind kind)
     else if (state_.screen == Screen::Unavailable) state_.screen = Screen::Menu;
     else if (state_.screen == Screen::Utility) {
         switch (state_.utility_index) {
-        case 0: {
-            constexpr std::uint32_t presets[]{60, 300, 1500, 3000};
-            auto next = presets[0];
-            for (unsigned i = 0; i < 4; ++i)
-                if (presets[i] == state_.configured_duration_seconds) next = presets[(i + 1) % 4];
-            return handle({EventKind::SetTimerDuration, next}) | Effect::Render;
-        }
+        case 0: return open_duration_editor(false);
         case 1:
             return handle({state_.timer_running ? EventKind::PauseTimer :
                            state_.timer_paused ? EventKind::ResumeTimer : EventKind::StartTimer,
@@ -167,6 +179,7 @@ Effects Core::navigate(EventKind kind)
         case 2: return handle({EventKind::CancelTimer, 0}) | Effect::Render;
         case 3: state_.screen = Screen::Home; break;
         case 4: return handle({state_.focus_waiting ? EventKind::NextFocusPhase : EventKind::StartFocusCycle, 0});
+        case 5: return open_duration_editor(true);
         }
     }
     return effect(Effect::Render);
@@ -179,7 +192,7 @@ Effects Core::handle(const Event &event)
         state_.screen = Screen::Home;
         state_.timer_completed = false;
         state_.tuner_running = false;
-        state_.motion_settled = false; state_.motion_config = motion::kAll;
+        state_.motion_settled = false;
         timer_.cancel(); focus_.cancel(); metronome_ = Metronome{}; sync_metronome(); sync_timer(); sync_focus(); activity();
         return Effect::Render | Effect::Notify;
     case EventKind::Tick: return on_tick(event.value);
@@ -297,13 +310,13 @@ Effects Core::handle(const Event &event)
     case EventKind::SetBreakDuration:
         if (!event.value || event.value > kMaxTimerSeconds || event.value == state_.break_duration_seconds)
             return effect(Effect::None);
-        state_.break_duration_seconds = event.value; activity(); return Effect::Render | Effect::Notify;
+        state_.break_duration_seconds = event.value; activity(); return Effect::Render | Effect::Notify | Effect::Persist;
     case EventKind::TestSound:
-        if (state_.tuner_running || state_.sound_muted || event.value >= static_cast<unsigned>(audio::Cue::MetronomeClick)) return effect(Effect::None);
+        if (state_.tuner_running || state_.sound_muted || state_.sound_volume_percent == 0 || event.value >= static_cast<unsigned>(audio::Cue::MetronomeClick)) return effect(Effect::None);
         state_.sound_cue = static_cast<audio::Cue>(event.value); return effect(Effect::Chirp);
     case EventKind::SetMuted:
         if (event.value > 1 || state_.sound_muted == (event.value != 0)) return effect(Effect::None);
-        state_.sound_muted = event.value != 0; return Effect::Render | Effect::Notify;
+        state_.sound_muted = event.value != 0; return Effect::Render | Effect::Notify | Effect::Persist;
     case EventKind::MusicTick: {
         music_ms_ = event.value;
         const bool previous_pulse = state_.beat_pulse;
@@ -371,7 +384,7 @@ Effects Core::handle(const Event &event)
         if (event.value > motion::kAll || state_.motion_config == event.value) return effect(Effect::None);
         state_.motion_config = static_cast<std::uint8_t>(event.value);
         state_.motion_settled = false;
-        return Effect::Render | Effect::Notify;
+        return Effect::Render | Effect::Notify | Effect::Persist;
     case EventKind::MotionSettled: case EventKind::MotionActive:
         if (!state_.motion_ready || !state_.motion_config) return effect(Effect::None);
         state_.motion_settled = event.kind == EventKind::MotionSettled;
@@ -396,6 +409,14 @@ Effects Core::handle(const Event &event)
         }
         return Effect::Render | Effect::Notify;
     }
+    case EventKind::SetVolume:
+        if (event.value > 100 || state_.sound_volume_percent == event.value) return effect(Effect::None);
+        state_.sound_volume_percent = static_cast<std::uint8_t>(event.value);
+        return Effect::Render | Effect::Notify | Effect::Persist;
+    case EventKind::OpenSettings:
+        if (state_.dock == Dock::Car) return effect(Effect::None);
+        metronome_.stop(); sync_metronome(); state_.tuner_running = false;
+        state_.screen = Screen::Settings; activity(); return Effect::Render | Effect::Notify;
     case EventKind::RequestStatus: return effect(Effect::Notify);
     }
     return effect(Effect::None);
@@ -417,16 +438,20 @@ PersistedState Core::persistent_state() const
 {
     return {state_.mode == Mode::Driving ? mode_before_car_dock_ : state_.mode,
             Mood::Neutral, state_.interaction_count, state_.theme,
-            state_.configured_duration_seconds};
+            state_.configured_duration_seconds,state_.break_duration_seconds,state_.sound_muted,
+            state_.sound_volume_percent,state_.motion_config};
 }
 bool Core::restore(const PersistedState &p)
 {
     if (!valid_mode(p.mode) || p.mode == Mode::Driving || !valid_mood(p.mood) ||
         !valid_theme(p.theme) || !p.configured_duration_seconds ||
-        p.configured_duration_seconds > kMaxTimerSeconds) return false;
+        p.configured_duration_seconds > kMaxTimerSeconds || !p.break_duration_seconds ||
+        p.break_duration_seconds > kMaxTimerSeconds || p.sound_volume_percent > 100 || p.motion_config > motion::kAll) return false;
     state_.mode = p.mode; state_.mood = p.mood;
     state_.theme = p.theme; state_.interaction_count = p.interaction_count;
     state_.configured_duration_seconds = p.configured_duration_seconds;
+    state_.break_duration_seconds = p.break_duration_seconds; state_.sound_muted = p.sound_muted;
+    state_.sound_volume_percent = p.sound_volume_percent; state_.motion_config = p.motion_config;
     mode_before_car_dock_ = p.mode;
     return true;
 }

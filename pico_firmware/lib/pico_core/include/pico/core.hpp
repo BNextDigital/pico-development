@@ -22,6 +22,10 @@ private:
     Effects set_theme(FaceTheme theme);
     Effects on_tick(std::uint32_t now_seconds);
     Effects navigate(EventKind kind);
+    Effects edit_duration(EventKind kind);
+    Effects edit_setting(EventKind kind);
+    Effects open_setting(SettingKey key);
+    Effects open_duration_editor(bool break_duration);
     void sync_timer();
     Effects timer_complete();
     void activity();

@@ -167,3 +167,17 @@ writes flash. Rest requires both classifier stillness and user inactivity.
 The implementation polls at ~25 Hz inside the existing loop; it does not yet
 provide hardware sleep/wakeup. See [motion-personality.md](motion-personality.md)
 for timing thresholds, compatibility and physical validation limits.
+
+## Local Settings and storage v4
+
+`settings.cpp` holds the shared draft-editor actions; Core navigation opens the
+Settings hub and delegates. Renderers show draft values without applying them;
+Save routes through normal setting events, Back discards. Opening Settings stops
+Music input/output while retaining background timer operation. Optional Back
+GPIO reuses the portable button classifier.
+
+Persistence v4 is 28 bytes and adds break/mute/volume/motion. The common decoder
+migrates 16/20-byte legacy records, and both NVS and simulator accept those
+lengths. Only confirmed changes request coalesced flash saves. No active utility
+or editor is restored. I2S jobs snapshot runtime volume, preserving worker/main
+separation. See [local-settings.md](local-settings.md) for format and validation.

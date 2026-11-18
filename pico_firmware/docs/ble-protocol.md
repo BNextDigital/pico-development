@@ -33,11 +33,13 @@ All integers are little-endian. There is no packed C struct on the wire.
 | `12` | Previous menu item / previous theme |
 | `13` | Select / activate highlighted action |
 | `14` | Back / exit |
+| `15` | Open local Settings |
 | `20` | Start explicit work/break cycle when idle |
 | `21` | Confirm next cycle phase while waiting |
-| `22 ss ss ss ss` | Configure break duration, 1–604800 seconds; runtime only |
+| `22 ss ss ss ss` | Configure break duration, 1–604800 seconds; durable |
 | `23 cc` | Test cue 0 interact, 1 timer done, 2 work done, 3 break done |
-| `24 mm` | Runtime mute: 0 unmuted, 1 muted |
+| `24 mm` | Durable mute: 0 unmuted, 1 muted |
+| `25 vv` | Durable volume percent, 0–100 |
 | `30` | Start metronome and open Music |
 | `31` | Stop metronome |
 | `32 bb bb` | Set BPM, 16-bit little-endian, 30–240 |
@@ -45,7 +47,7 @@ All integers are little-endian. There is no packed C struct on the wire.
 | `34` | Tap tempo at processing time |
 | `35` | Open/start onboard microphone tuner |
 | `36` | Stop tuner listening |
-| `40 ff` | Runtime motion mask: pickup bit 0, rock bit 1, rest bit 2 (0–7) |
+| `40 ff` | Durable motion mask: pickup bit 0, rock bit 1, rest bit 2 (0–7) |
 
 Mode IDs are companion `0`, focus `1`, music `2`, cooking `3`, wayfinding `4`,
 notes `5`, and driving `6`. Driving cannot be requested remotely; the car dock
@@ -138,3 +140,12 @@ means motion hardware is available. The 16-byte v1 status does not encode the
 mask or raw acceleration. Motion reactions do not control utilities, timers or
 modes and do not persist. Clients must ignore unknown flags. See
 [motion-personality.md](motion-personality.md) for context guards and tests.
+
+## Local Settings additions
+
+Commands 15 (open Settings) and 25 (volume byte 0–100) are additive. UUIDs, modes
+and status v1 stay unchanged. Break duration, mute, volume and motion mask now
+persist through storage v4, as do theme/work duration. Previous runtime-only
+notes describe their introduction; the v4 behavior supersedes them. The packet
+has no new settings readback fields. See [local-settings.md](local-settings.md)
+for editor controls, migration and downgrade behavior.

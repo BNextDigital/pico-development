@@ -37,13 +37,13 @@ void apply_effects(pico::Effects effects, pico::Core &core,
                    pico::platform::Ble &ble, pico::Capabilities capabilities)
 {
     microphone.sync(core.state().tuner_running,core.state().tuner_session);
-    audio.set_muted(core.state().sound_muted || core.state().tuner_running);
+    audio.set_muted(core.state().sound_muted || core.state().tuner_running || core.state().sound_volume_percent == 0);
     audio.set_metronome_running(core.state().metronome_running);
     if (pico::has_effect(effects, pico::Effect::Persist)) {
         storage.save(core.persistent_state());
     }
-    if (pico::has_effect(effects, pico::Effect::Chirp) && !core.state().sound_muted && !core.state().tuner_running) {
-        if (audio.ready()) audio.play(core.state().sound_cue);
+    if (pico::has_effect(effects, pico::Effect::Chirp) && !core.state().sound_muted && !core.state().tuner_running && core.state().sound_volume_percent > 0) {
+        if (audio.ready()) audio.play(core.state().sound_cue,core.state().sound_volume_percent);
         else if (core.state().sound_cue < pico::audio::Cue::MetronomeClick) hardware.chirp();
     }
     if (pico::has_effect(effects, pico::Effect::Render)) {
@@ -78,6 +78,9 @@ int main()
     const bool storage_ready = storage.init();
     const bool ble_ready = ble.init(queue_event);
 
+#if defined(CONFIG_PICO_AUDIO_VOLUME_PERCENT)
+    core.handle({pico::EventKind::SetVolume,CONFIG_PICO_AUDIO_VOLUME_PERCENT});
+#endif
     pico::PersistedState persisted{};
     if (storage_ready && storage.load(persisted)) {
         core.restore(persisted);

@@ -1,0 +1,11 @@
+/* Optional Back/Cancel button: D2/P0.28 to GND. Add after your base overlay. */
+#include <zephyr/dt-bindings/gpio/gpio.h>
+/ {
+    buttons {
+        pico_back_button: back_button {
+            gpios = <&gpio0 28 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
+            label = "Back/Cancel on D2";
+        };
+    };
+    aliases { pico-back-button = &pico_back_button; };
+};

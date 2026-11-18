@@ -102,9 +102,13 @@ enum class EventKind : std::uint8_t {
     MotionRock,
     MotionRest,
     SetMotionConfig,
+    SetVolume,
+    OpenSettings,
 };
 
-enum class Screen : std::uint8_t { Home, Menu, Utility, Themes, Unavailable, Music, Tuner };
+enum class Screen : std::uint8_t { Home, Menu, Utility, Themes, Unavailable, Music, Tuner, DurationEdit, Settings, SettingEdit };
+
+enum class SettingKey : std::uint8_t { Theme, Mute, Volume, Motion };
 
 struct Event {
     EventKind kind{EventKind::Boot};
@@ -182,6 +186,15 @@ struct State {
     bool motion_ready{false};
     bool motion_settled{false};
     std::uint8_t motion_config{motion::kAll};
+    std::uint32_t draft_duration_seconds{1500};
+    bool editing_break_duration{false};
+    Screen duration_return_screen{Screen::Utility};
+    std::uint8_t settings_index{0};
+    SettingKey setting_key{SettingKey::Theme};
+    std::uint32_t setting_draft{0};
+    std::uint8_t setting_action{1};
+    std::uint8_t sound_volume_percent{25};
+    std::uint8_t duration_action{1}; // -1 minute, +1 minute, Save, Cancel
 };
 
 struct PersistedState {
@@ -190,6 +203,10 @@ struct PersistedState {
     std::uint32_t interaction_count{0};
     FaceTheme theme{FaceTheme::Modern};
     std::uint32_t configured_duration_seconds{1500};
+    std::uint32_t break_duration_seconds{300};
+    bool sound_muted{false};
+    std::uint8_t sound_volume_percent{25};
+    std::uint8_t motion_config{motion::kAll};
 };
 
 } // namespace pico

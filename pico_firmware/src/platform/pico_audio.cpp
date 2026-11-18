@@ -13,7 +13,8 @@ constexpr std::size_t kFrames = 128;
 constexpr std::size_t kBytes = kFrames * 2 * sizeof(std::int16_t);
 const device *audio_device = DEVICE_DT_GET(DT_ALIAS(pico_i2s));
 K_MEM_SLAB_DEFINE(audio_slab, kBytes, 4, 4);
-K_MSGQ_DEFINE(audio_queue, sizeof(pico::audio::Cue), 4, 4);
+struct SoundJob { pico::audio::Cue cue; std::uint8_t volume; };
+K_MSGQ_DEFINE(audio_queue, sizeof(SoundJob), 4, 4);
 atomic_t audio_ready;
 atomic_t audio_muted;
 atomic_t audio_playing;
@@ -32,7 +33,7 @@ bool wait_buffers()
     }
     return true;
 }
-void play_cue(pico::audio::Cue cue)
+void play_cue(pico::audio::Cue cue,unsigned volume)
 {
     if (!wait_buffers()) {
         LOG_ERR("I2S buffers not released; disabling audio until restart");
@@ -49,7 +50,7 @@ void play_cue(pico::audio::Cue cue)
         error = k_mem_slab_alloc(&audio_slab, &data, K_MSEC(100));
         if (error) break;
         pico::audio::render(cue, block * kFrames, static_cast<std::int16_t *>(data),
-                            kFrames, CONFIG_PICO_AUDIO_VOLUME_PERCENT);
+                            kFrames, volume);
         error = i2s_write(audio_device, data, kBytes);
         if (error) { k_mem_slab_free(&audio_slab, data); break; }
         // Queue two buffers before starting so the first IRQ has its successor.
@@ -69,11 +70,11 @@ void play_cue(pico::audio::Cue cue)
 void audio_loop(void *, void *, void *)
 {
     while (true) {
-        pico::audio::Cue cue{};
-        if (k_msgq_get(&audio_queue, &cue, K_FOREVER) == 0 && atomic_get(&audio_ready) &&
-            !atomic_get(&audio_muted) && (!beat_cue(cue) || atomic_get(&metronome_enabled))) {
+        SoundJob job{};
+        if (k_msgq_get(&audio_queue, &job, K_FOREVER) == 0 && atomic_get(&audio_ready) &&
+            !atomic_get(&audio_muted) && (!beat_cue(job.cue) || atomic_get(&metronome_enabled))) {
             atomic_set(&audio_playing, 1);
-            play_cue(cue);
+            play_cue(job.cue,job.volume);
             atomic_clear(&audio_playing);
         }
     }
@@ -99,7 +100,7 @@ bool Audio::init()
     const int error = i2s_configure(audio_device, I2S_DIR_TX, &config);
     if (error) { LOG_WRN("I2S configuration failed (%d)", error); return false; }
     atomic_set(&audio_ready, 1);
-    LOG_INF("MAX98357 I2S ready; volume=%u%%", static_cast<unsigned>(CONFIG_PICO_AUDIO_VOLUME_PERCENT));
+    LOG_INF("MAX98357 I2S ready; default volume=%u%%", static_cast<unsigned>(CONFIG_PICO_AUDIO_VOLUME_PERCENT));
     return true;
 #else
     LOG_INF("I2S audio disabled; visual alerts remain available");
@@ -131,22 +132,23 @@ void Audio::set_muted(bool muted)
     ARG_UNUSED(muted);
 #endif
 }
-void Audio::play(audio::Cue cue)
+void Audio::play(audio::Cue cue,unsigned volume_percent)
 {
 #if defined(CONFIG_PICO_AUDIO_I2S) && DT_NODE_HAS_STATUS(DT_ALIAS(pico_i2s), okay)
-    if (!ready() || atomic_get(&audio_muted) || cue >= audio::Cue::Count) return;
+    if (!ready() || atomic_get(&audio_muted) || cue >= audio::Cue::Count || !volume_percent) return;
+    const SoundJob job{cue,static_cast<std::uint8_t>(volume_percent > 100 ? 100 : volume_percent)};
     if (beat_cue(cue)) {
         if (!atomic_get(&metronome_enabled) || atomic_get(&audio_playing) ||
             k_msgq_num_used_get(&audio_queue)) return; // Never queue stale beats behind other audio.
-        k_msgq_put(&audio_queue, &cue, K_NO_WAIT);
+        k_msgq_put(&audio_queue, &job, K_NO_WAIT);
         return;
     }
-    if (k_msgq_put(&audio_queue, &cue, K_NO_WAIT) != 0 && cue != audio::Cue::Interact) {
+    if (k_msgq_put(&audio_queue, &job, K_NO_WAIT) != 0 && cue != audio::Cue::Interact) {
         k_msgq_purge(&audio_queue);
-        k_msgq_put(&audio_queue, &cue, K_NO_WAIT);
+        k_msgq_put(&audio_queue, &job, K_NO_WAIT);
     }
 #else
-    ARG_UNUSED(cue);
+    ARG_UNUSED(cue); ARG_UNUSED(volume_percent);
 #endif
 }
 }

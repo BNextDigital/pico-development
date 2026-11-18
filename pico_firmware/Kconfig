@@ -6,7 +6,7 @@ menu "Pico"
 
 config PICO_FIRMWARE_VERSION
     string "Firmware version"
-    default "0.6.0-motion"
+    default "0.7.0-local-settings"
 
 config PICO_DISPLAY
     bool "Render Pico on the chosen monochrome display"
@@ -29,7 +29,7 @@ config PICO_AUDIO_I2S
     default n
 
 config PICO_AUDIO_VOLUME_PERCENT
-    int "Sound cue volume percent (bounded PCM amplitude)"
+    int "Default sound cue volume percent (saved settings override)"
     depends on PICO_AUDIO_I2S
     range 0 100
     default 25
