@@ -4,6 +4,17 @@ source "Kconfig.zephyr"
 
 menu "Pico"
 
+config PICO_FIND_HUB
+    bool "Link optional Find Hub measurement integration (activation disabled)"
+    default n
+    depends on BT && SETTINGS && FLASH_MAP
+
+config PICO_RUNTIME_PROFILE
+    bool "Sample thread, slab and queue high water marks"
+    default n
+    depends on THREAD_MONITOR && THREAD_STACK_INFO && INIT_STACKS
+
+
 config PICO_FIRMWARE_VERSION
     string "Firmware version"
     default "0.13.0-locator"

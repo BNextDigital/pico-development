@@ -241,3 +241,11 @@ physical acknowledgement and timer-alert priority; no durable state is added.
 An additive encrypted four-byte GATT characteristic reports locating status.
 Phone-only presence/location responsibilities and the SDK-pinned Find Hub
 feasibility gates are documented in [tracking](tracking.md).
+
+## Optional combined tracking measurement profile
+
+[Combined Find Hub measurements and activation gates](combined-find-hub.md) describe
+the opt-in NCS 3.4.2 profile. It links the SDK protocol libraries into the existing
+Pico application without importing the SDK sample's main/UI/hardware loop. Network
+activation remains disabled; shared live ring/motion/radio lifecycle work is explicitly
+deferred. The default application and protocol/persistence IDs are unchanged.

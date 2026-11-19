@@ -28,3 +28,11 @@ ${CXX:-c++} -std=c++17 -Wall -Wextra -Wpedantic -Werror ${CXXFLAGS:-} \
     "$project_dir/tests/platform/audio_reference_tests.cpp" \
     "$project_dir/lib/pico_core/src/audio.cpp" -o "$project_dir/build-host/audio_reference_tests"
 "$project_dir/build-host/audio_reference_tests"
+
+${CXX:-c++} -std=c++17 -Wall -Wextra -Wpedantic -Werror \
+    -I"$project_dir/tests/platform/storage_fakes" -I"$project_dir/tests/platform/fakes" \
+    -I"$project_dir/lib/pico_core/include" -I"$project_dir/src" \
+    "$project_dir/tests/platform/storage_adapter_tests.cpp" \
+    "$project_dir/lib/pico_core/src/persistence.cpp" -o "$project_dir/build-host/storage_adapter_tests"
+"$project_dir/build-host/storage_adapter_tests"
+printf '%s\n' 'Storage namespace/write failure model checks passed'

@@ -1,0 +1,10 @@
+/* Append after the existing Pico peripheral overlays. Internal flash only. */
+&code_partition { reg = <0x27000 0xc4000>; };
+&flash0 {
+    partitions {
+        bt_fast_pair_partition: partition@eb000 {
+            label = "bt_fast_pair";
+            reg = <0xeb000 0x1000>;
+        };
+    };
+};

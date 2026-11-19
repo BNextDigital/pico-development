@@ -31,3 +31,14 @@ target_sources(app PRIVATE
     lib/pico_core/src/persistence.cpp
     lib/pico_core/src/protocol.cpp
 )
+
+if(CONFIG_PICO_FIND_HUB)
+    if(NOT CONFIG_BOARD_TARGET STREQUAL "xiao_ble/nrf52840/sense")
+        message(FATAL_ERROR "Combined partition map is qualified only for XIAO Sense")
+    endif()
+    target_sources(app PRIVATE src/platform/pico_find_hub.c)
+    zephyr_linker_sources(SECTIONS src/platform/pico_find_hub.ld)
+endif()
+if(CONFIG_PICO_RUNTIME_PROFILE)
+    target_sources(app PRIVATE src/platform/pico_runtime_profile.cpp)
+endif()

@@ -113,7 +113,11 @@ bool Storage::load(PersistedState &state)
     const int error = settings_load();
     if (error != 0) {
         LOG_ERR("Settings load failed (%d)", error);
+#if !defined(CONFIG_PICO_FIND_HUB)
         return false;
+#endif
+        // A separate namespace failing must not discard a valid Pico snapshot.
+        // Decode below still rejects absent, truncated or corrupt Pico data.
     }
     if (!loaded_blob_present) {
         LOG_INF("No saved Pico state; using defaults");
