@@ -85,8 +85,9 @@ and UI cannot be copied directly over Pico's factory UF2 bootloader layout.
 Next feasibility gates, in order:
 
 1. Build the unmodified pinned sample for its supported nRF52840 DK in a
-   separate build directory; record flash/RAM and configuration. **Do not flash
-   a DK image or sample bootloader onto the XIAO.** No such build ran here.
+   separate build directory; record flash/RAM and configuration. This build and an
+   isolated XIAO port now pass; see the [prototype results](../experiments/find_hub/validation.md). **Do not flash
+   a DK image or sample bootloader onto the XIAO.**
 2. Audit sample license/components, debug provisioning limitations and Google's
    [current partner process](https://developers.google.com/nearby/fast-pair/landing-page-find-hub).
    Product distribution requires approval, registration, testing/certification
@@ -129,3 +130,13 @@ reset is required. On the updated phone app:
 
 No SDK target build, full APK build, physical BLE/OLED/audio/power result,
 network enrollment or crowd locating is claimed by this delivery.
+
+## Isolated Find Hub prototype follow-up
+
+The [standalone XIAO experiment](../experiments/find_hub/README.md) now imports
+SDK 3.4.2's FHN application with Pico OLED/IMU/button/I2S adapters, protected
+partitions and credential-gated UF2 packaging. The DK baseline, XIAO audio
+prototype and normal combined companion target compile with an external Zephyr
+SDK. This closes the earlier target-compilation gap, without claiming physical
+or network acceptance. It is not combined with the normal Pico application.
+Authorized model/test-account provisioning remains the next external gate.

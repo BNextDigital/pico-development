@@ -2,7 +2,7 @@
 
 Offline-first Zephyr/C++17 firmware for Pico, a small BLE companion with expressive 128×64 monochrome face, contextual docks and local tools. Target hardware: **Seeed Studio XIAO nRF52840 Sense** with **nRF Connect SDK 3.4.2**.
 
-**Snapshot (November 19, 2026):** the source build-version default is `0.13.0-locator` (`Kconfig` and `VERSION`). This is a software milestone, **not a hardware-validated release**. Earlier XIAO OLED, BLE and D0 behavior were physically demonstrated; compilation and acceptance of the latest combined profile are still pending.
+**Snapshot (November 19, 2026):** the source build-version default is `0.13.0-locator` (`Kconfig` and `VERSION`). This is a software milestone, **not a hardware-validated release**. Earlier XIAO OLED, BLE and D0 behavior were physically demonstrated. The combined OLED/mic/motion target now compiles with SDK 3.4.2 sources and external Zephyr SDK 1.0.1; physical acceptance remains pending.
 
 ## Implemented software
 
@@ -19,7 +19,15 @@ Offline-first Zephyr/C++17 firmware for Pico, a small BLE companion with express
 | Persistence | 32-byte **storage v5**, migration from v1–v4, coalesced saves; transient timers and editors not restored |
 | BLE | Encrypted custom GATT protocol v1, 16-byte status, additive commands; bonds stored separately |
 
-Optional peripherals have hardware adapters and host coverage, but **target compilation, audio/acoustic accuracy, OLED contrast, button interrupts, sensor thresholds and current draw need real-board validation**. Wayfinding GPS/compass, Notes recording, complete dock electronics and final battery/power hardware are not implemented.
+Optional peripherals have hardware adapters and host coverage, but **audio/acoustic accuracy, OLED contrast, button interrupts, sensor thresholds and current draw need real-board validation**. Wayfinding GPS/compass, Notes recording, complete dock electronics and final battery/power hardware are not implemented.
+
+## Find Hub prototype
+
+A [standalone XIAO experiment](experiments/find_hub/README.md) now builds the
+SDK's Find Hub/Fast Pair/DULT application with Pico hardware adapters. It uses
+isolated settings and guarded packaging, requires authorized external model
+credentials, and replaces the companion application while installed. See
+[target build results and remaining gates](experiments/find_hub/validation.md).
 
 ## Find Pico
 
@@ -84,7 +92,7 @@ sh simulator/run-tests.sh
 python tools/compile_face_assets.py --check
 ```
 
-On Windows run `simulator/run.bat`; on macOS/Linux run `./simulator/run.sh`. See [simulator guide](docs/simulator.md). The pocket UI revision passes host, adapter-model and 33 simulator tests. Target compilation and physical acceptance remain pending.
+On Windows run `simulator/run.bat`; on macOS/Linux run `./simulator/run.sh`. See [simulator guide](docs/simulator.md). The pocket UI revision passes host, adapter-model and 33 simulator tests. The combined target compiles in the [recorded build environment](experiments/find_hub/validation.md); physical acceptance remains pending.
 
 ## Next acceptance milestones
 

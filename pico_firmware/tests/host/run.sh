@@ -21,3 +21,6 @@ ${CXX:-c++} \
 sh "$project_dir/tests/host/check_nordic_limits.sh"
 
 sh "$project_dir/tests/platform/run.sh"
+
+# Isolated network prototype: portable flash-layout and button-policy guards.
+sh "$project_dir/experiments/find_hub/tests/run.sh"
