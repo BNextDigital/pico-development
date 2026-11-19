@@ -6,6 +6,7 @@
 #include <pico/timer.hpp>
 #include <pico/personality.hpp>
 #include <pico/metronome.hpp>
+#include <pico/locator.hpp>
 
 namespace pico {
 
@@ -30,13 +31,14 @@ public:
         const auto elapsed = now - reference_started_ms_;
         const std::uint32_t reference_delay = state_.reference_playing ?
             (elapsed >= 2000U ? 0U : 2000U-elapsed) : UINT32_MAX;
-        return std::min(metronome_.next_update_ms(now), reference_delay);
+        return std::min(std::min(metronome_.next_update_ms(now), reference_delay), locator_.next(now));
     }
 
     PersistedState persistent_state() const;
     bool restore(const PersistedState &persisted);
 
 private:
+    Effects stop_finding(bool acknowledged);
     Effects set_mode(Mode mode);
     Effects set_mood(Mood mood);
     Effects set_theme(FaceTheme theme);
@@ -60,6 +62,8 @@ private:
     Mode mode_before_car_dock_{Mode::Companion};
     Timer timer_{};
     Metronome metronome_{};
+    Locator locator_{};
+    Screen finding_return_screen_{Screen::Home};
     std::uint32_t music_ms_{0};
     std::uint32_t reference_started_ms_{0};
     FocusSession focus_{};

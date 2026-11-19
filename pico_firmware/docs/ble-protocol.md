@@ -183,3 +183,13 @@ commands honor the local goal selected for the next session; boot defaults to
 Continuous. Bounded completion clears active phase/waiting and uses the normal
 completion alert. Goal/history currently have local UI and simulator readback
 only; see [Focus sessions](focus-sessions.md).
+
+## Locator extension (0.13.0-locator)
+
+Capability bit 8 adds local locating, without claiming GPS/network support.
+Commands `50 ss ss` (1–120 seconds uint16 LE) and `51` start/stop a bounded
+finding session. The existing encrypted command characteristic is unchanged.
+New encrypted read/notify characteristic `8e7b0004-54f2-4d9b-a3d1-9f150000c001`
+is four bytes: version 1, flags (active bit 0, sound available bit 1), remaining
+seconds uint16 LE. The original 16-byte status is unchanged. Read [tracking](tracking.md)
+for rejection/priority behavior, sound semantics, security limits and network feasibility.

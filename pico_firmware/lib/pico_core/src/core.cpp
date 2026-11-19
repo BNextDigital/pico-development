@@ -66,8 +66,17 @@ Effects Core::start_focus_phase()
     personality_.react(state_, Mood::Neutral, animation_ms_);
     return Effect::Render | Effect::Notify;
 }
+Effects Core::stop_finding(bool acknowledged)
+{
+    if (!state_.finding) return effect(Effect::None);
+    locator_.stop(); state_.finding=false; state_.finding_remaining_seconds=0;
+    state_.screen=finding_return_screen_;
+    activity(); personality_.react(state_,acknowledged ? Mood::Happy : Mood::Neutral,animation_ms_);
+    return Effect::Render | Effect::Notify;
+}
 Effects Core::timer_complete()
 {
+    stop_finding(false);
     state_.reference_playing = false;
     metronome_.stop(); sync_metronome();
     if (state_.screen == Screen::DurationEdit || state_.screen == Screen::SettingEdit) state_.screen = Screen::Home;
@@ -248,6 +257,11 @@ Effects Core::navigate(EventKind kind)
 }
 Effects Core::handle(const Event &event)
 {
+    // A physical acknowledgement dismisses locating without activating a hidden control.
+    if (state_.finding && (event.kind==EventKind::PrimaryPressed || event.kind==EventKind::SecondaryPressed ||
+        event.kind==EventKind::FocusButtonTapped || event.kind==EventKind::FocusButtonHeld ||
+        event.kind==EventKind::NavigateNext || event.kind==EventKind::NavigatePrevious ||
+        event.kind==EventKind::Select || event.kind==EventKind::Back)) return stop_finding(true);
     // A sleeping screen consumes the first physical-style input as wake only.
     if (state_.display_asleep && (event.kind == EventKind::PrimaryPressed ||
         event.kind == EventKind::SecondaryPressed || event.kind == EventKind::FocusButtonTapped ||
@@ -255,7 +269,24 @@ Effects Core::handle(const Event &event)
         event.kind == EventKind::NavigatePrevious || event.kind == EventKind::Select || event.kind == EventKind::Back)) {
         activity(); return Effect::Render | Effect::Notify;
     }
+    if (state_.finding && (event.kind==EventKind::SetMode || event.kind==EventKind::OpenMenu ||
+        event.kind==EventKind::OpenSettings || event.kind==EventKind::StartMetronome ||
+        event.kind==EventKind::StartTuner || event.kind==EventKind::OpenReference ||
+        event.kind==EventKind::PlayReference || event.kind==EventKind::DockChanged)) {
+        const auto finding_exit=stop_finding(false);
+        return handle(event) | finding_exit;
+    }
     switch (event.kind) {
+    case EventKind::StartFinding: {
+        if (state_.timer_completed || !locator_.start(music_ms_,event.value)) return effect(Effect::None);
+        finding_return_screen_=state_.screen;
+        metronome_.stop(); sync_metronome(); state_.tuner_running=false; state_.reference_playing=false;
+        state_.finding=true; state_.finding_remaining_seconds=static_cast<std::uint16_t>(event.value);
+        activity(); personality_.react(state_,Mood::Curious,animation_ms_);
+        state_.sound_cue=audio::Cue::Interact;
+        return Effect::Render | Effect::Notify | Effect::Chirp;
+    }
+    case EventKind::StopFinding: return stop_finding(false);
     case EventKind::AudioReady:
         if (event.value > 1) return effect(Effect::None);
         state_.audio_ready = event.value != 0;
@@ -301,11 +332,12 @@ Effects Core::handle(const Event &event)
         state_.display_timeout_minutes = static_cast<std::uint8_t>(event.value);
         activity(); return Effect::Render | Effect::Persist;
     case EventKind::SleepDisplay:
-        if (state_.timer_completed || state_.tuner_running || state_.metronome_running || state_.reference_playing)
+        if (state_.finding || state_.timer_completed || state_.tuner_running || state_.metronome_running || state_.reference_playing)
             return effect(Effect::None);
         state_.screen = Screen::Home; state_.display_asleep = true;
         return effect(Effect::Render);
     case EventKind::Boot:
+        locator_.stop(); state_.finding=false; state_.finding_remaining_seconds=0;
         state_.mode = Mode::Companion;
         state_.screen = Screen::Home;
         state_.timer_completed = false;
@@ -433,6 +465,13 @@ Effects Core::handle(const Event &event)
         state_.sound_muted = event.value != 0; return Effect::Render | Effect::Notify | Effect::Persist;
     case EventKind::MusicTick: {
         music_ms_ = event.value;
+        if (state_.finding) {
+            const bool pulse=locator_.advance(music_ms_);
+            if (!locator_.active()) return stop_finding(false);
+            state_.finding_remaining_seconds=static_cast<std::uint16_t>(locator_.remaining(music_ms_));
+            if (pulse) { state_.sound_cue=audio::Cue::Interact; return Effect::Chirp | Effect::Notify; }
+            return effect(Effect::None);
+        }
         const bool ended = state_.reference_playing && music_ms_ - reference_started_ms_ >= 2000U;
         if (ended) state_.reference_playing = false;
         const bool previous_pulse = state_.beat_pulse;

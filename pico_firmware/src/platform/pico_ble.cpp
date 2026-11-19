@@ -24,6 +24,9 @@ LOG_MODULE_REGISTER(pico_ble, CONFIG_PICO_LOG_LEVEL);
 #define BT_UUID_PICO_COMMAND_VAL                                                \
     BT_UUID_128_ENCODE(0x8e7b0003, 0x54f2, 0x4d9b, 0xa3d1, 0x9f150000c001)
 
+#define BT_UUID_PICO_LOCATOR_VAL \
+    BT_UUID_128_ENCODE(0x8e7b0004, 0x54f2, 0x4d9b, 0xa3d1, 0x9f150000c001)
+
 namespace {
 
 #define BT_UUID_PICO_SERVICE BT_UUID_DECLARE_128(BT_UUID_PICO_SERVICE_VAL)
@@ -33,6 +36,15 @@ namespace {
 pico::platform::EventSink event_sink;
 std::array<std::uint8_t, pico::protocol::kStatusSize> status_value{};
 K_MUTEX_DEFINE(status_mutex);
+std::array<std::uint8_t,4> locator_value{{1,0,0,0}};
+
+ssize_t read_locator(bt_conn *connection, const bt_gatt_attr *attribute,
+                     void *buffer, std::uint16_t length, std::uint16_t offset)
+{
+    std::array<std::uint8_t,4> snapshot{};
+    k_mutex_lock(&status_mutex,K_FOREVER); snapshot=locator_value; k_mutex_unlock(&status_mutex);
+    return bt_gatt_attr_read(connection,attribute,buffer,length,offset,snapshot.data(),snapshot.size());
+}
 
 bool emit(pico::EventKind kind, std::uint32_t value = 0)
 {
@@ -87,7 +99,12 @@ BT_GATT_SERVICE_DEFINE(
     BT_GATT_CHARACTERISTIC(BT_UUID_PICO_COMMAND,
                            BT_GATT_CHRC_WRITE | BT_GATT_CHRC_WRITE_WITHOUT_RESP,
                            BT_GATT_PERM_WRITE_ENCRYPT, nullptr, write_command,
-                           nullptr));
+                           nullptr),
+    BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(BT_UUID_PICO_LOCATOR_VAL),
+                           BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,
+                           BT_GATT_PERM_READ_ENCRYPT,read_locator,nullptr,nullptr),
+    BT_GATT_CCC(status_subscription_changed,
+                BT_GATT_PERM_READ_ENCRYPT | BT_GATT_PERM_WRITE_ENCRYPT));
 
 const bt_data advertising_data[] = {
     BT_DATA_BYTES(BT_DATA_FLAGS, BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR),
@@ -236,10 +253,14 @@ void Ble::publish(const State &state, Capabilities capabilities)
     std::uint8_t encoded[protocol::kStatusSize]{};
     protocol::encode_status(state, capabilities, encoded);
 
+    std::uint8_t locator[protocol::kLocatorStatusSize]{};
+    protocol::encode_locator(state,capabilities,locator);
     k_mutex_lock(&status_mutex, K_FOREVER);
+    std::memcpy(locator_value.data(),locator,sizeof(locator));
     std::memcpy(status_value.data(), encoded, sizeof(encoded));
     k_mutex_unlock(&status_mutex);
 
+    bt_gatt_notify(nullptr,&pico_service.attrs[7],locator,sizeof(locator));
     const int error = bt_gatt_notify(nullptr, &pico_service.attrs[2], encoded,
                                      sizeof(encoded));
     if (error != 0 && error != -ENOTCONN) {
