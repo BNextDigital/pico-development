@@ -184,7 +184,88 @@ void render_status(const State &state, MonoSurface &surface)
     if (state.focus_waiting) std::snprintf(value,sizeof(value),"READY");
     else if (state.timer_running || state.timer_paused)
         duration(value,sizeof(value),state.timer_remaining_seconds);
+    if (!value[0] && state.clock.settings.glance) {
+        if (state.clock.valid) {
+            const auto date=clock::from_epoch(static_cast<std::int64_t>(state.clock.utc)+state.clock.settings.offset_minutes*60);
+            clock::format_time(value,sizeof(value),date,state.clock.settings.hour24);
+            if (!state.clock.settings.hour24) {
+                const auto length=std::strlen(value);
+                std::snprintf(value+length,sizeof(value)-length," %s",date.hour<12 ? "AM" : "PM");
+            }
+        } else std::snprintf(value,sizeof(value),"--:--");
+    }
     if (value[0]) centered(surface,value,surface.height-11U,2);
+}
+
+void clock_card(const State &s, MonoSurface &surface, bool desk=false)
+{
+    char value[16]="--:--",date[24]="SET TIME";
+    const auto &clock=s.clock;
+    if (clock.valid) {
+        const auto d=clock::from_epoch(static_cast<std::int64_t>(clock.utc)+clock.settings.offset_minutes*60);
+        clock::format_time(value,sizeof(value),d,clock.settings.hour24);
+        clock::format_date(date,sizeof(date),d);
+        if (!clock.settings.hour24) {
+            const auto length=std::strlen(date);
+            std::snprintf(date+length,sizeof(date)-length," %s",d.hour<12 ? "AM" : "PM");
+        }
+    }
+    constexpr const char *actions[]{"ALARMS","STOPWATCH","SET TIME","OPTIONS","HOME"};
+    card(surface,desk ? "PICO DESK" : "CLOCK",value,date,desk ? "MENU" : actions[s.clock_index%5],s.clock_index,desk ? 0 : 5);
+}
+void render_clock_utility(const State &s, MonoSurface &surface)
+{
+    if (s.screen==Screen::Clock) { clock_card(s,surface); return; }
+    if (s.screen==Screen::Stopwatch) {
+        char elapsed[24]; duration(elapsed,sizeof(elapsed),s.clock.stopwatch_seconds);
+        const char *actions[]{s.clock.stopwatch_running ? "PAUSE" : s.clock.stopwatch_seconds ? "RESUME" : "START","RESET","BACK"};
+        card(surface,"STOPWATCH",elapsed,s.clock.stopwatch_running ? "RUNNING" : "PAUSED",actions[s.clock_index%3],s.clock_index,3); return;
+    }
+    if (s.screen==Screen::ClockOptions) {
+        constexpr const char *titles[]{"TIME FORMAT","FACE GLANCE","USB DESK","BACK"};
+        const auto i=s.clock_index%4;
+        const auto &options=s.clock.settings;
+        const char *value=i==0 ? options.hour24 ? "24 H" : "12 H" : i==1 ? options.glance ? "ON" : "OFF" :
+            i==2 ? options.usb_desk ? "ON" : "OFF" : "CLOCK";
+        card(surface,titles[i],value,"",i==3 ? "BACK" : "TOGGLE",i,4); return;
+    }
+    if (s.screen==Screen::Alarms) {
+        const auto i=s.clock_index%5;
+        if (i==4) { card(surface,"ALARMS","CLOCK","","BACK",i,5); return; }
+        const auto &a=s.clock.settings.alarms[i];
+        char value[16],title[24],context[24];
+        std::snprintf(value,sizeof(value),"%02u:%02u",a.minute/60,a.minute%60);
+        std::snprintf(title,sizeof(title),"ALARM %u / %s",i+1,a.enabled ? "ON" : "OFF");
+        const char *repeat=a.weekdays==0 ? "ONCE" : a.weekdays==127 ? "DAILY" : a.weekdays==31 ? "WEEKDAYS" : a.weekdays==96 ? "WEEKEND" : "WEEKLY";
+        std::snprintf(context,sizeof(context),"%s",s.clock.valid ? repeat : "TIME UNSET");
+        card(surface,title,value,context,"CHANGE",i,5); return;
+    }
+    constexpr const char *actions[]{"DECREASE","INCREASE","NEXT FIELD","SAVE","CANCEL"};
+    char value[24],title[24],context[24]{};
+    if (s.screen==Screen::ClockEdit) {
+        constexpr const char *fields[]{"YEAR","MONTH","DAY","HOUR","MINUTE","UTC OFFSET"};
+        const unsigned values[]{s.clock_draft.year,s.clock_draft.month,s.clock_draft.day,s.clock_draft.hour,s.clock_draft.minute};
+        const auto field=s.clock_edit_field%6;
+        if (field<5) std::snprintf(value,sizeof(value),"%02u",values[field]);
+        else std::snprintf(value,sizeof(value),"%+d MIN",s.clock_offset_draft);
+        std::snprintf(title,sizeof(title),"SET %s",fields[field]);
+        std::snprintf(context,sizeof(context),"%u/6",field+1);
+    } else {
+        const auto &a=s.alarm_draft;
+        const auto field=s.clock_edit_field%4;
+        constexpr const char *fields[]{"HOUR","MINUTE","REPEAT","ENABLED"};
+        std::snprintf(title,sizeof(title),"ALARM %u %s",s.alarm_index+1,fields[field]);
+        if (field<2) std::snprintf(value,sizeof(value),"%02u",field==0 ? a.minute/60 : a.minute%60);
+        else if (field==3) std::snprintf(value,sizeof(value),"%s",a.enabled ? "ON" : "OFF");
+        else {
+            const char *name=a.weekdays==0 ? "ONCE" : a.weekdays==127 ? "DAILY" : a.weekdays==31 ? "WEEKDAYS" : a.weekdays==96 ? "WEEKEND" : "CUSTOM";
+            constexpr const char *days[]{"MON","TUE","WED","THU","FRI","SAT","SUN"};
+            for (unsigned i=0;i<7;++i) if (a.weekdays==(1U<<i)) name=days[i];
+            std::snprintf(value,sizeof(value),"%s",name);
+        }
+        std::snprintf(context,sizeof(context),"%u/4",field+1);
+    }
+    card(surface,title,value,context,actions[s.clock_action%5],s.clock_action,5);
 }
 
 void render_screen(const State &state, MonoSurface &surface)
@@ -195,13 +276,23 @@ void render_screen(const State &state, MonoSurface &surface)
                       state.focus_phase == FocusPhase::Break ? "BREAK DONE" : "DONE",surface.height-11U,2);
         return;
     }
+    if (state.clock.ringing) {
+        State alert=state; alert.mood=Mood::Alert; alert.eyes_closed=false;
+        render_face(alert,surface);
+        centered(surface,state.audio_ready ? "ALARM / DISMISS" : "ALARM / NO SOUND",surface.height-11U,2);
+        return;
+    }
     if (state.finding) {
         State searching=state; searching.mood=Mood::Curious;
         render_face(searching,surface);
         centered(surface,"PICO HERE",surface.height-11U,2);
         return;
     }
+    if (state.screen>=Screen::Clock) { render_clock_utility(state,surface); return; }
     if (state.screen == Screen::Home || state.screen == Screen::Themes) {
+        if (state.screen==Screen::Home && state.clock.settings.usb_desk && state.clock.usb_powered && state.mood!=Mood::Happy) {
+            clock_card(state,surface,true); return;
+        }
         render_face(state, surface);
         if (state.screen == Screen::Home) render_status(state, surface);
         else {
@@ -327,7 +418,7 @@ void render_screen(const State &state, MonoSurface &surface)
             fill_rect(surface,5+offset,arrow_y+i*2,2,2);
             fill_rect(surface,surface.width-9-offset,arrow_y+i*2,2,2);
         }
-        const unsigned first = (surface.width-51U)/2U;
+        const unsigned first = (surface.width-(assets::menu_icons.size()-1U)*6U-3U)/2U;
         for (unsigned i=0; i<assets::menu_icons.size(); ++i) {
             const unsigned x=first+i*6U, y=surface.height-4U;
             if (i == selected) fill_rect(surface,x,y,3,3);

@@ -45,6 +45,18 @@ int main() {
  play_cue(job); CHECK(writes>400 && drains==1 && audio_slab.used==0);
  adapter.set_muted(true); CHECK(cancelled(job));
  CHECK(k_msgq_num_used_get(&audio_queue)==0);
+ adapter.set_muted(false); adapter.set_reference(false,40);
+ adapter.set_owner(pico::audio::Owner::Alarm);
+ CHECK(cancelled(job));
+ adapter.play(Cue::TimerComplete,25); CHECK(k_msgq_get(&audio_queue,&job,0)==0);
+ CHECK(!cancelled(job));
+ writes=drops=drains=0;
+ after_write=[&] { if(writes==2) adapter.set_owner(pico::audio::Owner::Feature); };
+ play_cue(job);
+ CHECK(writes==2 && drains==0 && drops==2 && cancelled(job));
+ adapter.set_owner(pico::audio::Owner::Alarm);
+ adapter.play(Cue::TimerComplete,25); CHECK(k_msgq_num_used_get(&audio_queue)==1);
+ adapter.set_owner(pico::audio::Owner::Timer); CHECK(k_msgq_num_used_get(&audio_queue)==0);
  if(failures) return EXIT_FAILURE;
  std::cout << "Reference audio worker model tests passed\n";
 }

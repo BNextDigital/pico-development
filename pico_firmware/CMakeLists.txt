@@ -22,6 +22,8 @@ target_sources(app PRIVATE
     src/platform/pico_status_led.cpp
     src/platform/pico_hardware.cpp
     src/platform/pico_storage.cpp
+    lib/pico_core/src/clock.cpp
+    lib/pico_core/src/clock_ui.cpp
     lib/pico_core/src/core.cpp
     lib/pico_core/src/settings.cpp
     lib/pico_core/src/timer.cpp

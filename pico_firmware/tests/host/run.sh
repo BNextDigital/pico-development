@@ -30,3 +30,9 @@ ${CXX:-c++} -std=c++17 -Wall -Wextra -Wpedantic -Werror \
 printf '%s\n' 'Tracking policy checks passed (live alert routing remains gated)'
 
 python3 "$project_dir/tests/host/test_combined_report.py"
+
+${CXX:-c++} -std=c++17 -Wall -Wextra -Wpedantic -Werror \
+    -I"$project_dir/lib/pico_core/include" \
+    "$project_dir"/lib/pico_core/src/*.cpp "$project_dir/tests/host/clock_tests.cpp" \
+    -o "$build_dir/clock_tests"
+"$build_dir/clock_tests"

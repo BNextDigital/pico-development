@@ -28,16 +28,22 @@ public:
     }
     std::uint32_t next_music_ms(std::uint32_t now) const
     {
+        if (state_.clock.ringing) return UINT32_MAX; // Suppressed features resume phase without fast cosmetic wakes.
         const auto elapsed = now - reference_started_ms_;
         const std::uint32_t reference_delay = state_.reference_playing ?
             (elapsed >= 2000U ? 0U : 2000U-elapsed) : UINT32_MAX;
         return std::min(std::min(metronome_.next_update_ms(now), reference_delay), locator_.next(now));
     }
 
+    const clock::Settings &clock_settings() const { return state_.clock.settings; }
+    bool restore_clock(const clock::Settings &settings) { return clock_.restore(state_.clock,settings); }
     PersistedState persistent_state() const;
     bool restore(const PersistedState &persisted);
 
 private:
+    Effects clock_event(const Event &event);
+    Effects clock_navigation(EventKind kind);
+    Effects advance_clock(std::uint32_t now);
     Effects stop_finding(bool acknowledged);
     Effects set_mode(Mode mode);
     Effects set_mood(Mood mood);
@@ -59,6 +65,8 @@ private:
     Effects start_focus_phase();
 
     State state_{};
+    clock::Engine clock_{};
+    std::uint32_t alarm_signal_seconds_{0};
     Mode mode_before_car_dock_{Mode::Companion};
     Timer timer_{};
     Metronome metronome_{};
