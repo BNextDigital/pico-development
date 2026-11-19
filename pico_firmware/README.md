@@ -10,7 +10,7 @@ Offline-first Zephyr/C++17 firmware for Pico, a small BLE companion with express
 | --- | --- |
 | Personality | Eight layered bitmap faces, blink/idle behavior and guarded reactions |
 | Controls | D0 Action, D1 Navigate, optional D2 Back; icon root menu; GPIO interrupts with deferred debounce/hold |
-| Time | Reusable pause/resume timer, Cooking/general timer, Focus work/break confirmation, one-minute local editors |
+| Time | Reusable pause/resume timer, Cooking/general timer, Focus goals, Work/Break confirmation, since-boot history and one-minute editors |
 | Music | Visual metronome, optional Sense PDM chromatic tuner and E2–C6 reference pitches through optional I2S audio |
 | Motion | Optional Sense IMU pickup/rock/rest classification and personality behavior mask |
 | Audio | Optional MAX98357A I2S sound cues, volume/mute and visual-only fallback |
@@ -20,6 +20,12 @@ Offline-first Zephyr/C++17 firmware for Pico, a small BLE companion with express
 | BLE | Encrypted custom GATT protocol v1, 16-byte status, additive commands; bonds stored separately |
 
 Optional peripherals have hardware adapters and host coverage, but **target compilation, audio/acoustic accuracy, OLED contrast, button interrupts, sensor thresholds and current draw need real-board validation**. Wayfinding GPS/compass, Notes recording, complete dock electronics and final battery/power hardware are not implemented.
+
+## Focus sessions
+
+[Focus sessions](docs/focus-sessions.md) adds a local round goal, progress and
+four-entry history explicitly labelled Since Boot. This integration preserves
+the separate Focus feature and its tests.
 
 ## Music reference pitches
 

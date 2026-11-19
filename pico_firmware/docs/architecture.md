@@ -212,3 +212,12 @@ Portable PCM generation and a core two-second intent deadline share the existing
 Music/audio services. The I2S worker uses generation-tagged jobs and cancellation
 checks per block; no second audio thread or extra periodic sampler is added.
 See [Music reference pitches](music-reference.md).
+
+## Focus session goals and recent summaries
+
+FocusSession snapshots a bounded goal or Continuous, then tracks completed Work
+without owning a clock. Core archives at most four session summaries in RAM on
+finish or meaningful stop. Timer remains the only elapsed-time service. No
+persistence change or per-tick writes are introduced. Focus utility navigation
+has eight actions, plus appended summary screen and goal editor; all are shared
+with the simulator. See [Focus sessions](focus-sessions.md).

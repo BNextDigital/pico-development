@@ -103,6 +103,7 @@ constexpr Glyph font[]{
  {'Y',{5,5,2,2,2}}, {'Z',{7,1,2,4,7}}, {'0',{7,5,5,5,7}}, {'1',{2,6,2,2,7}},
  {'2',{6,1,2,4,7}}, {'3',{6,1,2,1,6}}, {'4',{5,5,7,1,1}}, {'5',{7,4,6,1,6}},
  {'6',{3,4,6,5,2}}, {'7',{7,1,2,2,2}}, {'8',{2,5,2,5,2}}, {'9',{2,5,3,1,6}},
+ {'.',{0,0,0,0,2}}, {'=',{0,7,0,7,0}},
  {'#',{5,7,5,7,5}}, {'+',{0,2,7,2,0}}, {':',{0,2,0,2,0}}, {'-',{0,0,7,0,0}}, {'>',{4,2,1,2,4}}, {'/',{1,1,2,4,4}}
 };
 void text(MonoSurface &surface, const char *str, unsigned x, unsigned y, unsigned scale = 1)
@@ -172,7 +173,7 @@ void render_screen(const State &state, MonoSurface &surface)
 {
     if (state.timer_completed) {
         render_face(state, surface);
-        text(surface, state.focus_phase == FocusPhase::Work ? "WORK DONE" :
+        text(surface, state.focus_finished ? "SESSION DONE" : state.focus_phase == FocusPhase::Work ? "WORK DONE" :
                       state.focus_phase == FocusPhase::Break ? "BREAK DONE" : "DONE", 44, 1);
         return;
     }
@@ -225,10 +226,15 @@ void render_screen(const State &state, MonoSurface &surface)
         } else {
             text(surface,state.setting_key == SettingKey::Mute ? "SOUND MUTE" :
                 state.setting_key == SettingKey::Brightness ? "BRIGHTNESS" :
-                state.setting_key == SettingKey::DisplayTimeout ? "SCREEN TIMEOUT" : "VOLUME",24,2);
+                state.setting_key == SettingKey::DisplayTimeout ? "SCREEN TIMEOUT" :
+                state.setting_key == SettingKey::FocusGoal ? "WORK ROUND GOAL" : "VOLUME",24,2);
             char value[24];
             if (state.setting_key == SettingKey::Mute)
                 std::snprintf(value,sizeof(value),"%s",state.setting_draft ? "MUTED" : "SOUND ON");
+            else if (state.setting_key == SettingKey::FocusGoal) {
+                if (!state.setting_draft) std::snprintf(value,sizeof(value),"CONTINUOUS");
+                else std::snprintf(value,sizeof(value),"%u ROUNDS",static_cast<unsigned>(state.setting_draft));
+            }
             else if (state.setting_key == SettingKey::DisplayTimeout) {
                 if (!state.setting_draft) std::snprintf(value,sizeof(value),"OFF");
                 else std::snprintf(value,sizeof(value),"%u MIN",static_cast<unsigned>(state.setting_draft));
@@ -362,6 +368,28 @@ void render_screen(const State &state, MonoSurface &surface)
         }
         return;
     }
+    if (state.screen == Screen::FocusSummary) {
+        text(surface,"FOCUS HISTORY",10,2,2);
+        text(surface,"SINCE BOOT",44,15);
+        if (!state.focus_history_count) {
+            text(surface,"NO COMPLETED WORK YET",12,30);
+            text(surface,"FINISH A WORK ROUND",20,42);
+        } else {
+            const auto index = state.focus_history_index % state.focus_history_count;
+            const auto &record = state.focus_history[index];
+            char summary[32];
+            std::snprintf(summary,sizeof(summary),"%u/%u %s",index+1,state.focus_history_count,
+                          record.finished ? "FINISHED" : "STOPPED EARLY");
+            text(surface,summary,8,25);
+            std::snprintf(summary,sizeof(summary),"%u WORK ROUNDS",record.rounds);
+            text(surface,summary,8,35);
+            duration(summary,sizeof(summary),record.work_seconds);
+            text(surface,summary,8,45);
+            text(surface,"WORK TIME",70,45);
+        }
+        text(surface,"NAV HISTORY  ACTION BACK",10,58);
+        return;
+    }
     if (state.screen == Screen::Unavailable) {
         text(surface, "NOT READY", 8, 10, 2);
         text(surface, "FEATURE NOT IMPLEMENTED", 4, 32);
@@ -371,9 +399,42 @@ void render_screen(const State &state, MonoSurface &surface)
     char buffer[24];
     duration(buffer, sizeof(buffer), state.timer_running || state.timer_paused ?
              state.timer_remaining_seconds : state.configured_duration_seconds);
-    text(surface, buffer, 24, 1, 2);
-    text(surface, state.focus_phase == FocusPhase::Break ? "BREAK TIMER" :
+    text(surface, state.mode == Mode::Focus && state.focus_finished ? "COMPLETE" :
+                  state.mode == Mode::Focus && state.focus_waiting ? "READY" : buffer, 24, 1, 2);
+    text(surface, state.timer_paused ? "PAUSED" : state.focus_waiting ?
+                  (state.focus_phase == FocusPhase::Work ? "BREAK READY" : "WORK READY") :
+                  state.focus_phase == FocusPhase::Break ? "BREAK TIMER" :
                   state.mode == Mode::Cooking ? "COOKING TIMER" : "FOCUS TIMER", 20, 15);
+    if (state.mode == Mode::Focus) {
+        char progress[32];
+        const auto goal = state.focus_phase != FocusPhase::None || state.focus_finished ? state.active_focus_goal : state.focus_goal;
+        if (goal)
+            std::snprintf(progress,sizeof(progress),"%u/%u DONE",state.completed_work_sessions,
+                          goal);
+        else std::snprintf(progress,sizeof(progress),"%u DONE - CONTINUOUS",state.completed_work_sessions);
+        text(surface,progress,6,22);
+        if (state.timer_total_seconds && (state.timer_running || state.timer_paused)) {
+            outline_rect(surface,4,29,120,4);
+            fill_rect(surface,5,30,static_cast<unsigned>((static_cast<std::uint64_t>(state.timer_total_seconds-state.timer_remaining_seconds)*118U)/state.timer_total_seconds),2);
+        }
+        constexpr const char *items[]{"WORK DURATION","START TIMER","CANCEL","HOME","START CYCLE","BREAK DURATION","ROUND GOAL","HISTORY"};
+        const unsigned first=(state.utility_index/3)*3;
+        for (unsigned row=0; row<3 && first+row<8; ++row) {
+            const auto i=first+row;
+            const char *label=i == 1 && state.timer_running ? "PAUSE" : i == 1 && state.timer_paused ? "RESUME" :
+                i == 4 && state.focus_waiting ? "NEXT PHASE" : i == 4 && state.focus_phase != FocusPhase::None ? "CYCLE ACTIVE" : items[i];
+            text(surface,i == state.utility_index ? ">" : " ",2,36+row*9);
+            text(surface,label,10,36+row*9);
+            if (i == 0 || i == 5) {
+                duration(progress,sizeof(progress),i == 0 ? state.configured_duration_seconds : state.break_duration_seconds);
+                text(surface,progress,88,36+row*9);
+            } else if (i == 6) {
+                if (!state.focus_goal) text(surface,"CONT",100,36+row*9);
+                else { std::snprintf(progress,sizeof(progress),"%u",state.focus_goal); text(surface,progress,100,36+row*9); }
+            }
+        }
+        return;
+    }
     constexpr const char *actions[]{"DURATION", "START", "CANCEL", "HOME", "WORK/BREAK", "BREAK"};
     for (unsigned i = 0; i < (state.mode == Mode::Focus ? 6U : 4U); ++i) {
         text(surface, state.utility_index == i ? ">" : " ", 2, 21 + i * 7);

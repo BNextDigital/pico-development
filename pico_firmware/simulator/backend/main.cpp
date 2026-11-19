@@ -131,6 +131,18 @@ std::string dock_name(pico::Dock dock)
     return "unknown";
 }
 
+std::string focus_history_json(const pico::State &state)
+{
+    std::ostringstream out; out << '[';
+    for (unsigned i=0; i<state.focus_history_count; ++i) {
+        const auto &entry=state.focus_history[i];
+        if (i) out << ',';
+        out << "{\"rounds\":" << entry.rounds << ",\"work_seconds\":" << entry.work_seconds
+            << ",\"finished\":" << (entry.finished ? "true" : "false") << '}';
+    }
+    out << ']'; return out.str();
+}
+
 std::string event_name(pico::EventKind kind)
 {
     switch (kind) {
@@ -166,6 +178,8 @@ std::string event_name(pico::EventKind kind)
     case pico::EventKind::PlayReference: return "PlayReference";
     case pico::EventKind::StopReference: return "StopReference";
     case pico::EventKind::AudioReady: return "AudioReady";
+    case pico::EventKind::SetFocusGoal: return "SetFocusGoal";
+    case pico::EventKind::OpenFocusSummary: return "OpenFocusSummary";
     case pico::EventKind::Boot:
         return "Boot";
     case pico::EventKind::Tick:
@@ -225,7 +239,7 @@ std::string event_name(pico::EventKind kind)
 
 std::optional<pico::EventKind> parse_event_kind(const std::string &token)
 {
-    constexpr std::array<pico::EventKind, 58> kinds{
+    constexpr std::array<pico::EventKind, 60> kinds{
         pico::EventKind::Boot,          pico::EventKind::Tick,
         pico::EventKind::PrimaryPressed, pico::EventKind::SecondaryPressed,
         pico::EventKind::Connected,     pico::EventKind::Disconnected,
@@ -276,6 +290,8 @@ std::optional<pico::EventKind> parse_event_kind(const std::string &token)
         pico::EventKind::PlayReference,
         pico::EventKind::StopReference,
         pico::EventKind::AudioReady,
+        pico::EventKind::SetFocusGoal,
+        pico::EventKind::OpenFocusSummary,
 
 
 
@@ -614,6 +630,12 @@ public:
                << "\"focus_phase\":" << static_cast<unsigned>(state.focus_phase) << ','
                << "\"focus_waiting\":" << (state.focus_waiting ? "true" : "false") << ','
                << "\"completed_work_sessions\":" << state.completed_work_sessions << ','
+               << "\"focus_goal\":" << static_cast<unsigned>(state.focus_goal) << ','
+               << "\"active_focus_goal\":" << static_cast<unsigned>(state.active_focus_goal) << ','
+               << "\"focus_finished\":" << (state.focus_finished ? "true" : "false") << ','
+               << "\"focus_work_seconds\":" << state.focus_work_seconds << ','
+               << "\"focus_history_count\":" << static_cast<unsigned>(state.focus_history_count) << ','
+               << "\"focus_history\":" << focus_history_json(state) << ','
                << "\"break_duration_seconds\":" << state.break_duration_seconds << ','
                << "\"sound_muted\":" << (state.sound_muted ? "true" : "false") << ','
                << "\"sound_cue\":" << static_cast<unsigned>(state.sound_cue) << ','

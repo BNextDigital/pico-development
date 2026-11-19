@@ -18,8 +18,8 @@ when a feature genuinely needs them.
 | Mode/context | Intended behavior | Current firmware status |
 | --- | --- | --- |
 | Companion | Face, mood, interactions, lightweight local memory | Themes, deterministic idle expressions, blinking and motion reactions implemented |
-| Study/focus | Tomato-style focus timer, water breaks, later quizzes | Work/break cycles, pause/resume and local minute-duration controls implemented |
-| Music | Chromatic tuner from microphone; speaker metronome | Metronome, optional microphone tuner and optional I2S reference pitches implemented; physical validation remains profile-specific |
+| Study/focus | Tomato-style focus timer, water breaks, later quizzes | Work/break cycles, local goals, progress and four-entry since-boot history implemented |
+| Music | Chromatic tuner, metronome and reference pitches | Optional microphone tuner and I2S reference tones; physical validation remains profile-specific |
 | Cooking | Egg/general timer and concise cooking reference | Local configurable timer implemented; cooking references remain future work |
 | Wayfinding | Compass/GPS or phone-assisted direction cues | Stable mode ID; sensors pending |
 | Notes | Local capture with later local speech-to-text handoff | Stable mode ID; capture/storage/handoff not implemented |
@@ -71,3 +71,9 @@ It uses the existing optional audio adapter; power bench work remains deferred.
 Focus session goals/history are a separate reviewed change and are not removed
 or overwritten by this branch. Durable Music calibration/presets and broader
 practice tools remain future scope.
+
+Feature development currently expands Focus with [round goals and session
+history](focus-sessions.md). Physical power measurements are deferred by user
+request. Existing automatic checks continue; measurement-based battery and
+shutdown decisions remain outstanding. Durable/calendar-based history, custom
+phase sequences and long-break scheduling remain future Focus work.

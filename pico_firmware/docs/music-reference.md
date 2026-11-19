@@ -51,11 +51,10 @@ The pre-existing PDM settling/drain behavior remains; physical feedback and
 transition timing still need validation on the chosen combined profile.
 
 No persistence format, mode ID, BLE command ID, UUID or status-packet change is
-introduced. Reference cue appends existing cue IDs. ReferenceTone screen is 11;
-10 is reserved for the separately reviewed Focus summary. Logical reference
-EventKind IDs start at 55, reserving 53/54 for that Focus work. These internal
-IDs are not new BLE commands. This Music branch is based on current main; the
-separate Focus PR is preserved, and any source merge conflicts need reconciliation.
+introduced. Reference cue appends existing cue IDs. ReferenceTone screen is 11, following FocusSummary=10. Logical reference
+EventKind IDs start at 55, after Focus events 53/54. These internal
+IDs are not new BLE commands. This branch integrates the existing Focus PR as a merge parent, preserving
+its implementation and tests. Both features can land without ID collisions.
 
 Simulator virtual AudioReady defaults true, just as virtual microphone readiness
 does. It displays playback state and Chirp effects but does not play reference
@@ -65,6 +64,11 @@ reference_playing. Logical injection adds OpenReference, SetReferenceNote,
 PlayReference, StopReference and AudioReady.
 
 ## Validation and usage
+
+Local validation passes: the host/core and GPIO/display/audio worker models,
+all 30 combined simulator tests, ASan/UBSan (leak detection disabled), packed
+asset regeneration, Python syntax and whitespace checks. Framebuffer previews
+are inspected; live desktop audio/GUI and target output are not validated.
 
 Run `bash tests/host/run.sh` and `bash simulator/run-tests.sh`. Tests cover PCM
 frequency/zero crossings at E2/A4/C6, chunk equivalence, mute, bounds, stereo,

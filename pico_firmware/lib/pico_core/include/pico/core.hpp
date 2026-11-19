@@ -51,6 +51,8 @@ private:
     void sync_metronome();
     Effects music_beat();
     void sync_focus();
+    void archive_focus(bool finished);
+    void cancel_focus();
     Effects start_focus_phase();
 
     State state_{};

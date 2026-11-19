@@ -177,3 +177,9 @@ Reference pitches add no BLE IDs or status fields. Existing mode IDs and
 persistence v5 remain unchanged. Note selection and playback have local UI and
 simulator logical injection only.
 See [Music reference pitches](music-reference.md).
+
+Focus goals/history add no BLE command IDs or status fields. Existing cycle
+commands honor the local goal selected for the next session; boot defaults to
+Continuous. Bounded completion clears active phase/waiting and uses the normal
+completion alert. Goal/history currently have local UI and simulator readback
+only; see [Focus sessions](focus-sessions.md).

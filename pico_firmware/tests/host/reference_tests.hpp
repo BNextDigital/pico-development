@@ -34,6 +34,11 @@ void test_reference_lifecycle_and_priority()
     using E=pico::EventKind;
     pico::Core c; c.handle({E::Boot,0}); c.handle({E::OpenReference,0});
     CHECK(c.state().screen == pico::Screen::ReferenceTone);
+    std::array<std::uint8_t,1024> preview{};
+    pico::display::MonoSurface surface{preview.data(),preview.size(),128,64,pico::display::MonoLayout::HorizontalMsb};
+    CHECK(pico::display::render(c.state(),surface));
+    CHECK(pico::display::pixel_at(surface,49,35)); // visible decimal in 440.000 Hz
+
     CHECK(!pico::has_effect(c.handle({E::PlayReference,0}),pico::Effect::Chirp));
     c.handle({E::AudioReady,1});
     c.handle({E::MusicTick,UINT32_MAX-100U});
