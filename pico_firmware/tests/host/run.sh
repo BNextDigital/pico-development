@@ -18,4 +18,6 @@ ${CXX:-c++} \
 
 "$build_dir/pico_core_tests"
 
+sh "$project_dir/tests/host/check_nordic_limits.sh"
+
 sh "$project_dir/tests/platform/run.sh"

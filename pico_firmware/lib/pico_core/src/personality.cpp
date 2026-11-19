@@ -66,7 +66,7 @@ bool Personality::advance(State &s, std::uint32_t now)
 }
 std::uint32_t Personality::next_update_ms(const State &s, std::uint32_t now) const
 {
-    auto delay = UINT32_MAX;
+    std::uint32_t delay = UINT32_MAX;
     const auto include = [&](std::uint32_t deadline) {
         delay = std::min(delay, due(now, deadline) ? 0U : deadline - now);
     };
