@@ -10,14 +10,14 @@ constexpr bool companion_advertising(unsigned companions, unsigned total,
 }
 // Contract for the subsequent live activation milestone. No second timer service.
 enum class Alert : std::uint8_t { None, LocalFind, OwnerRing, Timer, UnwantedTracking };
-constexpr Alert alert(bool local, bool owner, bool timer, bool unwanted)
+constexpr Alert alert(bool local, bool owner, bool timer, bool unwanted, bool alarm=false)
 {
-    return unwanted ? Alert::UnwantedTracking : timer ? Alert::Timer :
+    return unwanted ? Alert::UnwantedTracking : (timer || alarm) ? Alert::Timer :
         owner ? Alert::OwnerRing : local ? Alert::LocalFind : Alert::None;
 }
 constexpr bool capture_microphone(bool requested, Alert priority)
 {
-    return requested && priority != Alert::OwnerRing && priority != Alert::UnwantedTracking;
+    return requested && priority < Alert::OwnerRing;
 }
 constexpr std::uint8_t motion_mask(std::uint8_t user, std::uint8_t required)
 {

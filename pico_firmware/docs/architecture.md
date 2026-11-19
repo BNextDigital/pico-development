@@ -249,3 +249,13 @@ the opt-in NCS 3.4.2 profile. It links the SDK protocol libraries into the exist
 Pico application without importing the SDK sample's main/UI/hardware loop. Network
 activation remains disabled; shared live ring/motion/radio lifecycle work is explicitly
 deferred. The default application and protocol/persistence IDs are unchanged.
+
+## Clock service
+
+[Clock](clock.md) adds a fixed-capacity portable wall clock/alarm engine and monotonic
+stopwatch. Existing Tick/MusicTick events service it; there is no dedicated clock task.
+A separate versioned `pico_clock/config` key reuses the existing NVS backend, mutex and
+coalescing work item. UTC and running state are volatile. Audio ownership generations
+cancel stale cues in the existing I2S worker; clock alarms temporarily suspend capture
+without erasing tuner selection. The compositor and 12-byte internal Event transport
+are shared. New encrypted GATT attributes are appended, with legacy packets unchanged.

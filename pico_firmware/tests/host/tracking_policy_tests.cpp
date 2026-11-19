@@ -18,6 +18,8 @@ int main()
     assert(alert(false,false,false,false) == Alert::None);
     assert(!capture_microphone(true, Alert::UnwantedTracking));
     assert(!capture_microphone(true, Alert::OwnerRing));
+    assert(!capture_microphone(true, Alert::Timer));
+    assert(alert(true,true,false,false,true)==Alert::Timer);
     assert(capture_microphone(true, Alert::None));
     assert(!capture_microphone(false, Alert::None));
     assert(motion_mask(0,1) == 1); // User disable cannot disable safety demand.

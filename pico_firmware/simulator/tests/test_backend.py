@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import struct
+from datetime import datetime, timezone
 from pathlib import Path
 import subprocess
 import sys
@@ -72,11 +74,11 @@ class BackendTests(unittest.TestCase):
     def test_root_icon_menu_cycles_and_selects_music(self) -> None:
         first = self.harness.send("event OpenMenu")
         frames = [first["frame_hex"]]
-        for index in range(1, 9):
+        for index in range(1, 10):
             current = self.harness.send("event NavigateNext")
             self.assertEqual(current["state"]["menu_index"], index)
             frames.append(current["frame_hex"])
-        self.assertEqual(len(set(frames)), 9)
+        self.assertEqual(len(set(frames)), 10)
         wrapped = self.harness.send("event NavigateNext")
         self.assertEqual(wrapped["frame_hex"], first["frame_hex"])
         for _ in range(3):
@@ -274,7 +276,7 @@ class BackendTests(unittest.TestCase):
     def test_boot_and_interaction_use_real_core_and_renderer(self) -> None:
         boot = self.harness.initial
         self.assertEqual(boot["state"]["mode_name"], "companion")
-        self.assertEqual(boot["effect_names"], ["Render", "Notify"])
+        self.assertEqual(boot["effect_names"], ["Render", "Notify", "NotifyClock"])
         self.assertEqual(len(bytes.fromhex(boot["frame_hex"])), 1024)
 
         interaction = self.harness.send("event PrimaryPressed")
@@ -665,6 +667,140 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(reboot["state"]["mode_name"], "companion")
         self.assertFalse(reboot["state"]["timer_running"])
 
+
+
+    def phone_sync(self, year=2026, month=11, day=19, hour=12, minute=0, second=0, offset=0):
+        utc=int(datetime(year,month,day,hour,minute,second,tzinfo=timezone.utc).timestamp())
+        return self.harness.send("ble "+(b"\x60"+struct.pack("<Ih",utc,offset)).hex())
+
+    def set_alarm(self, slot, minute, weekdays=0, enabled=True):
+        return self.harness.send("ble "+(bytes([0x62,slot])+struct.pack("<HBB",minute,weekdays,int(enabled))).hex())
+
+    def test_clock_phone_sync_disconnect_rollover_and_daily_refresh(self):
+        initial=self.harness.initial["state"]["clock"]
+        self.assertFalse(initial["valid"])
+        self.harness.send("event Connected")
+        synced=self.phone_sync(hour=23,minute=59,second=58)
+        self.assertTrue(synced["state"]["clock"]["valid"])
+        self.harness.send("event Disconnected")
+        continued=self.harness.send("advance 3")["state"]["clock"]
+        self.assertEqual(continued["local_time"],"00:00")
+        self.assertEqual(continued["local_date"],"FRI 11/20")
+        self.assertFalse(continued["sync_due"])
+        self.harness.send("advance 86397")
+        connected=self.harness.send("event Connected")
+        self.assertTrue(connected["state"]["clock"]["sync_due"])
+        self.assertIn("NotifyClock",connected["effect_names"])
+        refreshed=self.phone_sync(day=20)
+        self.assertFalse(refreshed["state"]["clock"]["sync_due"])
+
+    def test_clock_alarm_physical_dismiss_recurs_without_losing_stopwatch(self):
+        self.phone_sync(hour=6,minute=59,second=59)
+        self.set_alarm(0,420,127)
+        self.harness.send("ble 64")
+        ringing=self.harness.send("advance 1")
+        self.assertEqual(ringing["state"]["clock"]["ringing"],1)
+        self.assertTrue(ringing["chirped"])
+        before=ringing["state"]["interaction_count"]
+        dismissed=self.harness.send("event FocusButtonTapped")
+        self.assertEqual(dismissed["state"]["clock"]["ringing"],0)
+        self.assertEqual(dismissed["state"]["interaction_count"],before)
+        self.assertTrue(dismissed["state"]["clock"]["stopwatch_running"])
+        self.phone_sync(day=20,hour=6,minute=59,second=59)
+        again=self.harness.send("advance 1")
+        self.assertEqual(again["state"]["clock"]["ringing"],1)
+        self.assertEqual(again["state"]["clock"]["stopwatch_seconds"],2)
+
+    def test_clock_settings_reboot_preserves_alarms_but_time_is_unset(self):
+        self.phone_sync(offset=-300)
+        self.harness.send("ble 61 06") # 12h, glance and USB desk enabled.
+        self.set_alarm(1,450,31)
+        self.harness.send("advance 5")
+        self.harness.send("power_cycle")
+        reboot=self.harness.send("status")["state"]["clock"]
+        self.assertFalse(reboot["valid"])
+        self.assertTrue(reboot["sync_due"])
+        self.assertTrue(reboot["glance"])
+        self.assertTrue(reboot["usb_desk"])
+        self.assertFalse(reboot["hour24"])
+        self.assertEqual(reboot["offset_minutes"],-300)
+        self.assertTrue(reboot["alarms"][1]["enabled"])
+        self.assertEqual(reboot["alarms"][1]["weekdays"],31)
+        self.phone_sync(offset=-300)
+        self.assertTrue(self.harness.send("status")["state"]["clock"]["valid"])
+
+    def test_clock_interrupted_unsaved_write_and_corrupt_settings(self):
+        self.harness.send("ble 61 02")
+        self.harness.send("advance 5")
+        self.harness.send("ble 61 07")
+        reboot=self.harness.send("power_cycle")["state"]["clock"]
+        self.assertFalse(reboot["hour24"])
+        self.assertFalse(reboot["usb_desk"])
+        settings_path=Path(self.temporary.name)/"pico-state.bin.clock"
+        settings_path.write_bytes(b"PCLK")
+        reboot=self.harness.send("power_cycle")["state"]["clock"]
+        self.assertTrue(reboot["hour24"])
+        self.assertFalse(reboot["valid"])
+
+    def test_clock_minute_render_sleep_and_usb_desk(self):
+        self.phone_sync(hour=12)
+        self.harness.send("ble 68")
+        unchanged=self.harness.send("advance 1")
+        self.assertFalse(unchanged["rendered"])
+        changed=self.harness.send("advance 59")
+        self.assertTrue(changed["rendered"])
+        self.assertEqual(changed["state"]["clock"]["local_time"],"12:01")
+        self.harness.send("event SleepDisplay")
+        asleep=self.harness.send("advance 60")
+        self.assertFalse(asleep["rendered"])
+        self.harness.send("event FocusButtonTapped")
+        self.harness.send("ble 68")
+        self.harness.send("event SetDisplayTimeout 1")
+        self.harness.send("ble 61 05")
+        self.harness.send("event UsbPower 1")
+        plugged=self.harness.send("advance 120")
+        self.assertTrue(any(bytes.fromhex(plugged["frame_hex"])))
+        self.harness.send("event UsbPower 0")
+        battery=self.harness.send("advance 1")
+        self.assertFalse(any(bytes.fromhex(battery["frame_hex"])))
+
+    def test_clock_manual_buttons_and_alarm_editor(self):
+        self.harness.send("ble 68")
+        for _ in range(2): self.harness.send("event NavigateNext")
+        edit=self.harness.send("event FocusButtonTapped")
+        self.assertEqual(edit["state"]["screen"],15)
+        self.harness.send("event FocusButtonTapped") # Increase year from 2000 to 2001.
+        for _ in range(2): self.harness.send("event NavigateNext") # Save.
+        saved=self.harness.send("event FocusButtonTapped")
+        self.assertTrue(saved["state"]["clock"]["valid"])
+        self.assertEqual(saved["state"]["clock"]["utc"],int(datetime(2001,1,1,tzinfo=timezone.utc).timestamp()))
+        self.harness.send("event FocusButtonTapped") # Alarms.
+        self.harness.send("event FocusButtonTapped") # Alarm 1 editor.
+        self.harness.send("event NavigateNext") # Next field action.
+        for _ in range(3): self.harness.send("event FocusButtonTapped") # Enabled field.
+        self.harness.send("event NavigatePrevious") # Increase/toggle.
+        self.harness.send("event FocusButtonTapped")
+        for _ in range(2): self.harness.send("event NavigateNext") # Save.
+        saved=self.harness.send("event FocusButtonTapped")
+        self.assertTrue(saved["state"]["clock"]["alarms"][0]["enabled"])
+        self.assertTrue(saved["persist_queued"])
+
+    def test_clock_dst_correction_and_stopwatch_pause_resume_with_timer(self):
+        self.phone_sync(month=3,day=8,hour=6,minute=59,second=59,offset=-300)
+        self.harness.send("ble 64")
+        self.harness.send("ble 04 1e000000")
+        self.harness.send("advance 1")
+        corrected=self.phone_sync(month=3,day=8,hour=7,offset=-240)
+        self.assertEqual(corrected["state"]["clock"]["local_time"],"03:00")
+        self.assertEqual(corrected["state"]["clock"]["stopwatch_seconds"],1)
+        self.assertEqual(corrected["state"]["timer_remaining_seconds"],29)
+        self.harness.send("ble 65")
+        self.harness.send("advance 5")
+        self.assertEqual(self.harness.send("status")["state"]["clock"]["stopwatch_seconds"],1)
+        self.harness.send("ble 66")
+        self.assertEqual(self.harness.send("advance 5")["state"]["clock"]["stopwatch_seconds"],6)
+        self.harness.send("ble 67")
+        self.assertEqual(self.harness.send("status")["state"]["clock"]["stopwatch_seconds"],0)
 
 
 class UiHelperTests(unittest.TestCase):

@@ -4,7 +4,8 @@ namespace pico::display {
 inline bool auto_sleep_allowed(const State &s)
 {
     return !s.display_asleep && s.display_timeout_minutes && !s.timer_completed &&
-        !s.finding && !s.tuner_running && !s.metronome_running && !s.reference_playing && s.screen != Screen::SettingEdit &&
+        !s.clock.ringing && !(s.clock.settings.usb_desk && s.clock.usb_powered &&
+            (s.screen==Screen::Clock || s.screen==Screen::Home)) && !s.finding && !s.tuner_running && !s.metronome_running && !s.reference_playing && s.screen != Screen::SettingEdit &&
         s.screen != Screen::DurationEdit;
 }
 inline unsigned brightness_percent(const State &state)

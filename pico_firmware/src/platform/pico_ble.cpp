@@ -1,6 +1,8 @@
 #include "pico_ble.hpp"
 
 #include <array>
+#include <algorithm>
+#include <limits>
 #include <cerrno>
 #include <cstdint>
 #include <cstring>
@@ -40,6 +42,49 @@ pico::platform::EventSink event_sink;
 std::array<std::uint8_t, pico::protocol::kStatusSize> status_value{};
 K_MUTEX_DEFINE(status_mutex);
 std::array<std::uint8_t,4> locator_value{{1,0,0,0}};
+std::array<std::uint8_t,pico::protocol::kClockStatusSize> clock_value{};
+pico::clock::Blob clock_config_value{};
+std::uint32_t clock_uptime, stopwatch_uptime_ms;
+constexpr std::uint8_t clock_attr_index=10;
+std::uint32_t read32(const std::uint8_t *p)
+{ return std::uint32_t(p[0])|(std::uint32_t(p[1])<<8)|(std::uint32_t(p[2])<<16)|(std::uint32_t(p[3])<<24); }
+void write32(std::uint8_t *p,std::uint32_t value)
+{ for (unsigned i=0;i<4;++i) p[i]=static_cast<std::uint8_t>(value>>(8*i)); }
+ssize_t read_clock(bt_conn *conn,const bt_gatt_attr *attr,void *buffer,std::uint16_t length,std::uint16_t offset)
+{
+    std::array<std::uint8_t,pico::protocol::kClockStatusSize> value{};
+    k_mutex_lock(&status_mutex,K_FOREVER);
+    value=clock_value;
+    const auto elapsed=static_cast<std::uint32_t>(k_uptime_get()/1000U)-clock_uptime;
+    const auto stopwatch_elapsed=k_uptime_get_32()-stopwatch_uptime_ms;
+    k_mutex_unlock(&status_mutex);
+    if (value[1]&1U) {
+        const auto utc=static_cast<std::uint64_t>(read32(value.data()+2))+elapsed;
+        const auto raw=value[6]|(unsigned(value[7])<<8);
+        const int zone=raw>=32768U ? static_cast<int>(raw)-65536 : static_cast<int>(raw);
+        if (utc<=pico::clock::kMaxUtc && pico::clock::valid_time(static_cast<std::uint32_t>(utc),zone))
+            write32(value.data()+2,static_cast<std::uint32_t>(utc));
+        else { value[1]=static_cast<std::uint8_t>((value[1]&~1U)|2U); write32(value.data()+2,0); }
+        const auto age=std::min<std::uint64_t>(UINT32_MAX,static_cast<std::uint64_t>(read32(value.data()+14))+elapsed);
+        write32(value.data()+14,static_cast<std::uint32_t>(age));
+        if (age>=86400U) value[1]|=2U;
+    }
+    if (value[1]&64U) {
+        const auto milliseconds=static_cast<std::uint64_t>(stopwatch_elapsed)+value[18]+(unsigned(value[19])<<8);
+        write32(value.data()+8,static_cast<std::uint32_t>(std::min<std::uint64_t>(UINT32_MAX,
+            static_cast<std::uint64_t>(read32(value.data()+8))+milliseconds/1000U)));
+        value[18]=static_cast<std::uint8_t>(milliseconds%1000U);
+        value[19]=static_cast<std::uint8_t>((milliseconds%1000U)>>8);
+    }
+    return bt_gatt_attr_read(conn,attr,buffer,length,offset,value.data(),value.size());
+}
+ssize_t read_clock_config(bt_conn *conn,const bt_gatt_attr *attr,void *buffer,std::uint16_t length,std::uint16_t offset)
+{
+    pico::clock::Blob value{};
+    k_mutex_lock(&status_mutex,K_FOREVER); value=clock_config_value; k_mutex_unlock(&status_mutex);
+    return bt_gatt_attr_read(conn,attr,buffer,length,offset,value.data(),value.size());
+}
+
 
 ssize_t read_locator(bt_conn *connection, const bt_gatt_attr *attribute,
                      void *buffer, std::uint16_t length, std::uint16_t offset)
@@ -107,7 +152,12 @@ BT_GATT_SERVICE_DEFINE(
                            BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,
                            BT_GATT_PERM_READ_ENCRYPT,read_locator,nullptr,nullptr),
     BT_GATT_CCC(status_subscription_changed,
-                BT_GATT_PERM_READ_ENCRYPT | BT_GATT_PERM_WRITE_ENCRYPT));
+                BT_GATT_PERM_READ_ENCRYPT | BT_GATT_PERM_WRITE_ENCRYPT),
+    BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(BT_UUID_128_ENCODE(0x8e7b0005,0x54f2,0x4d9b,0xa3d1,0x9f150000c001)),
+        BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,BT_GATT_PERM_READ_ENCRYPT,read_clock,nullptr,nullptr),
+    BT_GATT_CCC(status_subscription_changed,BT_GATT_PERM_READ_ENCRYPT | BT_GATT_PERM_WRITE_ENCRYPT),
+    BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(BT_UUID_128_ENCODE(0x8e7b0006,0x54f2,0x4d9b,0xa3d1,0x9f150000c001)),
+        BT_GATT_CHRC_READ,BT_GATT_PERM_READ_ENCRYPT,read_clock_config,nullptr,nullptr));
 
 const bt_data advertising_data[] = {
     BT_DATA_BYTES(BT_DATA_FLAGS, BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR),
@@ -299,6 +349,27 @@ bool Ble::start_advertising()
     }
     LOG_INF("Advertising as %s", CONFIG_BT_DEVICE_NAME);
     return true;
+}
+
+void Ble::publish_clock(const State &state,bool notify)
+{
+    if (!ready_) return;
+    std::uint8_t encoded[protocol::kClockStatusSize]{};
+    protocol::encode_clock(state,encoded);
+    const auto settings=notify ? clock::encode(state.clock.settings) : clock::Blob{};
+    k_mutex_lock(&status_mutex,K_FOREVER);
+    std::copy(std::begin(encoded),std::end(encoded),clock_value.begin());
+    if (notify) clock_config_value=settings;
+    clock_uptime=state.uptime_seconds; stopwatch_uptime_ms=state.clock.monotonic_ms;
+    k_mutex_unlock(&status_mutex);
+    if (!notify) return;
+#if defined(CONFIG_PICO_FIND_HUB)
+    bt_conn_foreach(BT_CONN_TYPE_LE,[](bt_conn *conn,void *context) {
+        if (is_companion(conn)) bt_gatt_notify(conn,&pico_service.attrs[clock_attr_index],context,protocol::kClockStatusSize);
+    },encoded);
+#else
+    bt_gatt_notify(nullptr,&pico_service.attrs[clock_attr_index],encoded,sizeof(encoded));
+#endif
 }
 
 void Ble::publish(const State &state, Capabilities capabilities)

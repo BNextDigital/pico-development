@@ -2,6 +2,8 @@
 #include <cstddef>
 #include <cstdint>
 namespace pico::audio {
+// Single worker ownership; changing owner invalidates queued/in-flight stale cues.
+enum class Owner : std::uint8_t { Feature, LocalFind, Timer, Alarm, NetworkRing, UnwantedTracking };
 enum class Cue : std::uint8_t { Interact, TimerComplete, WorkComplete, BreakComplete, MetronomeClick, MetronomeAccent, ReferenceTone, Count };
 inline constexpr std::uint32_t kSampleRate = 31250;
 inline constexpr std::int16_t kPeakLimit = 2048;
