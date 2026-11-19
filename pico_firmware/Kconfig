@@ -6,7 +6,7 @@ menu "Pico"
 
 config PICO_FIRMWARE_VERSION
     string "Firmware version"
-    default "0.9.0-oled-power"
+    default "0.10.0-focus-sessions"
 
 config PICO_DISPLAY
     bool "Render Pico on the chosen monochrome display"

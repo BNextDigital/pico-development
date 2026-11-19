@@ -4,7 +4,7 @@ void open_duration(pico::Core &core,bool break_duration=false)
     using E=pico::EventKind;
     core.handle({E::OpenMenu,0}); core.handle({E::Select,0}); // Focus, Start index 1
     core.handle({E::NavigatePrevious,0}); // duration index 0
-    if (break_duration) core.handle({E::NavigatePrevious,0}); // wrap to break index 5
+    if (break_duration) for (unsigned i=0; i<3; ++i) core.handle({E::NavigatePrevious,0}); // break index 5
     core.handle({E::Select,0});
 }
 void test_minute_duration_preview_save_and_cancel()

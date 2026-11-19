@@ -157,6 +157,52 @@ class BackendTests(unittest.TestCase):
         self.harness.send("advance 5")
         self.assertEqual(len(path.read_bytes()), 32)
 
+    def test_bounded_focus_session_finishes_with_summary(self) -> None:
+        self.harness.send("event SetTimerDuration 2")
+        self.harness.send("event SetBreakDuration 1")
+        self.harness.send("event SetFocusGoal 2")
+        self.harness.send("event StartFocusCycle")
+        changed = self.harness.send("event SetFocusGoal 3")
+        self.assertEqual(changed["state"]["active_focus_goal"], 2)
+        self.harness.send("advance 2")
+        self.harness.send("event NextFocusPhase")
+        self.harness.send("advance 1")
+        self.harness.send("event NextFocusPhase")
+        done = self.harness.send("advance 2")
+        self.assertTrue(done["state"]["focus_finished"])
+        self.assertFalse(done["state"]["timer_running"])
+        self.assertFalse(done["state"]["focus_waiting"])
+        self.assertEqual(done["state"]["focus_history"],
+                         [{"rounds": 2, "work_seconds": 4, "finished": True}])
+        summary = self.harness.send("advance 4")
+        self.assertEqual(summary["state"]["screen"], 10)
+        self.assertNotEqual(summary["frame_hex"], done["frame_hex"])
+        back = self.harness.send("event FocusButtonTapped")
+        self.assertEqual(back["state"]["screen"], 2)
+        self.assertFalse(back["state"]["timer_running"])
+        self.harness.send("advance 5")
+        reboot = self.harness.send("power_cycle")
+        self.assertEqual(reboot["state"]["focus_history"], [])
+        self.assertEqual(reboot["state"]["focus_goal"], 0)
+        self.assertEqual(reboot["state"]["configured_duration_seconds"], 2)
+
+    def test_focus_history_cancel_and_four_entry_limit(self) -> None:
+        self.harness.send("event SetTimerDuration 1")
+        self.harness.send("event StartFocusCycle")
+        self.harness.send("event CancelTimer")
+        self.assertEqual(self.harness.send("status")["state"]["focus_history"], [])
+        self.harness.send("event StartFocusCycle")
+        self.harness.send("advance 1")
+        cancelled = self.harness.send("event CancelTimer")
+        self.assertEqual(cancelled["state"]["focus_history"],
+                         [{"rounds": 1, "work_seconds": 1, "finished": False}])
+        self.harness.send("event SetFocusGoal 1")
+        for _ in range(5):
+            self.harness.send("event StartFocusCycle")
+            completed = self.harness.send("advance 1")
+        self.assertEqual(len(completed["state"]["focus_history"]), 4)
+        self.assertTrue(all(entry["finished"] for entry in completed["state"]["focus_history"]))
+
     def test_boot_and_interaction_use_real_core_and_renderer(self) -> None:
         boot = self.harness.initial
         self.assertEqual(boot["state"]["mode_name"], "companion")
@@ -467,7 +513,7 @@ class BackendTests(unittest.TestCase):
         self.harness.send("ble 11")  # Save
         saved = self.harness.send("ble 13")
         self.assertEqual(saved["state"]["configured_duration_seconds"],1560)
-        self.harness.send("ble 12")  # Break, utility index 5
+        for _ in range(3): self.harness.send("ble 12")  # Break, utility index 5
         self.harness.send("ble 13"); self.harness.send("ble 13")
         self.harness.send("ble 11")
         rest = self.harness.send("ble 13")
