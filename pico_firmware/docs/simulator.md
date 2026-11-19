@@ -200,3 +200,16 @@ shared eleven-item Settings menu. JSON includes
 saved/preview brightness, timeout and sleep state; the GUI dims lit pixels for
 preview and displays black during sleep. These colors do not model measured
 OLED luminance. See [OLED power controls](oled-power.md).
+
+## Reference tool
+
+Music -> Tone uses the shared renderer and virtual AudioReady state. The
+simulator emits Chirp/state changes, not soundcard audio. AudioReady 0 tests
+the optional-speaker fallback; reference note/play intent reset on reboot.
+See [Music reference pitches](music-reference.md).
+
+Focus JSON adds focus_goal, active_focus_goal, focus_finished,
+focus_work_seconds, focus_history_count and focus_history (newest first).
+SetFocusGoal and OpenFocusSummary are logical event injections; existing virtual
+buttons expose the same goal editor and history screens as firmware. Goal and
+history reset on power_cycle, while existing durable settings remain saved.

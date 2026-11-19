@@ -9,4 +9,4 @@ Firmware, simulator, hardware adapters and documentation for **Pico**, an offlin
 - [Simulator](pico_firmware/docs/simulator.md) and [product map](pico_firmware/docs/product-map.md)
 - [Separate Flutter companion app](https://github.com/BNextDigital/pico-companion)
 
-**Current source milestone:** `0.9.0-oled-power` (November 18, 2026). Earlier baseline OLED/BLE/D0 checks do not validate the current combined build. Target compilation, new peripheral acceptance and current measurements remain outstanding. Sprint documents are retained as historical records.
+**Current source milestone:** `0.11.0-music-reference` (November 18, 2026). Earlier baseline OLED/BLE/D0 checks do not validate the current combined build. Target compilation, new peripheral acceptance and current measurements remain outstanding. Sprint documents are retained as historical records.

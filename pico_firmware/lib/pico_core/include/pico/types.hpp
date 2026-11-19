@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <array>
 #include <cstdint>
 #include <pico/audio.hpp>
 #include <pico/pitch.hpp>
@@ -107,11 +108,18 @@ enum class EventKind : std::uint8_t {
     SetBrightness,
     SetDisplayTimeout,
     SleepDisplay,
+    SetFocusGoal,
+    OpenFocusSummary,
+    OpenReference = 55,
+    SetReferenceNote,
+    PlayReference,
+    StopReference,
+    AudioReady,
 };
 
-enum class Screen : std::uint8_t { Home, Menu, Utility, Themes, Unavailable, Music, Tuner, DurationEdit, Settings, SettingEdit };
+enum class Screen : std::uint8_t { Home, Menu, Utility, Themes, Unavailable, Music, Tuner, DurationEdit, Settings, SettingEdit, FocusSummary = 10, ReferenceTone = 11 };
 
-enum class SettingKey : std::uint8_t { Theme, Mute, Volume, Motion, Brightness, DisplayTimeout };
+enum class SettingKey : std::uint8_t { Theme, Mute, Volume, Motion, Brightness, DisplayTimeout, FocusGoal };
 
 struct Event {
     EventKind kind{EventKind::Boot};
@@ -173,6 +181,13 @@ struct State {
     FocusPhase focus_phase{FocusPhase::None};
     bool focus_waiting{false};
     std::uint32_t completed_work_sessions{0};
+    std::uint8_t focus_goal{0}; // 0 = continuous, applies to the next session
+    std::uint8_t active_focus_goal{0};
+    bool focus_finished{false};
+    std::uint32_t focus_work_seconds{0};
+    std::array<FocusRecord,4> focus_history{};
+    std::uint8_t focus_history_count{0};
+    std::uint8_t focus_history_index{0};
     std::uint32_t break_duration_seconds{300};
     audio::Cue sound_cue{audio::Cue::Interact};
     bool sound_muted{false};
@@ -182,6 +197,10 @@ struct State {
     std::uint8_t beats_per_bar{4};
     std::uint8_t current_beat{1};
     std::uint8_t music_index{2};
+    bool audio_ready{false};
+    bool reference_playing{false};
+    std::uint8_t reference_note{69};
+    std::uint8_t reference_index{2};
     bool microphone_ready{false};
     bool tuner_running{false};
     std::uint8_t tuner_session{0};
@@ -193,6 +212,7 @@ struct State {
     bool editing_break_duration{false};
     Screen duration_return_screen{Screen::Utility};
     std::uint8_t settings_index{0};
+    Screen setting_return_screen{Screen::Settings};
     SettingKey setting_key{SettingKey::Theme};
     std::uint32_t setting_draft{0};
     std::uint8_t setting_action{1};

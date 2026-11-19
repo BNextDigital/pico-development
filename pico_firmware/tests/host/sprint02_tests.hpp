@@ -4,7 +4,7 @@ void test_sound_pcm_is_bounded_and_chunk_independent()
     for (unsigned cue = 0; cue < static_cast<unsigned>(pico::audio::Cue::Count); ++cue) {
         const auto kind = static_cast<pico::audio::Cue>(cue);
         const auto frames = pico::audio::frames(kind);
-        CHECK(frames > 0 && frames <= pico::audio::kSampleRate);
+        CHECK(frames > 0 && frames <= (kind == pico::audio::Cue::ReferenceTone ? pico::audio::kReferenceFrames : pico::audio::kSampleRate));
         std::vector<std::int16_t> full((frames + 10) * 2), chunks(full.size());
         pico::audio::render(kind, 0, full.data(), frames + 10, 100);
         for (unsigned offset = 0; offset < frames + 10; offset += 128) {
@@ -106,7 +106,7 @@ void test_session_menu_and_extended_protocol()
     using E = pico::EventKind;
     pico::Core core;
     core.handle({E::OpenMenu,0}); core.handle({E::Select,0});
-    core.handle({E::NavigatePrevious,0}); core.handle({E::NavigatePrevious,0}); core.handle({E::NavigatePrevious,0});
+    for (unsigned i=0; i<3; ++i) core.handle({E::NavigateNext,0});
     CHECK(core.state().utility_index == 4);
     core.handle({E::Select,0});
     CHECK(core.state().focus_phase == pico::FocusPhase::Work);

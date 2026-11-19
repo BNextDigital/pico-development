@@ -26,7 +26,11 @@ public:
         return delay;
     }
     std::uint32_t next_music_ms(std::uint32_t now) const
-    { return metronome_.next_update_ms(now); }
+    {
+        const auto elapsed = now - reference_started_ms_;
+        return std::min(metronome_.next_update_ms(now), state_.reference_playing ?
+            (elapsed >= 2000U ? 0U : 2000U-elapsed) : UINT32_MAX);
+    }
 
     PersistedState persistent_state() const;
     bool restore(const PersistedState &persisted);
@@ -47,6 +51,8 @@ private:
     void sync_metronome();
     Effects music_beat();
     void sync_focus();
+    void archive_focus(bool finished);
+    void cancel_focus();
     Effects start_focus_phase();
 
     State state_{};
@@ -54,6 +60,7 @@ private:
     Timer timer_{};
     Metronome metronome_{};
     std::uint32_t music_ms_{0};
+    std::uint32_t reference_started_ms_{0};
     FocusSession focus_{};
     Personality personality_;
     std::uint32_t animation_ms_{0};

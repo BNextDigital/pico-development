@@ -19,7 +19,7 @@ Score score(Cue cue)
     case Cue::BreakComplete: return {rest,3};
     case Cue::MetronomeClick: return {click,1};
     case Cue::MetronomeAccent: return {accent,1};
-    case Cue::Count: break;
+    case Cue::ReferenceTone: case Cue::Count: break;
     }
     return {nullptr,0};
 }
@@ -46,6 +46,7 @@ std::int16_t sample(Cue cue, std::uint32_t frame, unsigned volume)
 }
 std::uint32_t frames(Cue cue)
 {
+    if (cue == Cue::ReferenceTone) return kReferenceFrames;
     const auto s = score(cue);
     std::uint32_t total=0;
     for (std::size_t i=0; i<s.count; ++i) total += s.notes[i].ms * kSampleRate / 1000U;
@@ -53,6 +54,7 @@ std::uint32_t frames(Cue cue)
 }
 void render(Cue cue, std::uint32_t first, std::int16_t *out, std::size_t count, unsigned volume)
 {
+    if (cue == Cue::ReferenceTone) { render_reference(69,first,out,count,volume); return; }
     if (!out) return;
     const auto length = frames(cue);
     for (std::size_t i=0; i<count; ++i) {
@@ -61,4 +63,29 @@ void render(Cue cue, std::uint32_t first, std::int16_t *out, std::size_t count, 
         out[2*i] = out[2*i+1] = static_cast<std::int16_t>(value);
     }
 }
+std::uint32_t frequency_millihz(std::uint8_t note)
+{
+    // Equal temperament, A4=440 Hz, E2..C6. No runtime floating point.
+    constexpr std::uint32_t pitches[]{82407U,87307U,92499U,97999U,103826U,110000U,116541U,123471U,130813U,138591U,146832U,155563U,164814U,174614U,184997U,195998U,207652U,220000U,233082U,246942U,261626U,277183U,293665U,311127U,329628U,349228U,369994U,391995U,415305U,440000U,466164U,493883U,523251U,554365U,587330U,622254U,659255U,698456U,739989U,783991U,830609U,880000U,932328U,987767U,1046502U};
+    return note >= 40 && note <= 84 ? pitches[note-40] : 0;
+}
+void render_reference(std::uint8_t note, std::uint32_t first, std::int16_t *out,
+                      std::size_t count, unsigned volume)
+{
+    if (!out) return;
+    const auto hz = frequency_millihz(note);
+    for (std::size_t i=0; i<count; ++i) {
+        const auto frame = static_cast<std::uint64_t>(first) + i;
+        std::int16_t value = 0;
+        if (hz && frame < kReferenceFrames) {
+            const auto phase = static_cast<unsigned>((frame * hz * 65536U / (kSampleRate * 1000ULL)) & 65535U);
+            const int triangle = phase < 32768U ? static_cast<int>(phase)*2-32768 : 98303-static_cast<int>(phase)*2;
+            const auto fade = std::min({frame, kReferenceFrames-1-frame, static_cast<std::uint64_t>(kSampleRate/200U)});
+            value = static_cast<std::int16_t>(static_cast<std::int64_t>(triangle)*kPeakLimit*
+                std::min(volume,100U)*static_cast<std::int64_t>(fade)/(32768LL*100*(kSampleRate/200U)));
+        }
+        out[2*i] = out[2*i+1] = value;
+    }
+}
+
 }

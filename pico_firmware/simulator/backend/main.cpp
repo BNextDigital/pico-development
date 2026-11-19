@@ -131,6 +131,18 @@ std::string dock_name(pico::Dock dock)
     return "unknown";
 }
 
+std::string focus_history_json(const pico::State &state)
+{
+    std::ostringstream out; out << '[';
+    for (unsigned i=0; i<state.focus_history_count; ++i) {
+        const auto &entry=state.focus_history[i];
+        if (i) out << ',';
+        out << "{\"rounds\":" << entry.rounds << ",\"work_seconds\":" << entry.work_seconds
+            << ",\"finished\":" << (entry.finished ? "true" : "false") << '}';
+    }
+    out << ']'; return out.str();
+}
+
 std::string event_name(pico::EventKind kind)
 {
     switch (kind) {
@@ -161,6 +173,13 @@ std::string event_name(pico::EventKind kind)
     case pico::EventKind::SetBrightness: return "SetBrightness";
     case pico::EventKind::SetDisplayTimeout: return "SetDisplayTimeout";
     case pico::EventKind::SleepDisplay: return "SleepDisplay";
+    case pico::EventKind::OpenReference: return "OpenReference";
+    case pico::EventKind::SetReferenceNote: return "SetReferenceNote";
+    case pico::EventKind::PlayReference: return "PlayReference";
+    case pico::EventKind::StopReference: return "StopReference";
+    case pico::EventKind::AudioReady: return "AudioReady";
+    case pico::EventKind::SetFocusGoal: return "SetFocusGoal";
+    case pico::EventKind::OpenFocusSummary: return "OpenFocusSummary";
     case pico::EventKind::Boot:
         return "Boot";
     case pico::EventKind::Tick:
@@ -220,7 +239,7 @@ std::string event_name(pico::EventKind kind)
 
 std::optional<pico::EventKind> parse_event_kind(const std::string &token)
 {
-    constexpr std::array<pico::EventKind, 53> kinds{
+    constexpr std::array<pico::EventKind, 60> kinds{
         pico::EventKind::Boot,          pico::EventKind::Tick,
         pico::EventKind::PrimaryPressed, pico::EventKind::SecondaryPressed,
         pico::EventKind::Connected,     pico::EventKind::Disconnected,
@@ -266,6 +285,13 @@ std::optional<pico::EventKind> parse_event_kind(const std::string &token)
         pico::EventKind::SetBrightness,
         pico::EventKind::SetDisplayTimeout,
         pico::EventKind::SleepDisplay,
+        pico::EventKind::OpenReference,
+        pico::EventKind::SetReferenceNote,
+        pico::EventKind::PlayReference,
+        pico::EventKind::StopReference,
+        pico::EventKind::AudioReady,
+        pico::EventKind::SetFocusGoal,
+        pico::EventKind::OpenFocusSummary,
 
 
 
@@ -358,6 +384,7 @@ public:
         load_state();
         core_.handle({pico::EventKind::MotionReady,1});
         core_.handle({pico::EventKind::MicrophoneReady,1});
+        core_.handle({pico::EventKind::AudioReady,1});
         last_result_ = dispatch({pico::EventKind::Boot, 0});
         last_result_.message = restored_ ? "Booted with saved state"
                                          : "Booted with default state";
@@ -498,6 +525,7 @@ public:
 
         core_.handle({pico::EventKind::MotionReady,1});
         core_.handle({pico::EventKind::MicrophoneReady,1});
+        core_.handle({pico::EventKind::AudioReady,1});
         auto result = dispatch({pico::EventKind::Boot, 0});
         result.event = factory_reset ? "FactoryReset" : "PowerCycle";
         result.message = factory_reset
@@ -579,6 +607,10 @@ public:
                << "\"motion_ready\":" << (state.motion_ready ? "true" : "false") << ','
                << "\"motion_settled\":" << (state.motion_settled ? "true" : "false") << ','
                << "\"motion_config\":" << static_cast<unsigned>(state.motion_config) << ','
+               << "\"audio_ready\":" << (state.audio_ready ? "true" : "false") << ','
+               << "\"reference_playing\":" << (state.reference_playing ? "true" : "false") << ','
+               << "\"reference_note\":" << static_cast<unsigned>(state.reference_note) << ','
+               << "\"reference_frequency_millihz\":" << pico::audio::frequency_millihz(state.reference_note) << ','
                << "\"display_brightness_percent\":" << static_cast<unsigned>(state.display_brightness_percent) << ','
                << "\"display_preview_percent\":" << pico::display::brightness_percent(state) << ','
                << "\"display_timeout_minutes\":" << static_cast<unsigned>(state.display_timeout_minutes) << ','
@@ -598,6 +630,12 @@ public:
                << "\"focus_phase\":" << static_cast<unsigned>(state.focus_phase) << ','
                << "\"focus_waiting\":" << (state.focus_waiting ? "true" : "false") << ','
                << "\"completed_work_sessions\":" << state.completed_work_sessions << ','
+               << "\"focus_goal\":" << static_cast<unsigned>(state.focus_goal) << ','
+               << "\"active_focus_goal\":" << static_cast<unsigned>(state.active_focus_goal) << ','
+               << "\"focus_finished\":" << (state.focus_finished ? "true" : "false") << ','
+               << "\"focus_work_seconds\":" << state.focus_work_seconds << ','
+               << "\"focus_history_count\":" << static_cast<unsigned>(state.focus_history_count) << ','
+               << "\"focus_history\":" << focus_history_json(state) << ','
                << "\"break_duration_seconds\":" << state.break_duration_seconds << ','
                << "\"sound_muted\":" << (state.sound_muted ? "true" : "false") << ','
                << "\"sound_cue\":" << static_cast<unsigned>(state.sound_cue) << ','

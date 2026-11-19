@@ -375,6 +375,9 @@ void test_focus_button_standalone_controls()
 #include "menu_tests.hpp"
 #include "schedule_tests.hpp"
 #include "oled_tests.hpp"
+#include "reference_tests.hpp"
+
+#include "focus_sessions_tests.hpp"
 
 } // namespace
 
@@ -394,12 +397,17 @@ int main()
     run_sprint01_tests();
     run_sprint02_tests();
     run_music_tests();
+    test_reference_pcm_frequency_bounds_and_chunks();
+    test_reference_lifecycle_and_priority();
     run_tuner_tests();
     run_motion_tests();
     run_duration_tests();
     run_settings_tests();
     test_icon_menu_frames();
     run_schedule_tests();
+    test_focus_goal_and_bounded_finish();
+    test_focus_history_bounds_exits_and_restart();
+    test_focus_goal_editor_and_frames();
     test_oled_settings_and_power_policy();
     test_oled_timeout_wrap_preview_and_rendering();
     test_button_debounce_and_hold();

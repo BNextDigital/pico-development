@@ -37,14 +37,15 @@ void apply_effects(pico::Effects effects, pico::Core &core,
                    pico::platform::Storage &storage,
                    pico::platform::Ble &ble, pico::Capabilities capabilities)
 {
-    microphone.sync(core.state().tuner_running,core.state().tuner_session);
     audio.set_muted(core.state().sound_muted || core.state().tuner_running || core.state().sound_volume_percent == 0);
+    audio.set_reference(core.state().reference_playing,core.state().reference_note);
+    microphone.sync(core.state().tuner_running,core.state().tuner_session);
     audio.set_metronome_running(core.state().metronome_running);
     if (pico::has_effect(effects, pico::Effect::Persist)) {
         storage.save(core.persistent_state());
     }
     if (pico::has_effect(effects, pico::Effect::Chirp) && !core.state().sound_muted && !core.state().tuner_running && core.state().sound_volume_percent > 0) {
-        if (audio.ready()) audio.play(core.state().sound_cue,core.state().sound_volume_percent);
+        if (audio.ready()) audio.play(core.state().sound_cue,core.state().sound_volume_percent,core.state().reference_note);
         else if (core.state().sound_cue < pico::audio::Cue::MetronomeClick) hardware.chirp();
     }
     if (pico::has_effect(effects, pico::Effect::Render)) {
@@ -88,7 +89,7 @@ int main()
     }
 
     core.handle({pico::EventKind::MotionReady,motion.init(queue_event) ? 1U : 0U});
-    audio.init();
+    core.handle({pico::EventKind::AudioReady,audio.init() ? 1U : 0U});
     core.handle({pico::EventKind::MicrophoneReady, microphone.init(queue_event) ? 1U : 0U});
     display.init();
     hardware.init(queue_event);
@@ -130,6 +131,10 @@ int main()
         motion.poll(core.state().motion_config);
         if (core.state().motion_ready != motion.ready()) {
             apply_effects(core.handle({pico::EventKind::MotionReady,motion.ready() ? 1U : 0U}),
+                          core,hardware,audio,microphone,display,storage,ble,capabilities);
+        }
+        if (core.state().audio_ready != audio.ready()) {
+            apply_effects(core.handle({pico::EventKind::AudioReady,audio.ready() ? 1U : 0U}),
                           core,hardware,audio,microphone,display,storage,ble,capabilities);
         }
         microphone.poll();
