@@ -19,6 +19,7 @@ target_sources(app PRIVATE
     src/platform/pico_ble.cpp
     src/platform/pico_display.cpp
     src/platform/pico_button.cpp
+    src/platform/pico_status_led.cpp
     src/platform/pico_hardware.cpp
     src/platform/pico_storage.cpp
     lib/pico_core/src/core.cpp

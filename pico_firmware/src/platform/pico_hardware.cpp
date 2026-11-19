@@ -1,5 +1,6 @@
 #include "pico_hardware.hpp"
 #include "pico_button.hpp"
+#include "pico_status_led.hpp"
 
 #include <zephyr/devicetree.h>
 #include <zephyr/drivers/gpio.h>
@@ -11,7 +12,11 @@ LOG_MODULE_REGISTER(pico_hardware, CONFIG_PICO_LOG_LEVEL);
 
 #define PRIMARY_BUTTON_NODE DT_ALIAS(sw0)
 #define SECONDARY_BUTTON_NODE DT_ALIAS(sw1)
+#if DT_NODE_HAS_STATUS(DT_ALIAS(pico_status_led), okay)
+#define STATUS_LED_NODE DT_ALIAS(pico_status_led)
+#else
 #define STATUS_LED_NODE DT_ALIAS(led0)
+#endif
 #define HOME_DOCK_NODE DT_ALIAS(pico_dock_home)
 #define CAR_DOCK_NODE DT_ALIAS(pico_dock_car)
 #define BUZZER_NODE DT_ALIAS(pico_buzzer)
@@ -62,6 +67,7 @@ gpio_callback secondary_button_callback;
 
 #if PICO_HAS_STATUS_LED
 const gpio_dt_spec status_led = GPIO_DT_SPEC_GET(STATUS_LED_NODE, gpios);
+pico::platform::StatusLed status_indicator;
 #endif
 
 #if PICO_HAS_HOME_DOCK
@@ -183,7 +189,7 @@ bool Hardware::init(EventSink sink)
     const bool focus_ready = focus_button_input.init(focus_button, sink,
         EventKind::FocusButtonTapped, EventKind::FocusButtonHeld);
     ready &= focus_ready;
-    if (focus_ready) LOG_INF("Focus button interrupt ready: D0 to GND; tap=start/pat, hold=cancel");
+    if (focus_ready) LOG_INF("Action button interrupt ready: D0 to GND; face=tap to pet, apps=select/back");
     else LOG_ERR("Focus button GPIO/interrupt could not be configured");
 #endif
 #if PICO_HAS_NAV_BUTTON
@@ -199,9 +205,16 @@ bool Hardware::init(EventSink sink)
     else LOG_WRN("Optional Back button unavailable; hold-to-back remains available");
 #endif
 
+#if DT_NODE_HAS_STATUS(DT_ALIAS(pico_status_red), okay)
+    const gpio_dt_spec red = GPIO_DT_SPEC_GET(DT_ALIAS(pico_status_red),gpios);
+    if (gpio_is_ready_dt(&red)) gpio_pin_configure_dt(&red,GPIO_OUTPUT_INACTIVE);
+#endif
+#if DT_NODE_HAS_STATUS(DT_ALIAS(pico_status_blue), okay)
+    const gpio_dt_spec blue = GPIO_DT_SPEC_GET(DT_ALIAS(pico_status_blue),gpios);
+    if (gpio_is_ready_dt(&blue)) gpio_pin_configure_dt(&blue,GPIO_OUTPUT_INACTIVE);
+#endif
 #if PICO_HAS_STATUS_LED
-    if (!gpio_is_ready_dt(&status_led) ||
-        gpio_pin_configure_dt(&status_led, GPIO_OUTPUT_INACTIVE) != 0) {
+    if (!status_indicator.init(status_led)) {
         LOG_ERR("Status LED is not ready");
         ready = false;
     }
@@ -251,16 +264,8 @@ bool Hardware::init(EventSink sink)
 
 void Hardware::reflect(const State &state)
 {
-#if PICO_HAS_STATUS_LED
-    // Solid while connected; a short heartbeat while advertising.
-    const bool led_on = state.connected || (state.uptime_seconds % 4U == 0U);
-    const int error = gpio_pin_set_dt(&status_led, led_on ? 1 : 0);
-    if (error != 0) {
-        LOG_WRN("Could not update status LED (%d)", error);
-    }
-#else
+    // Heartbeat timing is handled by deferred work, independently of BLE/state.
     ARG_UNUSED(state);
-#endif
 }
 
 void Hardware::chirp()
