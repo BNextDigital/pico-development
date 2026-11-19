@@ -292,6 +292,25 @@ void render_screen(const State &state, MonoSurface &surface)
         text(surface,"HOLD TO GO BACK",28,59);
         return;
     }
+    if (state.screen == Screen::ReferenceTone) {
+        text(surface,"REFERENCE  A4=440",8,2);
+        char note[16],hz[24];
+        std::snprintf(note,sizeof(note),"%s%d",pitch::note_name(state.reference_note),static_cast<int>(state.reference_note)/12-1);
+        text(surface,note,44,13,3);
+        const auto frequency = audio::frequency_millihz(state.reference_note);
+        std::snprintf(hz,sizeof(hz),"%u.%03u HZ",frequency/1000U,frequency%1000U);
+        text(surface,hz,36,31);
+        text(surface,!state.audio_ready ? "SPEAKER UNAVAILABLE" :
+            state.sound_muted || !state.sound_volume_percent ? "MUTED" :
+            state.reference_playing ? "PLAYING - 2 SEC" : "READY",20,40);
+        const char *items[]{"NOTE-","NOTE+",state.reference_playing ? "STOP" : "PLAY","OCT-","OCT+","BACK"};
+        for (unsigned i=0; i<6; ++i) {
+            const auto x=1+(i%3)*42,y=48+(i/3)*8;
+            if (i == state.reference_index) outline_rect(surface,x,y,40,8);
+            text(surface,items[i],x+7,y+2);
+        }
+        return;
+    }
     if (state.screen == Screen::Music) {
         char buffer[24];
         std::snprintf(buffer, sizeof(buffer), "%u BPM", static_cast<unsigned>(state.metronome_bpm));
@@ -308,8 +327,8 @@ void render_screen(const State &state, MonoSurface &surface)
         text(surface, buffer, 4, 32);
         text(surface, state.metronome_running ? "RUN" : "STOPPED", 88, 32);
         const char *labels[]{"BPM-", "BPM+", state.metronome_running ? "STOP" : "START",
-                             "TAP", "BAR", "TUNER", "HOME"};
-        for (unsigned i = 0; i < 7; ++i) {
+                             "TAP", "BAR", "TUNER", "TONE", "HOME"};
+        for (unsigned i = 0; i < 8; ++i) {
             const auto x = 1 + (i % 4) * 32, y = 41 + (i / 4) * 12;
             if (i == state.music_index) outline_rect(surface, x, y, 30, 11);
             text(surface, labels[i], x + 3, y + 3);

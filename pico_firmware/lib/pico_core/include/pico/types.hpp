@@ -107,9 +107,15 @@ enum class EventKind : std::uint8_t {
     SetBrightness,
     SetDisplayTimeout,
     SleepDisplay,
+    // IDs 53/54 are reserved for the separately reviewed Focus session events.
+    OpenReference = 55,
+    SetReferenceNote,
+    PlayReference,
+    StopReference,
+    AudioReady,
 };
 
-enum class Screen : std::uint8_t { Home, Menu, Utility, Themes, Unavailable, Music, Tuner, DurationEdit, Settings, SettingEdit };
+enum class Screen : std::uint8_t { Home, Menu, Utility, Themes, Unavailable, Music, Tuner, DurationEdit, Settings, SettingEdit, ReferenceTone = 11 };
 
 enum class SettingKey : std::uint8_t { Theme, Mute, Volume, Motion, Brightness, DisplayTimeout };
 
@@ -182,6 +188,10 @@ struct State {
     std::uint8_t beats_per_bar{4};
     std::uint8_t current_beat{1};
     std::uint8_t music_index{2};
+    bool audio_ready{false};
+    bool reference_playing{false};
+    std::uint8_t reference_note{69};
+    std::uint8_t reference_index{2};
     bool microphone_ready{false};
     bool tuner_running{false};
     std::uint8_t tuner_session{0};

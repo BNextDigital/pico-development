@@ -157,6 +157,33 @@ class BackendTests(unittest.TestCase):
         self.harness.send("advance 5")
         self.assertEqual(len(path.read_bytes()), 32)
 
+    def test_reference_notes_play_stop_tuner_and_missing_speaker(self) -> None:
+        opened = self.harness.send("event OpenReference")
+        self.assertEqual(opened["state"]["reference_frequency_millihz"], 440000)
+        tone = self.harness.send("event PlayReference")
+        self.assertTrue(tone["state"]["reference_playing"])
+        self.assertIn("Chirp", tone["effect_names"])
+        ended = self.harness.send("advance_ms 2000")
+        self.assertFalse(ended["state"]["reference_playing"])
+        self.harness.send("event SetReferenceNote 40")
+        self.harness.send("event PlayReference")
+        changed = self.harness.send("event SetReferenceNote 45")
+        self.assertFalse(changed["state"]["reference_playing"])
+        self.assertEqual(changed["state"]["reference_frequency_millihz"], 110000)
+        self.harness.send("event PlayReference")
+        tuner = self.harness.send("event StartTuner")
+        self.assertFalse(tuner["state"]["reference_playing"])
+        self.assertTrue(tuner["state"]["tuner_running"])
+        self.harness.send("event OpenReference")
+        self.harness.send("event AudioReady 0")
+        unavailable = self.harness.send("event PlayReference")
+        self.assertFalse(unavailable["state"]["reference_playing"])
+        self.assertNotIn("Chirp", unavailable["effect_names"])
+        self.assertTrue(any(bytes.fromhex(unavailable["frame_hex"])))
+        reboot = self.harness.send("power_cycle")
+        self.assertEqual(reboot["state"]["reference_note"], 69)
+        self.assertFalse(reboot["state"]["reference_playing"])
+
     def test_boot_and_interaction_use_real_core_and_renderer(self) -> None:
         boot = self.harness.initial
         self.assertEqual(boot["state"]["mode_name"], "companion")

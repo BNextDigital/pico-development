@@ -200,3 +200,10 @@ shared eleven-item Settings menu. JSON includes
 saved/preview brightness, timeout and sleep state; the GUI dims lit pixels for
 preview and displays black during sleep. These colors do not model measured
 OLED luminance. See [OLED power controls](oled-power.md).
+
+## Reference tool
+
+Music -> Tone uses the shared renderer and virtual AudioReady state. The
+simulator emits Chirp/state changes, not soundcard audio. AudioReady 0 tests
+the optional-speaker fallback; reference note/play intent reset on reboot.
+See [Music reference pitches](music-reference.md).

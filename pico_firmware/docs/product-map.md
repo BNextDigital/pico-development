@@ -19,7 +19,7 @@ when a feature genuinely needs them.
 | --- | --- | --- |
 | Companion | Face, mood, interactions, lightweight local memory | Themes, deterministic idle expressions, blinking and motion reactions implemented |
 | Study/focus | Tomato-style focus timer, water breaks, later quizzes | Work/break cycles, pause/resume and local minute-duration controls implemented |
-| Music | Chromatic tuner from microphone; speaker metronome | Visual metronome and optional Sense microphone tuner implemented; physical validation remains profile-specific |
+| Music | Chromatic tuner from microphone; speaker metronome | Metronome, optional microphone tuner and optional I2S reference pitches implemented; physical validation remains profile-specific |
 | Cooking | Egg/general timer and concise cooking reference | Local configurable timer implemented; cooking references remain future work |
 | Wayfinding | Compass/GPS or phone-assisted direction cues | Stable mode ID; sensors pending |
 | Notes | Local capture with later local speech-to-text handoff | Stable mode ID; capture/storage/handoff not implemented |
@@ -65,3 +65,9 @@ are implemented. OLED brightness and screen sleep extend the power foundation;
 
 Host success alone does not validate target compilation, OLED readability,
 acoustic tuner accuracy, audio output, electrical behavior or battery runtime.
+
+The current feature pass adds [Music reference pitches](music-reference.md).
+It uses the existing optional audio adapter; power bench work remains deferred.
+Focus session goals/history are a separate reviewed change and are not removed
+or overwritten by this branch. Durable Music calibration/presets and broader
+practice tools remain future scope.

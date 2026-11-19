@@ -375,6 +375,7 @@ void test_focus_button_standalone_controls()
 #include "menu_tests.hpp"
 #include "schedule_tests.hpp"
 #include "oled_tests.hpp"
+#include "reference_tests.hpp"
 
 } // namespace
 
@@ -394,6 +395,8 @@ int main()
     run_sprint01_tests();
     run_sprint02_tests();
     run_music_tests();
+    test_reference_pcm_frequency_bounds_and_chunks();
+    test_reference_lifecycle_and_priority();
     run_tuner_tests();
     run_motion_tests();
     run_duration_tests();

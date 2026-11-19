@@ -205,3 +205,10 @@ timeout deadline. The platform adapter owns contrast/blanking, skips writes
 while blanked and restores the frame before unblanking. Unsupported operations
 fall back gracefully. See [OLED power design](oled-power.md) for storage v5,
 simulator behavior and physical validation.
+
+## Reference pitch playback
+
+Portable PCM generation and a core two-second intent deadline share the existing
+Music/audio services. The I2S worker uses generation-tagged jobs and cancellation
+checks per block; no second audio thread or extra periodic sampler is added.
+See [Music reference pitches](music-reference.md).

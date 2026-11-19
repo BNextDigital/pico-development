@@ -7,6 +7,7 @@ public:
     bool ready() const;
     void set_metronome_running(bool running);
     void set_muted(bool muted);
-    void play(audio::Cue cue,unsigned volume_percent = 25);
+    void set_reference(bool running, std::uint8_t note);
+    void play(audio::Cue cue,unsigned volume_percent = 25, std::uint8_t note = 69);
 };
 }
