@@ -1,0 +1,20 @@
+/* Prototype only. Never use the DK partition layout on this board. */
+#include "../../overlays/xiao_ble_ssd1306.overlay"
+/ {
+    aliases { pico-imu = &lsm6ds3tr_c; };
+};
+&code_partition { reg = <0x27000 0xb9000>; };
+&flash0 {
+    partitions {
+        /* Leave the normal Pico 0xec000..0xf4000 settings area untouched. */
+        /delete-node/ partition@ec000;
+        bt_fast_pair_partition: partition@e0000 {
+            label = "bt_fast_pair";
+            reg = <0xe0000 0x1000>;
+        };
+        storage_partition: partition@e1000 {
+            label = "storage";
+            reg = <0xe1000 0x8000>;
+        };
+    };
+};
