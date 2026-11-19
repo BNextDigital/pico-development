@@ -184,8 +184,8 @@ void test_display_model_is_layout_independent()
         }
     }
 
-    CHECK(pico::display::pixel_at(horizontal_surface, 3, 3));
-    CHECK(pico::display::pixel_at(horizontal_surface, 3, 3));
+    CHECK(!pico::display::pixel_at(horizontal_surface, 3, 3));
+    CHECK(!pico::display::pixel_at(vertical_surface, 3, 3));
 
     pico::display::MonoSurface short_surface{
         horizontal.data(), 4, pico::display::kDefaultWidth,
@@ -324,45 +324,26 @@ void test_button_deadline_schedule()
 
 void test_focus_button_standalone_controls()
 {
-    pico::Core core;
-    core.handle({pico::EventKind::Tick, 100});
-    core.handle({pico::EventKind::PrimaryPressed, 0}); // BLE pat remains a pat
-    CHECK(!core.state().timer_running);
-    CHECK(core.state().mode == pico::Mode::Companion);
-
-    const auto started = core.handle({pico::EventKind::FocusButtonTapped, 0});
-    CHECK(core.state().mode == pico::Mode::Focus);
-    CHECK(core.state().timer_running);
-    CHECK(core.state().timer_remaining_seconds == 1500U);
-    CHECK(pico::has_effect(started, pico::Effect::Persist));
-    core.handle({pico::EventKind::Tick, 111});
-    core.handle({pico::EventKind::FocusButtonTapped, 0});
-    CHECK(core.state().mood == pico::Mood::Happy);
-    CHECK(core.state().timer_remaining_seconds == 1489U);
-    core.handle({pico::EventKind::Tick, 112});
-    CHECK(core.state().timer_remaining_seconds == 1488U); // no timer restart
-
-    core.handle({pico::EventKind::FocusButtonHeld, 0});
-    CHECK(!core.state().timer_running);
-    CHECK(core.state().mode == pico::Mode::Companion);
-    CHECK(core.state().mood == pico::Mood::Neutral);
-    CHECK(core.handle({pico::EventKind::FocusButtonHeld, 0}) ==
-          pico::effect(pico::Effect::None));
-
-    core.handle({pico::EventKind::SetMode,
-                 static_cast<std::uint32_t>(pico::Mode::Cooking)});
-    core.handle({pico::EventKind::StartTimer, 30});
-    core.handle({pico::EventKind::FocusButtonTapped, 0});
-    core.handle({pico::EventKind::FocusButtonHeld, 0});
-    CHECK(core.state().mode == pico::Mode::Cooking);
-    CHECK(core.state().timer_remaining_seconds == 30U);
-    CHECK(core.state().timer_running); // leave other modes' timers alone
-    core.handle({pico::EventKind::CancelTimer, 0});
-    core.handle({pico::EventKind::DockChanged,
-                 static_cast<std::uint32_t>(pico::Dock::Car)});
-    core.handle({pico::EventKind::FocusButtonTapped, 0});
-    CHECK(core.state().mode == pico::Mode::Driving);
-    CHECK(!core.state().timer_running);
+    using E=pico::EventKind;
+    pico::Core c; c.handle({E::Boot,0});
+    c.handle({E::FocusButtonTapped,0});
+    CHECK(c.state().mood == pico::Mood::Happy && c.state().interaction_count == 1);
+    CHECK(c.state().mode == pico::Mode::Companion && !c.state().timer_running);
+    c.handle({E::FocusButtonHeld,0}); CHECK(!c.state().timer_running);
+    c.handle({E::SetTimerDuration,1}); c.handle({E::StartFocusCycle,0}); c.handle({E::Tick,1});
+    CHECK(c.state().focus_waiting);
+    c.handle({E::FocusButtonTapped,0});
+    CHECK(c.state().focus_waiting && c.state().focus_phase == pico::FocusPhase::Work);
+    CHECK(!c.state().timer_running); // pet does not confirm the next phase
+    c.handle({E::FocusButtonHeld,0}); CHECK(c.state().focus_waiting); // hold is Back only
+    c.handle({E::OpenMenu,0}); c.handle({E::Select,0});
+    while (c.state().utility_index != 4) c.handle({E::NavigateNext,0});
+    c.handle({E::FocusButtonTapped,0}); CHECK(c.state().focus_phase == pico::FocusPhase::Break);
+    CHECK(c.state().timer_running); // explicit in-app Next Phase still works
+    c.handle({E::Back,0}); c.handle({E::Back,0});
+    const auto remaining=c.state().timer_remaining_seconds;
+    c.handle({E::FocusButtonTapped,0}); c.handle({E::FocusButtonHeld,0});
+    CHECK(c.state().timer_running && c.state().timer_remaining_seconds == remaining);
 }
 
 #include "sprint01_tests.hpp"
@@ -378,6 +359,7 @@ void test_focus_button_standalone_controls()
 #include "reference_tests.hpp"
 
 #include "focus_sessions_tests.hpp"
+#include "pocket_ui_tests.hpp"
 
 } // namespace
 
@@ -396,6 +378,7 @@ int main()
     test_theme_events_and_persistence();
     run_sprint01_tests();
     run_sprint02_tests();
+    test_clean_face_and_app_layouts();
     run_music_tests();
     test_reference_pcm_frequency_bounds_and_chunks();
     test_reference_lifecycle_and_priority();

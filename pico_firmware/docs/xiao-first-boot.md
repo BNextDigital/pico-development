@@ -38,7 +38,7 @@ the selected terminals are separate when not pressed.
 
 | Input | Wire | Current behavior |
 | --- | --- | --- |
-| D0 Action | D0/P0.02 to GND | Context-sensitive select/interact/timer; hold for cancel/back |
+| D0 Action | D0/P0.02 to GND | Face: pet; apps: select; hold for Back |
 | D1 Navigate | D1/P0.03 to GND | Open/cycle icon root menu; hold for Back |
 | Optional D2 Back | D2/P0.28 to GND | Dedicated Back when `xiao_third_button.overlay` is added |
 
@@ -47,9 +47,9 @@ unless explicitly added. D0/D1/D2 use GPIO edges and deferred debounce/hold
 work, not 20 ms idle polling. A missing optional switch is harmless. See
 [interrupt button design](interrupt-buttons.md) for physical acceptance.
 
-At Home, D0 can start a configured Focus timer; it pats during running timers
-and confirms a waiting work/break phase. D1 navigates a labeled icon root
-menu, D0 selects. Focus/Cooking duration editors adjust by one minute; Local
+At Home, D0 only pets. Start timers/cycles or confirm Next Phase inside Focus;
+Home holds do not cancel a timer. D1 navigates the labeled icon root menu,
+and D0 selects. See [pocket UI controls](pocket-ui.md). Focus/Cooking duration editors adjust by one minute; Local
 Settings exposes theme, sound, durations, motion, brightness and screen sleep.
 The **first** physical-style button while the OLED is asleep wakes without
 taking its normal action. See [Settings](local-settings.md),

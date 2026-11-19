@@ -2,7 +2,7 @@
 
 Offline-first Zephyr/C++17 firmware for Pico, a small BLE companion with expressive 128×64 monochrome face, contextual docks and local tools. Target hardware: **Seeed Studio XIAO nRF52840 Sense** with **nRF Connect SDK 3.4.2**.
 
-**Snapshot (November 18, 2026):** the source build-version default is `0.11.0-music-reference` (`Kconfig` and `VERSION`). This is a software milestone, **not a hardware-validated release**. Earlier XIAO OLED, BLE and D0 behavior were physically demonstrated; compilation and acceptance of the latest combined profile are still pending.
+**Snapshot (November 19, 2026):** the source build-version default is `0.12.0-pocket-ui` (`Kconfig` and `VERSION`). This is a software milestone, **not a hardware-validated release**. Earlier XIAO OLED, BLE and D0 behavior were physically demonstrated; compilation and acceptance of the latest combined profile are still pending.
 
 ## Implemented software
 
@@ -21,6 +21,12 @@ Offline-first Zephyr/C++17 firmware for Pico, a small BLE companion with express
 
 Optional peripherals have hardware adapters and host coverage, but **target compilation, audio/acoustic accuracy, OLED contrast, button interrupts, sensor thresholds and current draw need real-board validation**. Wayfinding GPS/compass, Notes recording, complete dock electronics and final battery/power hardware are not implemented.
 
+## Pocket display and controls
+
+[The pocket UI update](docs/pocket-ui.md) gives apps a large value and one
+readable selected action, removes face-corner status dots, makes Home Action
+pet-only, and changes the XIAO heartbeat to green (200 ms on / 5 seconds off).
+
 ## Focus sessions
 
 [Focus sessions](docs/focus-sessions.md) adds a local round goal, progress and
@@ -29,7 +35,7 @@ the separate Focus feature and its tests.
 
 ## Music reference pitches
 
-Music -> Tone adds note/frequency selection and two-second E2–C6 reference
+Music -> Reference adds note/frequency selection and two-second E2–C6 reference
 pitches, defaulting to A4=440. Sound requires optional I2S hardware; OLED-only
 builds show Speaker Unavailable. See [controls, limits and validation](docs/music-reference.md).
 
@@ -71,7 +77,7 @@ sh simulator/run-tests.sh
 python tools/compile_face_assets.py --check
 ```
 
-On Windows run `simulator/run.bat`; on macOS/Linux run `./simulator/run.sh`. See [simulator guide](docs/simulator.md). Earlier feature PRs document successful local tests. **These tests and the target build were not rerun during this documentation update.**
+On Windows run `simulator/run.bat`; on macOS/Linux run `./simulator/run.sh`. See [simulator guide](docs/simulator.md). The pocket UI revision passes host, adapter-model and 32 simulator tests. Target compilation and physical acceptance remain pending.
 
 ## Next acceptance milestones
 

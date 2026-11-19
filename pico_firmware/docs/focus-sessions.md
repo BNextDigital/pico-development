@@ -6,8 +6,8 @@ sequencing, duration editors, optional sound cues and OLED wake policy.
 
 ## Local controls
 
-Open Focus from the icon menu. Navigate cycles eight actions, shown three per
-page beneath the countdown and progress bar:
+Open Focus from the icon menu. Navigate cycles eight actions, shown one at a time below the large countdown
+and short progress context ([pocket UI](pocket-ui.md)):
 
 | Index | Action | Behavior |
 | --- | --- | --- |
@@ -41,7 +41,7 @@ the car dock records completed Work once before ending the cycle. Unfinished
 partial rounds are excluded. Merely visiting Home/menu/history does not end it.
 Single timers do not create session-history entries.
 
-The screen explicitly says SINCE BOOT: this is bounded RAM history, not a daily
+The screen explicitly says THIS BOOT: this is bounded RAM history, not a daily
 streak, lifetime statistic or crash-resistant journal. Neither it nor the goal
 is written to flash. Reboot clears them; durable preferences and interaction
 counts are preserved. Persistent history needs a separately scoped storage and

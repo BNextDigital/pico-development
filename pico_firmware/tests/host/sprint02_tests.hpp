@@ -54,7 +54,7 @@ void test_focus_cycle_waits_for_confirmation_and_reuses_timer()
     core.handle({E::Tick, 200});
     CHECK(!core.state().timer_running && core.state().focus_waiting);
     CHECK(core.state().screen == pico::Screen::Home);
-    core.handle({E::FocusButtonTapped, 0});
+    core.handle({E::NextFocusPhase, 0});
     CHECK(core.state().focus_phase == pico::FocusPhase::Break && !core.state().focus_waiting);
     CHECK(core.state().timer_remaining_seconds == 3);
     core.handle({E::NextFocusPhase, 0}); // cannot skip an active phase
@@ -76,9 +76,9 @@ void test_focus_cycle_exits_and_legacy_timer()
     core.handle({E::SetTimerDuration, 1});
     core.handle({E::StartFocusCycle, 0});
     core.handle({E::Tick, 1});
-    core.handle({E::FocusButtonHeld, 0}); // cancel even when waiting
+    core.handle({E::CancelTimer, 0}); // cancellation is explicit in the app
     CHECK(!core.state().focus_waiting && core.state().focus_phase == pico::FocusPhase::None);
-    CHECK(core.state().mode == pico::Mode::Companion);
+    CHECK(core.state().mode == pico::Mode::Focus);
     core.handle({E::StartFocusCycle, 0});
     core.handle({E::SetMode, static_cast<unsigned>(pico::Mode::Cooking)});
     CHECK(!core.state().timer_running && core.state().focus_phase == pico::FocusPhase::None);

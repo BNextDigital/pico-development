@@ -1,6 +1,8 @@
 // Compiles the production GPIO adapter against a controlled workqueue/GPIO model.
 // This checks adapter behavior; it is not a Zephyr or electrical validation.
 #include "platform/pico_button.hpp"
+#include "platform/pico_status_led.hpp"
+#include <pico/status_led.hpp>
 #include <algorithm>
 #include <array>
 #include <cstdlib>
@@ -15,6 +17,8 @@ std::array<gpio_callback *, 8> callbacks{};
 std::array<int, 8> levels{};
 std::vector<pico::EventKind> events;
 unsigned reads;
+int write_error;
+std::vector<std::pair<std::uint64_t,int>> led_writes;
 bool in_isr;
 bool controller_ready = true;
 int configure_error, add_error, interrupt_error;
@@ -54,7 +58,7 @@ void reset(std::uint64_t time = 0)
 {
     now = time;
     jobs.clear(); callbacks.fill(nullptr); levels.fill(0); events.clear();
-    reads = 0; in_isr = false; controller_ready = true;
+    reads = 0; in_isr = false; controller_ready = true; write_error=0; led_writes.clear();
     configure_error = add_error = interrupt_error = 0; read_hook = {};
 }
 const device port{};
@@ -72,7 +76,7 @@ k_work_delayable *k_work_delayable_from_work(k_work *work)
 std::uint32_t k_uptime_get_32() { return static_cast<std::uint32_t>(now); }
 bool gpio_is_ready_dt(const gpio_dt_spec *) { return controller_ready; }
 int gpio_pin_configure_dt(const gpio_dt_spec *, unsigned flags)
-{ CHECK(flags == GPIO_INPUT); return configure_error; }
+{ CHECK(flags == GPIO_INPUT || flags == GPIO_OUTPUT_INACTIVE); return configure_error; }
 void gpio_init_callback(gpio_callback *cb, gpio_callback_handler_t handler, gpio_port_pins_t pins)
 { cb->handler = handler; cb->pins = pins; }
 int gpio_add_callback(const device *, gpio_callback *cb)
@@ -93,6 +97,9 @@ int gpio_pin_get_dt(const gpio_dt_spec *input)
     if (read_hook) { auto hook = std::move(read_hook); read_hook = {}; hook(); }
     return snapshot;
 }
+
+int gpio_pin_set_dt(const gpio_dt_spec *, int value)
+{ led_writes.push_back({now,value}); return write_error; }
 
 int main()
 {
@@ -169,6 +176,20 @@ int main()
         CHECK(callbacks[2] == nullptr);
         for (const auto *job : jobs) CHECK(!job->pending);
     }
+    reset();
+    pico::platform::StatusLed heartbeat;
+    CHECK(heartbeat.init({&port,6,0}));
+    advance(0); CHECK(led_writes.size()==1 && led_writes.back().second==1);
+    advance(199); CHECK(led_writes.size()==1);
+    advance(200); CHECK(led_writes.back() == std::make_pair(std::uint64_t{200},0));
+    advance(5199); CHECK(led_writes.size()==2);
+    advance(5200); CHECK(led_writes.back() == std::make_pair(std::uint64_t{5200},1));
+    advance(5400); CHECK(led_writes.back().second==0);
+    CHECK(pico::status_led::on(199) && !pico::status_led::on(200));
+    CHECK(!pico::status_led::on(5199) && pico::status_led::on(5200));
+    write_error=-5; advance(10400);
+    const auto failed_writes=led_writes.size(); advance(20000);
+    CHECK(led_writes.size()==failed_writes); // failed GPIO stops, no retry loop
     if (failures) return EXIT_FAILURE;
     std::cout << "GPIO button adapter model tests passed\n";
 }

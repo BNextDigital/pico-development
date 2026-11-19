@@ -14,7 +14,7 @@
         compatible = "gpio-keys";
         pico_focus_button: focus_button {
             gpios = <&gpio0 2 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
-            label = "Focus button on D0";
+            label = "Action button on D0";
         };
         pico_nav_button: nav_button {
             gpios = <&gpio0 3 (GPIO_PULL_UP | GPIO_ACTIVE_LOW)>;
@@ -23,6 +23,9 @@
     };
 
     aliases {
+        pico-status-led = &led1; /* XIAO green: P0.30, active low */
+        pico-status-red = &led0;
+        pico-status-blue = &led2;
         pico-focus-button = &pico_focus_button;
         pico-nav-button = &pico_nav_button;
     };

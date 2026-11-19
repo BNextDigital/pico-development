@@ -7,6 +7,7 @@ using gpio_callback_handler_t = void (*)(const device *, gpio_callback *, gpio_p
 struct gpio_callback { gpio_callback_handler_t handler{}; gpio_port_pins_t pins{}; };
 struct gpio_dt_spec { const device *port{}; unsigned pin{}; unsigned dt_flags{}; };
 #define GPIO_INPUT 1U
+#define GPIO_OUTPUT_INACTIVE 4U
 #define GPIO_INT_EDGE_BOTH 2U
 bool gpio_is_ready_dt(const gpio_dt_spec *);
 int gpio_pin_configure_dt(const gpio_dt_spec *, unsigned);
@@ -15,3 +16,5 @@ int gpio_add_callback(const device *, gpio_callback *);
 int gpio_remove_callback(const device *, gpio_callback *);
 int gpio_pin_interrupt_configure_dt(const gpio_dt_spec *, unsigned);
 int gpio_pin_get_dt(const gpio_dt_spec *);
+
+int gpio_pin_set_dt(const gpio_dt_spec *, int);

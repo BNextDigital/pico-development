@@ -66,7 +66,7 @@ button does not disable the two-button hold mappings. No third button is assumed
 by default. SDK's XIAO connector mapping was checked for D2/P0.28.
 
 Back is a navigation/cancel-edit action. It does not cancel a Home timer; use
-that utility's explicit Cancel action or the existing Home Focus hold shortcut.
+that utility's explicit Cancel action. Home Action only pets; Home holds do not cancel.
 The existing debounce/hold classifier is reused, so a hold emits one Back and
 its release does not produce a second action.
 
@@ -187,3 +187,8 @@ future work; no destructive reset control is added here.
 Time and Sleep Now after Test Sound, moving Back to the last row. Brightness
 previews live and Cancel restores the saved value. Storage v5 is now the current format (see table above); the linked guide
 has electrical acceptance tests. Current Settings has 11 rows including Back.
+
+## Pocket UI follow-up
+
+The [pocket UI](pocket-ui.md) shows one selected setting/action with larger
+text. Item order, preview/Save/Cancel behavior and storage v5 remain unchanged.
