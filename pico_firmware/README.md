@@ -2,7 +2,7 @@
 
 Offline-first Zephyr/C++17 firmware for Pico, a small BLE companion with expressive 128×64 monochrome face, contextual docks and local tools. Target hardware: **Seeed Studio XIAO nRF52840 Sense** with **nRF Connect SDK 3.4.2**.
 
-**Snapshot (November 19, 2026):** the source build-version default is `0.12.0-pocket-ui` (`Kconfig` and `VERSION`). This is a software milestone, **not a hardware-validated release**. Earlier XIAO OLED, BLE and D0 behavior were physically demonstrated; compilation and acceptance of the latest combined profile are still pending.
+**Snapshot (November 19, 2026):** the source build-version default is `0.13.0-locator` (`Kconfig` and `VERSION`). This is a software milestone, **not a hardware-validated release**. Earlier XIAO OLED, BLE and D0 behavior were physically demonstrated; compilation and acceptance of the latest combined profile are still pending.
 
 ## Implemented software
 
@@ -20,6 +20,13 @@ Offline-first Zephyr/C++17 firmware for Pico, a small BLE companion with express
 | BLE | Encrypted custom GATT protocol v1, 16-byte status, additive commands; bonds stored separately |
 
 Optional peripherals have hardware adapters and host coverage, but **target compilation, audio/acoustic accuracy, OLED contrast, button interrupts, sensor thresholds and current draw need real-board validation**. Wayfinding GPS/compass, Notes recording, complete dock electronics and final battery/power hardware are not implemented.
+
+## Find Pico
+
+[Local locating and tracking](docs/tracking.md) adds bounded Call Pico,
+button acknowledgement and a separate encrypted locator status. The companion
+app adds own-phone last contact/location and Android separation alerts. Find
+Hub feasibility is audited against SDK 3.4.2; crowd tracking is not integrated.
 
 ## Pocket display and controls
 
@@ -77,7 +84,7 @@ sh simulator/run-tests.sh
 python tools/compile_face_assets.py --check
 ```
 
-On Windows run `simulator/run.bat`; on macOS/Linux run `./simulator/run.sh`. See [simulator guide](docs/simulator.md). The pocket UI revision passes host, adapter-model and 32 simulator tests. Target compilation and physical acceptance remain pending.
+On Windows run `simulator/run.bat`; on macOS/Linux run `./simulator/run.sh`. See [simulator guide](docs/simulator.md). The pocket UI revision passes host, adapter-model and 33 simulator tests. Target compilation and physical acceptance remain pending.
 
 ## Next acceptance milestones
 

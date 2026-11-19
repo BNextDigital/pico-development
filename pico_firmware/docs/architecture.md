@@ -232,3 +232,12 @@ Action routes only to interaction; timer/session commands remain explicit.
 independent of BLE and application deadlines. XIAO aliases choose green and
 keep red/blue inactive; the simulator uses the same portable timing constants.
 No protocol IDs, persistence bytes or main-loop polling interval change.
+
+## Locating service
+
+The portable `Locator` owns a bounded millisecond deadline and two-second pulse
+cadence, contributing deadlines to the existing scheduler. Core handles wake,
+physical acknowledgement and timer-alert priority; no durable state is added.
+An additive encrypted four-byte GATT characteristic reports locating status.
+Phone-only presence/location responsibilities and the SDK-pinned Find Hub
+feasibility gates are documented in [tracking](tracking.md).

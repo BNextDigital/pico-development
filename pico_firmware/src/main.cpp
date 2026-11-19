@@ -93,7 +93,7 @@ int main()
     core.handle({pico::EventKind::MicrophoneReady, microphone.init(queue_event) ? 1U : 0U});
     display.init();
     hardware.init(queue_event);
-    const auto capabilities = hardware.capabilities() | display.capabilities() |
+    const auto capabilities = pico::capability(pico::Capability::Locator) | hardware.capabilities() | display.capabilities() |
         (audio.ready() ? pico::capability(pico::Capability::Speaker) : 0U) |
         (microphone.ready() ? pico::capability(pico::Capability::Microphone) : 0U);
 

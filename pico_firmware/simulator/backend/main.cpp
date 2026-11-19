@@ -27,6 +27,7 @@ namespace {
 
 constexpr std::uint32_t kSaveDelaySeconds = 5;
 constexpr pico::Capabilities kSimulatedCapabilities =
+    pico::capability(pico::Capability::Locator) |
     pico::capability(pico::Capability::Display) |
     pico::capability(pico::Capability::Speaker) |
     pico::capability(pico::Capability::HomeDock) |
@@ -179,6 +180,8 @@ std::string event_name(pico::EventKind kind)
     case pico::EventKind::PlayReference: return "PlayReference";
     case pico::EventKind::StopReference: return "StopReference";
     case pico::EventKind::AudioReady: return "AudioReady";
+    case pico::EventKind::StartFinding: return "StartFinding";
+    case pico::EventKind::StopFinding: return "StopFinding";
     case pico::EventKind::SetFocusGoal: return "SetFocusGoal";
     case pico::EventKind::OpenFocusSummary: return "OpenFocusSummary";
     case pico::EventKind::Boot:
@@ -240,7 +243,7 @@ std::string event_name(pico::EventKind kind)
 
 std::optional<pico::EventKind> parse_event_kind(const std::string &token)
 {
-    constexpr std::array<pico::EventKind, 60> kinds{
+    constexpr std::array<pico::EventKind, 62> kinds{
         pico::EventKind::Boot,          pico::EventKind::Tick,
         pico::EventKind::PrimaryPressed, pico::EventKind::SecondaryPressed,
         pico::EventKind::Connected,     pico::EventKind::Disconnected,
@@ -291,6 +294,8 @@ std::optional<pico::EventKind> parse_event_kind(const std::string &token)
         pico::EventKind::PlayReference,
         pico::EventKind::StopReference,
         pico::EventKind::AudioReady,
+        pico::EventKind::StartFinding,
+        pico::EventKind::StopFinding,
         pico::EventKind::SetFocusGoal,
         pico::EventKind::OpenFocusSummary,
 
@@ -639,6 +644,8 @@ public:
                << "\"focus_history\":" << focus_history_json(state) << ','
                << "\"break_duration_seconds\":" << state.break_duration_seconds << ','
                << "\"sound_muted\":" << (state.sound_muted ? "true" : "false") << ','
+               << "\"finding\":" << (state.finding ? "true" : "false") << ","
+               << "\"finding_remaining_seconds\":" << state.finding_remaining_seconds << ","
                << "\"sound_cue\":" << static_cast<unsigned>(state.sound_cue) << ','
                << "\"timer_paused\":" << (state.timer_paused ? "true" : "false") << ','
                << "\"configured_duration_seconds\":" << state.configured_duration_seconds << ','

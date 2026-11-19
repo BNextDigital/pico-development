@@ -230,6 +230,23 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(len(completed["state"]["focus_history"]), 4)
         self.assertTrue(all(entry["finished"] for entry in completed["state"]["focus_history"]))
 
+    def test_call_pico_timeout_acknowledgement_and_muted_fallback(self) -> None:
+        self.harness.send("event SleepDisplay")
+        called=self.harness.send("ble 50 05 00")
+        self.assertTrue(called["state"]["finding"])
+        self.assertFalse(called["state"]["display_asleep"])
+        self.assertFalse(called["persist_queued"])
+        ack=self.harness.send("event FocusButtonTapped")
+        self.assertFalse(ack["state"]["finding"])
+        self.assertEqual(ack["state"]["interaction_count"],0)
+        self.harness.send("ble 24 01")
+        self.harness.send("ble 50 05 00")
+        ended=self.harness.send("advance_ms 5000")
+        self.assertFalse(ended["state"]["finding"])
+        self.harness.send("ble 50 05 00")
+        stopped=self.harness.send("ble 51")
+        self.assertFalse(stopped["state"]["finding"])
+
     def test_face_action_only_pets_and_preserves_waiting_cycle(self) -> None:
         pet = self.harness.send("event FocusButtonTapped")
         self.assertEqual(pet["state"]["mode_name"], "companion")
