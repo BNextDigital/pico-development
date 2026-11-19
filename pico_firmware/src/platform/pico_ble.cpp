@@ -14,6 +14,9 @@
 #include <zephyr/sys/util.h>
 
 #include <pico/protocol.hpp>
+#if defined(CONFIG_PICO_FIND_HUB)
+#include <pico/tracking_policy.hpp>
+#endif
 
 LOG_MODULE_REGISTER(pico_ble, CONFIG_PICO_LOG_LEVEL);
 
@@ -116,8 +119,46 @@ const bt_data scan_response_data[] = {
             sizeof(CONFIG_BT_DEVICE_NAME) - 1U),
 };
 
+#if defined(CONFIG_PICO_FIND_HUB)
+bool is_companion(bt_conn *conn)
+{
+    bt_conn_info info{};
+    return bt_conn_get_info(conn, &info) == 0 && pico::tracking::companion_identity(info.id);
+}
+struct ConnectionCounts { unsigned companion{}, total{}; };
+void count_connections(bt_conn *conn, void *data)
+{
+    bt_conn_info info{};
+    if (bt_conn_get_info(conn, &info) || info.state == BT_CONN_STATE_DISCONNECTED) return;
+    auto &counts = *static_cast<ConnectionCounts *>(data);
+    ++counts.total;
+    if (pico::tracking::companion_identity(info.id)) ++counts.companion;
+}
+bool pico_authorized(bt_conn *conn, const bt_gatt_attr *attr)
+{
+    const auto address = reinterpret_cast<std::uintptr_t>(attr);
+    const auto start = reinterpret_cast<std::uintptr_t>(pico_service.attrs);
+    const auto end = start + pico_service.attr_count * sizeof(bt_gatt_attr);
+    return address < start || address >= end || is_companion(conn);
+}
+const bt_gatt_authorization_cb authorization_callbacks = {
+    .read_authorize = pico_authorized, .write_authorize = pico_authorized,
+};
+bt_security_err accept_pairing(bt_conn *conn, const bt_conn_pairing_feat *)
+{
+    return is_companion(conn) ? BT_SECURITY_ERR_SUCCESS : BT_SECURITY_ERR_PAIR_NOT_ALLOWED;
+}
+const bt_conn_auth_cb authentication_callbacks = { .pairing_accept = accept_pairing };
+#endif
+
 int begin_advertising()
 {
+#if defined(CONFIG_PICO_FIND_HUB)
+    ConnectionCounts counts;
+    bt_conn_foreach(BT_CONN_TYPE_LE, count_connections, &counts);
+    if (!pico::tracking::companion_advertising(counts.companion, counts.total,
+            CONFIG_BT_MAX_CONN, CONFIG_BT_FAST_PAIR_FHN_MAX_CONN)) return 0;
+#endif
     return bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, advertising_data,
                            ARRAY_SIZE(advertising_data), scan_response_data,
                            ARRAY_SIZE(scan_response_data));
@@ -130,6 +171,9 @@ void connected(bt_conn *connection, std::uint8_t error)
         return;
     }
 
+#if defined(CONFIG_PICO_FIND_HUB)
+    if (!is_companion(connection)) return;
+#endif
     LOG_INF("BLE central connected");
     emit(pico::EventKind::Connected);
 #if defined(CONFIG_PICO_BLE_AUTO_SECURITY)
@@ -143,8 +187,13 @@ void connected(bt_conn *connection, std::uint8_t error)
 #endif
 }
 
-void disconnected(bt_conn *, std::uint8_t reason)
+void disconnected(bt_conn *connection, std::uint8_t reason)
 {
+#if defined(CONFIG_PICO_FIND_HUB)
+    if (!is_companion(connection)) return;
+#else
+    ARG_UNUSED(connection);
+#endif
     LOG_INF("BLE central disconnected (0x%02x)", reason);
     emit(pico::EventKind::Disconnected);
 }
@@ -215,6 +264,13 @@ namespace pico::platform {
 bool Ble::init(EventSink sink)
 {
     event_sink = sink;
+#if defined(CONFIG_PICO_FIND_HUB)
+    if (bt_conn_auth_cb_register(&authentication_callbacks) ||
+        bt_gatt_authorization_cb_register(&authorization_callbacks)) {
+        LOG_ERR("Could not install identity isolation");
+        return false;
+    }
+#endif
     const int callback_error = bt_conn_auth_info_cb_register(&pairing_callbacks);
     if (callback_error != 0) {
         LOG_ERR("Could not register pairing diagnostics (%d)", callback_error);
@@ -260,12 +316,27 @@ void Ble::publish(const State &state, Capabilities capabilities)
     std::memcpy(status_value.data(), encoded, sizeof(encoded));
     k_mutex_unlock(&status_mutex);
 
+#if defined(CONFIG_PICO_FIND_HUB)
+    // Never broadcast private Pico status to a Fast Pair connection.
+    bt_conn_foreach(BT_CONN_TYPE_LE, [](bt_conn *conn, void *) {
+        if (!is_companion(conn)) return;
+        std::array<std::uint8_t, protocol::kStatusSize> status{};
+        std::array<std::uint8_t, protocol::kLocatorStatusSize> locator{};
+        k_mutex_lock(&status_mutex, K_FOREVER);
+        status = status_value;
+        locator = locator_value;
+        k_mutex_unlock(&status_mutex);
+        bt_gatt_notify(conn, &pico_service.attrs[7], locator.data(), locator.size());
+        bt_gatt_notify(conn, &pico_service.attrs[2], status.data(), status.size());
+    }, nullptr);
+#else
     bt_gatt_notify(nullptr,&pico_service.attrs[7],locator,sizeof(locator));
     const int error = bt_gatt_notify(nullptr, &pico_service.attrs[2], encoded,
                                      sizeof(encoded));
     if (error != 0 && error != -ENOTCONN) {
         LOG_DBG("Status notification not sent (%d)", error);
     }
+#endif
 }
 
 } // namespace pico::platform

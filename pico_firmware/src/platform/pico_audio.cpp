@@ -180,3 +180,15 @@ void Audio::play(audio::Cue cue,unsigned volume_percent,std::uint8_t note)
 #endif
 }
 }
+
+#if defined(CONFIG_PICO_RUNTIME_PROFILE)
+#include "pico_runtime_profile.hpp"
+namespace pico::platform {
+void profile_audio()
+{
+#if defined(CONFIG_PICO_AUDIO_I2S)
+    profile_slab("audio_slab", &audio_slab);
+#endif
+}
+}
+#endif

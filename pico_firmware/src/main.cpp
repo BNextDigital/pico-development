@@ -2,6 +2,10 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/sys/atomic.h>
+#if defined(CONFIG_PICO_RUNTIME_PROFILE)
+#include "platform/pico_runtime_profile.hpp"
+#endif
 
 #include <pico/core.hpp>
 #include <pico/service_schedule.hpp>
@@ -13,6 +17,9 @@
 #include "platform/pico_display.hpp"
 #include "platform/pico_hardware.hpp"
 #include "platform/pico_storage.hpp"
+#if defined(CONFIG_PICO_FIND_HUB)
+#include "platform/pico_find_hub.h"
+#endif
 
 LOG_MODULE_REGISTER(pico_main, CONFIG_PICO_LOG_LEVEL);
 
@@ -20,10 +27,17 @@ namespace {
 
 K_MSGQ_DEFINE(event_queue, sizeof(pico::Event), CONFIG_PICO_EVENT_QUEUE_SIZE, 4);
 
+#if defined(CONFIG_PICO_RUNTIME_PROFILE)
+atomic_t queue_drops;
+std::uint32_t queue_peak;
+#endif
 bool queue_event(const pico::Event &event)
 {
     const int error = k_msgq_put(&event_queue, &event, K_NO_WAIT);
     if (error != 0) {
+#if defined(CONFIG_PICO_RUNTIME_PROFILE)
+        atomic_inc(&queue_drops);
+#endif
         LOG_WRN("Event queue full; dropped event %u",
                 static_cast<unsigned int>(event.kind));
         return false;
@@ -68,6 +82,10 @@ int main()
 {
     LOG_INF("Pico firmware %s starting", CONFIG_PICO_FIRMWARE_VERSION);
 
+#if defined(CONFIG_PICO_FIND_HUB)
+    const int layout_error = pico_find_hub_measurement_init();
+    if (layout_error) LOG_ERR("Find Hub geometry check failed (%d); activation unavailable", layout_error);
+#endif
     pico::Core core;
     pico::platform::Hardware hardware;
     pico::platform::Motion motion;
@@ -128,6 +146,16 @@ int main()
     };
     while (true) {
         service_clocks();
+#if defined(CONFIG_PICO_RUNTIME_PROFILE)
+        const auto used = k_msgq_num_used_get(&event_queue);
+        if (used > queue_peak) queue_peak = used;
+        static std::uint32_t last_profile;
+        const auto profile_now = k_uptime_get_32();
+        if (profile_now - last_profile >= 60000U) {
+            last_profile = profile_now;
+            pico::platform::profile_sample(used, queue_peak, atomic_get(&queue_drops));
+        }
+#endif
         motion.poll(core.state().motion_config);
         if (core.state().motion_ready != motion.ready()) {
             apply_effects(core.handle({pico::EventKind::MotionReady,motion.ready() ? 1U : 0U}),
