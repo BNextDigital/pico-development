@@ -193,3 +193,13 @@ New encrypted read/notify characteristic `8e7b0004-54f2-4d9b-a3d1-9f150000c001`
 is four bytes: version 1, flags (active bit 0, sound available bit 1), remaining
 seconds uint16 LE. The original 16-byte status is unchanged. Read [tracking](tracking.md)
 for rejection/priority behavior, sound semantics, security limits and network feasibility.
+
+## Clock utility extension (0.14.0)
+
+Clock adds capability bit 9, encrypted 20-byte status characteristic `8e7b0005` and
+44-byte settings read characteristic `8e7b0006` with the existing UUID suffix. Commands
+0x60–0x68 provide UTC/offset synchronization, options, alarm slots, dismissal, stopwatch
+control and Clock navigation. Existing IDs, mode IDs and the v1 16-byte status are
+unchanged. See [Clock protocol and companion integration](clock.md#companion-integration-contract)
+for layouts, connection/daily/DST sync policy and backward compatibility. Production
+companion app adoption remains separate from this firmware/protocol implementation.

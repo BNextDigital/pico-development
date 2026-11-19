@@ -103,3 +103,11 @@ Use [the combined profile guide](docs/combined-find-hub.md) for the opt-in build
 actual flash/RAM comparisons, guarded partition/UF2 verification, runtime profiling and
 rollback. This milestone links the SDK network code while keeping activation disabled;
 ordinary Pico builds are unchanged. No Google credentials are embedded or needed.
+
+### Clock, alarms and stopwatch
+
+Version 0.14.0 adds [Clock](docs/clock.md) to the root icon menu: local time/date,
+12/24-hour format, optional face glance/USB desk view, four persisted alarm slots,
+manual time/alarm editors and a monotonic stopwatch. New protocol commands support
+phone time sync and alarm configuration; the production companion app still needs
+to adopt them. See the guide for packet layouts, simulator usage and physical checks.

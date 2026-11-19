@@ -207,3 +207,10 @@ UF2 bootloader mode; copy only the verified `build-combined/zephyr/zephyr.uf2` t
 XIAO drive. Do not use a DK binary, merged provisioning HEX or `west flash --erase`.
 Keep the current Pico-only UF2 for rollback. No real/debug Google key is needed to
 boot this measurement image; it does not advertise/register as a Find Hub tracker.
+
+## Subsequent Clock feature
+
+The 0.14.0 [Clock utility](clock.md) retains this optional profile and its network
+activation gate. Its [new measurements](measurements/clock-2026-11-19.json) compare
+against the immutable baseline above. The original registration/settings/UF2 partition
+map is unchanged; existing face assets and features remain included.

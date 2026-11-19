@@ -1,0 +1,124 @@
+{
+  "date": "2026-11-19",
+  "base_main": "16e326eb96c9df79dedb5d611829529df7479e72",
+  "implementation_tree": "1334c47f63323c7a8fdf4693ca5f70c6606dc9b2",
+  "sdk": "NCS v3.4.2 / Zephyr ncs-v3.4.2 (4.4.2)",
+  "compiler": "External Zephyr SDK 1.0.1 / GNU Arm 14.3.0",
+  "baseline_profiles": {
+    "pico_full": {
+      "flash_bytes": 320796,
+      "static_ram_bytes": 76472
+    },
+    "combined": {
+      "flash_bytes": 386892,
+      "static_ram_bytes": 90764
+    },
+    "combined_profile": {
+      "flash_bytes": 389148,
+      "static_ram_bytes": 91916
+    }
+  },
+  "clock_profiles": {
+    "pico_full": {
+      "flash_bytes": 330900,
+      "static_ram_bytes": 76812,
+      "application_capacity_bytes": 806912,
+      "below_600_KiB_target": true,
+      "below_700_KiB_gate": true,
+      "elf_sha256": "75349125d9d7540a8e74024ce1f07998479204a257a2bf78d66d9a57a648dc5e",
+      "uf2_sha256": "91506a61612ea63ca6a937da124699c60e86d703f3398eb32a4745b184efe79c",
+      "uf2_blocks": 1293,
+      "load_segments": [
+        {
+          "address": "0x27000",
+          "bytes": 324508
+        },
+        {
+          "address": "0x7639c",
+          "bytes": 6388
+        },
+        {
+          "address": "0x77c90",
+          "bytes": 4
+        }
+      ],
+      "partition_map_verified": false,
+      "runtime_peak_measured": false,
+      "current_measured": false,
+      "network_activation": "not compiled",
+      "flash_delta_bytes": 10104,
+      "static_ram_delta_bytes": 340
+    },
+    "combined": {
+      "flash_bytes": 396820,
+      "static_ram_bytes": 91104,
+      "application_capacity_bytes": 802816,
+      "below_600_KiB_target": true,
+      "below_700_KiB_gate": true,
+      "elf_sha256": "4d65db89c8e11a3d2c0db67c4119c14265b1cd79b4f0e84bfc269db542ddb80b",
+      "uf2_sha256": "ec16ee0a421137b03dc38bfe3ea72357a67088c8822b3ee89b533450dfe036bf",
+      "uf2_blocks": 1551,
+      "load_segments": [
+        {
+          "address": "0x27000",
+          "bytes": 389168
+        },
+        {
+          "address": "0x86030",
+          "bytes": 7468
+        },
+        {
+          "address": "0x87d5c",
+          "bytes": 184
+        }
+      ],
+      "partition_map_verified": true,
+      "runtime_peak_measured": false,
+      "current_measured": false,
+      "network_activation": "disabled",
+      "flash_delta_bytes": 9928,
+      "static_ram_delta_bytes": 340
+    },
+    "combined_profile": {
+      "flash_bytes": 399708,
+      "static_ram_bytes": 92128,
+      "application_capacity_bytes": 802816,
+      "below_600_KiB_target": true,
+      "below_700_KiB_gate": true,
+      "elf_sha256": "2f3a578e310a665cc5f1a659790d993b73e753e0623e432d3a2d89b9c24f40e2",
+      "uf2_sha256": "dfc6a2f11225c5c49a4ecc308e6a5f5d60d237ffb2ffa6743bbe0eb2921ea0aa",
+      "uf2_blocks": 1562,
+      "load_segments": [
+        {
+          "address": "0x27000",
+          "bytes": 392008
+        },
+        {
+          "address": "0x86b48",
+          "bytes": 7516
+        },
+        {
+          "address": "0x888a4",
+          "bytes": 184
+        }
+      ],
+      "partition_map_verified": true,
+      "runtime_peak_measured": false,
+      "current_measured": false,
+      "network_activation": "disabled",
+      "flash_delta_bytes": 10560,
+      "static_ram_delta_bytes": 212
+    }
+  },
+  "tests": {
+    "host": "passed: original core, Nordic limits, GPIO/OLED/audio/storage models, tracking contract, five build guard tests and new clock suite",
+    "simulator": "40 tests passed (33 existing + 7 clock scenarios)",
+    "address_and_undefined_sanitizers": "passed; leak scanning disabled because LeakSanitizer is incompatible with this ptrace environment",
+    "physical_phone": "not tested; production companion app adoption pending",
+    "physical_current": "not measured",
+    "physical_sleep_audio_power_cuts": "not tested"
+  },
+  "clock_thread_added": false,
+  "clock_dynamic_allocation": false,
+  "network_activation": "disabled as in merged baseline"
+}
