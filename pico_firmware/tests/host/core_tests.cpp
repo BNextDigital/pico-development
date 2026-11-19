@@ -360,6 +360,7 @@ void test_focus_button_standalone_controls()
 
 #include "focus_sessions_tests.hpp"
 #include "pocket_ui_tests.hpp"
+#include "locator_tests.hpp"
 
 } // namespace
 
@@ -379,6 +380,8 @@ int main()
     run_sprint01_tests();
     run_sprint02_tests();
     test_clean_face_and_app_layouts();
+    test_locator_service_and_protocol();
+    test_locator_priority_and_acknowledgement();
     run_music_tests();
     test_reference_pcm_frequency_bounds_and_chunks();
     test_reference_lifecycle_and_priority();

@@ -195,6 +195,12 @@ void render_screen(const State &state, MonoSurface &surface)
                       state.focus_phase == FocusPhase::Break ? "BREAK DONE" : "DONE",surface.height-11U,2);
         return;
     }
+    if (state.finding) {
+        State searching=state; searching.mood=Mood::Curious;
+        render_face(searching,surface);
+        centered(surface,"PICO HERE",surface.height-11U,2);
+        return;
+    }
     if (state.screen == Screen::Home || state.screen == Screen::Themes) {
         render_face(state, surface);
         if (state.screen == Screen::Home) render_status(state, surface);

@@ -115,6 +115,8 @@ enum class EventKind : std::uint8_t {
     PlayReference,
     StopReference,
     AudioReady,
+    StartFinding,
+    StopFinding,
 };
 
 enum class Screen : std::uint8_t { Home, Menu, Utility, Themes, Unavailable, Music, Tuner, DurationEdit, Settings, SettingEdit, FocusSummary = 10, ReferenceTone = 11 };
@@ -197,6 +199,8 @@ struct State {
     std::uint8_t beats_per_bar{4};
     std::uint8_t current_beat{1};
     std::uint8_t music_index{2};
+    bool finding{false};
+    std::uint16_t finding_remaining_seconds{0};
     bool audio_ready{false};
     bool reference_playing{false};
     std::uint8_t reference_note{69};

@@ -9,6 +9,7 @@
 namespace pico::protocol {
 
 inline constexpr std::size_t kStatusSize = 16;
+inline constexpr std::size_t kLocatorStatusSize = 4;
 
 enum class Command : std::uint8_t {
     Interact = 0x01,
@@ -41,6 +42,8 @@ enum class Command : std::uint8_t {
     StartTuner = 0x35,
     StopTuner = 0x36,
     SetMotionConfig = 0x40,
+    StartFinding = 0x50,
+    StopFinding = 0x51,
 };
 
 enum class DecodeStatus : std::uint8_t {
@@ -56,6 +59,7 @@ struct DecodeResult {
     Event event{};
 };
 
+void encode_locator(const State &state, Capabilities capabilities, std::uint8_t (&output)[kLocatorStatusSize]);
 DecodeResult decode_command(const std::uint8_t *data, std::size_t size);
 void encode_status(const State &state, Capabilities capabilities,
                    std::uint8_t (&output)[kStatusSize]);

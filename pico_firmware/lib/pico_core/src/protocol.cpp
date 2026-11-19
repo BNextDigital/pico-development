@@ -33,6 +33,14 @@ DecodeResult decode_command(const std::uint8_t *data, std::size_t size)
     }
 
     switch (static_cast<Command>(data[0])) {
+    case Command::StartFinding: {
+        if (size != 3U) return wrong_length();
+        const unsigned seconds=static_cast<unsigned>(data[1]) | (static_cast<unsigned>(data[2])<<8U);
+        if (!seconds || seconds>120U) return {DecodeStatus::InvalidValue,{}};
+        return {DecodeStatus::Ok,{EventKind::StartFinding,seconds}};
+    }
+    case Command::StopFinding:
+        return size==1U ? DecodeResult{DecodeStatus::Ok,{EventKind::StopFinding,0}} : wrong_length();
     case Command::Interact:
         return size == 1U
                    ? DecodeResult{DecodeStatus::Ok, {EventKind::PrimaryPressed, 0}}
@@ -153,6 +161,16 @@ DecodeResult decode_command(const std::uint8_t *data, std::size_t size)
     }
 
     return {DecodeStatus::UnknownCommand, {}};
+}
+
+void encode_locator(const State &state, Capabilities capabilities,
+                    std::uint8_t (&output)[kLocatorStatusSize])
+{
+    output[0]=1;
+    output[1]=static_cast<std::uint8_t>((state.finding ? 1U : 0U) |
+        ((capabilities & capability(Capability::Speaker)) && !state.sound_muted && state.sound_volume_percent ? 2U : 0U));
+    output[2]=static_cast<std::uint8_t>(state.finding_remaining_seconds);
+    output[3]=static_cast<std::uint8_t>(state.finding_remaining_seconds>>8U);
 }
 
 void encode_status(const State &state, Capabilities capabilities,
