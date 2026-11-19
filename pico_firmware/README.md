@@ -96,3 +96,10 @@ On Windows run `simulator/run.bat`; on macOS/Linux run `./simulator/run.sh`. See
 6. Complete amplifier shutdown and battery monitoring hardware; then expand companion-app protocol parity.
 
 Central references: [architecture](docs/architecture.md), [product map](docs/product-map.md), [BLE protocol](docs/ble-protocol.md), [OLED power](docs/oled-power.md), [local settings](docs/local-settings.md). [Sprint 01](docs/sprint01.md) and [Sprint 02](docs/sprint02.md) are **historical records**. The [Flutter app](https://github.com/BNextDigital/pico-companion) currently implements only original BLE commands `0x01`–`0x06`, not every firmware-local feature.
+
+### Optional combined Find Hub measurement build
+
+Use [the combined profile guide](docs/combined-find-hub.md) for the opt-in build helper,
+actual flash/RAM comparisons, guarded partition/UF2 verification, runtime profiling and
+rollback. This milestone links the SDK network code while keeping activation disabled;
+ordinary Pico builds are unchanged. No Google credentials are embedded or needed.

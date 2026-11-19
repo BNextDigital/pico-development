@@ -21,3 +21,12 @@ ${CXX:-c++} \
 sh "$project_dir/tests/host/check_nordic_limits.sh"
 
 sh "$project_dir/tests/platform/run.sh"
+
+${CXX:-c++} -std=c++17 -Wall -Wextra -Wpedantic -Werror \
+    -I"$project_dir/lib/pico_core/include" \
+    "$project_dir/tests/host/tracking_policy_tests.cpp" \
+    -o "$build_dir/tracking_policy_tests"
+"$build_dir/tracking_policy_tests"
+printf '%s\n' 'Tracking policy checks passed (live alert routing remains gated)'
+
+python3 "$project_dir/tests/host/test_combined_report.py"

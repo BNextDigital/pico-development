@@ -129,3 +129,13 @@ reset is required. On the updated phone app:
 
 No SDK target build, full APK build, physical BLE/OLED/audio/power result,
 network enrollment or crowd locating is claimed by this delivery.
+
+## Combined image measurement milestone
+
+The optional [combined profile](combined-find-hub.md) has a locally linked ARM image
+with OLED, PDM microphone, IMU and I2S retained. It includes dormant SDK Fast Pair/FHN/
+DULT code for honest footprint measurement, identity isolation and runtime profiling.
+It does not enroll, advertise on the network or supply qualified network ringing.
+See the report for partition verification, standalone comparisons, rollback, outstanding
+live arbitration/security work and physical validation gates. Existing Call Pico remains
+available through the companion protocol.

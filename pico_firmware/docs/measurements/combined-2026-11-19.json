@@ -1,0 +1,141 @@
+{
+  "date": "2026-11-19",
+  "base_main": "5e68f245e0d9953cc07d63469fdb2c4dc2be4bdd",
+  "sdk": "nRF Connect SDK v3.4.2 / Zephyr ncs-v3.4.2 (4.4.2)",
+  "compiler": "external Zephyr SDK 1.0.1 / GNU Arm 14.3.0",
+  "network_activation": "disabled; retained size anchor includes SDK activation/teardown/reset code",
+  "profiles": {
+    "pico_full": {
+      "flash_bytes": 320796,
+      "static_ram_bytes": 76472,
+      "application_capacity_bytes": 806912,
+      "below_600_KiB_target": true,
+      "below_700_KiB_gate": true,
+      "elf_sha256": "0932b474ba8f135275da826abb61a85ff9aeb4493538c8a781f04936dd0e7aa6",
+      "uf2_sha256": "9dc47aeb3f1f9bf797e75b4d01744ee2c7d066937d5c57e130cc31ec094bb0aa",
+      "uf2_blocks": 1254,
+      "load_segments": [
+        {
+          "address": "0x27000",
+          "bytes": 314444
+        },
+        {
+          "address": "0x73c4c",
+          "bytes": 6348
+        },
+        {
+          "address": "0x75518",
+          "bytes": 4
+        }
+      ],
+      "partition_map_verified": false,
+      "runtime_peak_measured": false,
+      "current_measured": false,
+      "network_activation": "not compiled"
+    },
+    "pico_full_lto": {
+      "flash_bytes": 292728,
+      "static_ram_bytes": 76344,
+      "application_capacity_bytes": 806912,
+      "below_600_KiB_target": true,
+      "below_700_KiB_gate": true,
+      "elf_sha256": "14cd0f99a0f11e114c525dff871d6453d4047300f5aa9a3e1f27ee84a712a9d0",
+      "uf2_sha256": "c0d8f463310b56b75571f4f47fd765b2436f920611cbe28ef676b8cbf6e1d1ba",
+      "uf2_blocks": 1144,
+      "load_segments": [
+        {
+          "address": "0x27000",
+          "bytes": 286416
+        },
+        {
+          "address": "0x6ced0",
+          "bytes": 6308
+        },
+        {
+          "address": "0x6e774",
+          "bytes": 4
+        }
+      ],
+      "partition_map_verified": false,
+      "runtime_peak_measured": false,
+      "current_measured": false,
+      "network_activation": "not compiled"
+    },
+    "combined": {
+      "flash_bytes": 386892,
+      "static_ram_bytes": 90764,
+      "application_capacity_bytes": 802816,
+      "below_600_KiB_target": true,
+      "below_700_KiB_gate": true,
+      "elf_sha256": "2b1377330d61abb654c5511aa782d1eee6244755fcbd06759e019e8a2a31a473",
+      "uf2_sha256": "72c7ece57f45c1d75f3206defef6788f43377d9499998ffa57575ba47b1053ac",
+      "uf2_blocks": 1512,
+      "load_segments": [
+        {
+          "address": "0x27000",
+          "bytes": 379312
+        },
+        {
+          "address": "0x839b0",
+          "bytes": 7396
+        },
+        {
+          "address": "0x85694",
+          "bytes": 184
+        }
+      ],
+      "partition_map_verified": true,
+      "runtime_peak_measured": false,
+      "current_measured": false,
+      "network_activation": "disabled"
+    },
+    "combined_profile": {
+      "flash_bytes": 389148,
+      "static_ram_bytes": 91916,
+      "application_capacity_bytes": 802816,
+      "below_600_KiB_target": true,
+      "below_700_KiB_gate": true,
+      "elf_sha256": "e2eb76436fa83a2dc6f45d17eda7472d40746c7c3fcbd89ab1d2564c237748c1",
+      "uf2_sha256": "99c4367390eb8ae9808cbd100feb992eddd73ff46423420ae89415354600d355",
+      "uf2_blocks": 1521,
+      "load_segments": [
+        {
+          "address": "0x27000",
+          "bytes": 381520
+        },
+        {
+          "address": "0x84250",
+          "bytes": 7444
+        },
+        {
+          "address": "0x85f64",
+          "bytes": 184
+        }
+      ],
+      "partition_map_verified": true,
+      "runtime_peak_measured": false,
+      "current_measured": false,
+      "network_activation": "disabled"
+    },
+    "standalone_fhn_audio": {
+      "flash_bytes": 348364,
+      "static_ram_bytes": 62548,
+      "application_capacity_bytes": 757760,
+      "source_branch": "feature/find-hub-prototype (draft PR 18)",
+      "source_tree": "038d29b8e732334353e79c20e83329bdee624881",
+      "lto": true,
+      "runtime_peak_measured": false,
+      "current_measured": false
+    },
+    "standalone_fhn": {
+      "flash_bytes": 340160,
+      "static_ram_bytes": 57780,
+      "application_capacity_bytes": 757760,
+      "source_branch": "feature/find-hub-prototype (draft PR 18)",
+      "source_tree": "038d29b8e732334353e79c20e83329bdee624881",
+      "lto": true,
+      "runtime_peak_measured": false,
+      "current_measured": false
+    }
+  }
+}
