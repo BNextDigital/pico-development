@@ -2,7 +2,7 @@
 
 Offline-first Zephyr/C++17 firmware for Pico, a small BLE companion with expressive 128×64 monochrome face, contextual docks and local tools. Target hardware: **Seeed Studio XIAO nRF52840 Sense** with **nRF Connect SDK 3.4.2**.
 
-**Snapshot (November 18, 2026):** the source build-version default is `0.9.0-oled-power` (`Kconfig` and `VERSION`). This is a software milestone, **not a hardware-validated release**. Earlier XIAO OLED, BLE and D0 behavior were physically demonstrated; compilation and acceptance of the latest combined profile are still pending.
+**Snapshot (November 18, 2026):** the source build-version default is `0.10.0-focus-sessions` (`Kconfig` and `VERSION`). This is a software milestone, **not a hardware-validated release**. Earlier XIAO OLED, BLE and D0 behavior were physically demonstrated; compilation and acceptance of the latest combined profile are still pending.
 
 ## Implemented software
 
@@ -10,7 +10,7 @@ Offline-first Zephyr/C++17 firmware for Pico, a small BLE companion with express
 | --- | --- |
 | Personality | Eight layered bitmap faces, blink/idle behavior and guarded reactions |
 | Controls | D0 Action, D1 Navigate, optional D2 Back; icon root menu; GPIO interrupts with deferred debounce/hold |
-| Time | Reusable pause/resume timer, Cooking/general timer, Focus work/break confirmation, one-minute local editors |
+| Time | Reusable pause/resume timer, Cooking/general timer, Focus work/break confirmation, 1–12-round goals, since-boot history, one-minute editors |
 | Music | Visual metronome (30–240 BPM, 1–8 beats/bar and tap tempo); optional Sense PDM chromatic tuner |
 | Motion | Optional Sense IMU pickup/rock/rest classification and personality behavior mask |
 | Audio | Optional MAX98357A I2S sound cues, volume/mute and visual-only fallback |
@@ -20,6 +20,14 @@ Offline-first Zephyr/C++17 firmware for Pico, a small BLE companion with express
 | BLE | Encrypted custom GATT protocol v1, 16-byte status, additive commands; bonds stored separately |
 
 Optional peripherals have hardware adapters and host coverage, but **target compilation, audio/acoustic accuracy, OLED contrast, button interrupts, sensor thresholds and current draw need real-board validation**. Wayfinding GPS/compass, Notes recording, complete dock electronics and final battery/power hardware are not implemented.
+
+## Focus session expansion
+
+Focus now offers Continuous or 1–12 work-round goals, countdown/round progress
+and four recent session summaries explicitly labelled Since Boot. Choose Round
+Goal, then Start Cycle; Start Timer retains the existing single-countdown flow.
+The goal and history are RAM-only. Durable durations and storage v5 are unchanged.
+See [Focus controls and demo](docs/focus-sessions.md).
 
 ## Repository map
 

@@ -205,3 +205,12 @@ timeout deadline. The platform adapter owns contrast/blanking, skips writes
 while blanked and restores the frame before unblanking. Unsupported operations
 fall back gracefully. See [OLED power design](oled-power.md) for storage v5,
 simulator behavior and physical validation.
+
+## Focus session goals and recent summaries
+
+FocusSession snapshots a bounded goal or Continuous, then tracks completed Work
+without owning a clock. Core archives at most four session summaries in RAM on
+finish or meaningful stop. Timer remains the only elapsed-time service. No
+persistence change or per-tick writes are introduced. Focus utility navigation
+has eight actions, plus appended summary screen and goal editor; all are shared
+with the simulator. See [Focus sessions](focus-sessions.md).

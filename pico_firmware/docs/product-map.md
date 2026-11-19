@@ -18,7 +18,7 @@ when a feature genuinely needs them.
 | Mode/context | Intended behavior | Current firmware status |
 | --- | --- | --- |
 | Companion | Face, mood, interactions, lightweight local memory | Themes, deterministic idle expressions, blinking and motion reactions implemented |
-| Study/focus | Tomato-style focus timer, water breaks, later quizzes | Work/break cycles, pause/resume and local minute-duration controls implemented |
+| Study/focus | Tomato-style focus timer, water breaks, later quizzes | Work/break cycles, local round goals, progress and four-entry since-boot history implemented |
 | Music | Chromatic tuner from microphone; speaker metronome | Visual metronome and optional Sense microphone tuner implemented; physical validation remains profile-specific |
 | Cooking | Egg/general timer and concise cooking reference | Local configurable timer implemented; cooking references remain future work |
 | Wayfinding | Compass/GPS or phone-assisted direction cues | Stable mode ID; sensors pending |
@@ -65,3 +65,9 @@ are implemented. OLED brightness and screen sleep extend the power foundation;
 
 Host success alone does not validate target compilation, OLED readability,
 acoustic tuner accuracy, audio output, electrical behavior or battery runtime.
+
+Feature development currently expands Focus with [round goals and session
+history](focus-sessions.md). Physical power measurements are deferred by user
+request. Existing automatic checks continue; measurement-based battery and
+shutdown decisions remain outstanding. Durable/calendar-based history, custom
+phase sequences and long-break scheduling remain future Focus work.
