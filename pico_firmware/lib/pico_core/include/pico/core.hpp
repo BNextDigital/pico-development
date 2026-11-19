@@ -28,8 +28,9 @@ public:
     std::uint32_t next_music_ms(std::uint32_t now) const
     {
         const auto elapsed = now - reference_started_ms_;
-        return std::min(metronome_.next_update_ms(now), state_.reference_playing ?
-            (elapsed >= 2000U ? 0U : 2000U-elapsed) : UINT32_MAX);
+        const std::uint32_t reference_delay = state_.reference_playing ?
+            (elapsed >= 2000U ? 0U : 2000U-elapsed) : UINT32_MAX;
+        return std::min(metronome_.next_update_ms(now), reference_delay);
     }
 
     PersistedState persistent_state() const;
