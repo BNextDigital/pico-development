@@ -54,7 +54,7 @@ should be used.
 - BLE connection state and arbitrary command-characteristic packets.
 - Timers at 1x, 10x, or 60x speed.
 - The exact portable 128x64 monochrome framebuffer.
-- LED heartbeat/connected behavior and 2.4 kHz chirp requests.
+- Green heartbeat (200 ms on / 5 seconds off), independent of connection and 2.4 kHz chirp requests.
 - Delayed flash writes, power loss before a save, reboot restoration, and
   factory reset.
 - Raw numeric event injection for early feature development.
@@ -213,3 +213,10 @@ focus_work_seconds, focus_history_count and focus_history (newest first).
 SetFocusGoal and OpenFocusSummary are logical event injections; existing virtual
 buttons expose the same goal editor and history screens as firmware. Goal and
 history reset on power_cycle, while existing durable settings remain saved.
+
+## Pocket UI
+
+The simulator uses the same [pocket UI](pocket-ui.md) renderer and pet-only
+Home Action mapping. `led_on` follows the 200/5000 ms heartbeat; connection
+state does not force it on. The GUI preview magnifies pixels; assess text
+readability on the actual 128×64 OLED before signing off hardware acceptance.

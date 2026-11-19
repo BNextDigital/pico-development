@@ -1,5 +1,6 @@
 #include <cmath>
 #include <pico/core.hpp>
+#include <pico/status_led.hpp>
 #include <pico/display_power.hpp>
 #include <pico/service_schedule.hpp>
 #include <pico/display_model.hpp>
@@ -570,7 +571,7 @@ public:
                     core_.next_animation_ms(static_cast<std::uint32_t>(now_ms_)),
                     core_.next_music_ms(static_cast<std::uint32_t>(now_ms_)), UINT32_MAX, false) << ','
                << "\"led_on\":"
-               << (state.connected || state.uptime_seconds % 4U == 0U ? "true"
+               << (pico::status_led::on(now_ms_) ? "true"
                                                                       : "false")
                << ',' << "\"capabilities\":" << capabilities() << ','
                << "\"state_path\":" << quoted(state_path_.string()) << ','

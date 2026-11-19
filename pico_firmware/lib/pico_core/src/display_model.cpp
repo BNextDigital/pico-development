@@ -65,17 +65,6 @@ void fill_rect(MonoSurface &surface, std::uint16_t x, std::uint16_t y,
     }
 }
 
-void outline_rect(MonoSurface &surface, std::uint16_t x, std::uint16_t y,
-                  std::uint16_t width, std::uint16_t height)
-{
-    if (width == 0U || height == 0U) {
-        return;
-    }
-    fill_rect(surface, x, y, width, 1);
-    fill_rect(surface, x, y + height - 1U, width, 1);
-    fill_rect(surface, x, y, 1, height);
-    fill_rect(surface, x + width - 1U, y, 1, height);
-}
 
 
 void bitmap(MonoSurface &surface, const assets::Bitmap &image, int center_x, int center_y)
@@ -104,6 +93,7 @@ constexpr Glyph font[]{
  {'2',{6,1,2,4,7}}, {'3',{6,1,2,1,6}}, {'4',{5,5,7,1,1}}, {'5',{7,4,6,1,6}},
  {'6',{3,4,6,5,2}}, {'7',{7,1,2,2,2}}, {'8',{2,5,2,5,2}}, {'9',{2,5,3,1,6}},
  {'.',{0,0,0,0,2}}, {'=',{0,7,0,7,0}},
+ {'<',{1,2,4,2,1}}, {'%',{5,1,2,4,5}},
  {'#',{5,7,5,7,5}}, {'+',{0,2,7,2,0}}, {':',{0,2,0,2,0}}, {'-',{0,0,7,0,0}}, {'>',{4,2,1,2,4}}, {'/',{1,1,2,4,4}}
 };
 void text(MonoSurface &surface, const char *str, unsigned x, unsigned y, unsigned scale = 1)
@@ -153,192 +143,163 @@ void render_face(const State &state, MonoSurface &surface)
         fill_rect(surface, surface.width - 15, 36, 2, 2);
     }
 }
-void render_status(const State &state, MonoSurface &surface)
+// Pocket layout: one selected action, a large value and a short context line.
+void centered(MonoSurface &surface, const char *label, unsigned y, unsigned preferred)
 {
-    if (state.motion_ready && state.motion_config) {
-        outline_rect(surface,10,3,3,3);
-        if (state.motion_settled) fill_rect(surface,11,4,1,1);
-    }
-    if (state.connected) fill_rect(surface, 3, 3, 3, 3);
-    else outline_rect(surface, 3, 3, 3, 3);
-    if (state.dock != Dock::None) outline_rect(surface, surface.width - 10, 3, 7, 6);
-    if (state.focus_waiting) text(surface, state.focus_phase == FocusPhase::Work ? "BREAK READY - TAP" : "WORK READY - TAP", 20, surface.height - 7);
-    if (state.timer_running || state.timer_paused) {
-        char buffer[16]; duration(buffer, sizeof(buffer), state.timer_remaining_seconds);
-        text(surface, buffer, 8, surface.height - 7);
-        text(surface, state.timer_paused ? "PAUSED" : state.focus_phase == FocusPhase::Break ? "BREAK" : state.mode == Mode::Focus ? "FOCUS" : "TIMER", 72, surface.height - 7);
+    unsigned scale=preferred;
+    const unsigned available=surface.width-12U;
+    while (scale>1 && std::strlen(label)*4U*scale-scale>available) --scale;
+    char clipped[32]{};
+    const auto count=std::min<std::size_t>(sizeof(clipped)-1,(available+scale)/(4U*scale));
+    std::strncpy(clipped,label,count);
+    const auto width=std::strlen(clipped)*4U*scale-(clipped[0] ? scale : 0U);
+    text(surface,clipped,(surface.width-width)/2U,y,scale);
+}
+void selected_action(MonoSurface &surface, const char *label, unsigned index, unsigned count)
+{
+    const bool large=surface.height>=56 && surface.width>=96;
+    const auto y=large ? 52U : 26U;
+    centered(surface,label,y,large ? 2U : 1U);
+    // Navigation hint, not a grid of buttons competing with the main value.
+    text(surface,"<",2,y,1); text(surface,">",surface.width-5,y,1);
+    if (large && count) {
+        const unsigned total=count*5U;
+        const unsigned left=(surface.width-total)/2U;
+        for (unsigned i=0; i<count; ++i) fill_rect(surface,left+i*5U,63,i==index ? 3 : 1,1);
     }
 }
+void card(MonoSurface &surface, const char *title, const char *value,
+          const char *context, const char *action, unsigned index=0, unsigned count=0)
+{
+    const bool large=surface.height>=56 && surface.width>=96;
+    centered(surface,title,0,large ? 2U : 1U);
+    centered(surface,value,large ? 15U : 8U,large ? 4U : 2U);
+    centered(surface,context,large ? 37U : 20U,large ? 2U : 1U);
+    selected_action(surface,action,index,count);
+}
+void render_status(const State &state, MonoSurface &surface)
+{
+    // Keep the companion face clean. BLE/motion/dock flags remain in diagnostics.
+    char value[24]{};
+    if (state.focus_waiting) std::snprintf(value,sizeof(value),"READY");
+    else if (state.timer_running || state.timer_paused)
+        duration(value,sizeof(value),state.timer_remaining_seconds);
+    if (value[0]) centered(surface,value,surface.height-11U,2);
+}
+
 void render_screen(const State &state, MonoSurface &surface)
 {
     if (state.timer_completed) {
         render_face(state, surface);
-        text(surface, state.focus_finished ? "SESSION DONE" : state.focus_phase == FocusPhase::Work ? "WORK DONE" :
-                      state.focus_phase == FocusPhase::Break ? "BREAK DONE" : "DONE", 44, 1);
+        centered(surface, state.focus_finished ? "SESSION DONE" : state.focus_phase == FocusPhase::Work ? "WORK DONE" :
+                      state.focus_phase == FocusPhase::Break ? "BREAK DONE" : "DONE",surface.height-11U,2);
         return;
     }
     if (state.screen == Screen::Home || state.screen == Screen::Themes) {
         render_face(state, surface);
         if (state.screen == Screen::Home) render_status(state, surface);
         else {
-            text(surface, "THEME", 2, 1);
-            text(surface, assets::theme_names[static_cast<unsigned>(state.theme) % 8], 22, surface.height - 7);
+            centered(surface, assets::theme_names[static_cast<unsigned>(state.theme) % 8],surface.height-11U,2);
         }
         return;
     }
     if (state.screen == Screen::Settings) {
-        constexpr const char *names[]{"FACE THEME","MUTE","VOLUME","WORK/TIMER","BREAK","MOTION","TEST SOUND","BRIGHTNESS","SCREEN TIME","SLEEP NOW","BACK"};
-        text(surface,"SETTINGS",4,2,2);
-        const unsigned first = (state.settings_index/4)*4;
-        for (unsigned row=0; row<4; ++row) {
-            const auto i=first+row;
-            if (i >= 11) break;
-            text(surface,i == state.settings_index ? ">" : " ",2,20+row*10);
-            text(surface,names[i],10,20+row*10);
-            char value[24]{};
-            if (i == 0) std::snprintf(value,sizeof(value),"%u",static_cast<unsigned>(state.theme)+1);
-            else if (i == 1) std::snprintf(value,sizeof(value),"%s",state.sound_muted ? "ON" : "OFF");
-            else if (i == 2) std::snprintf(value,sizeof(value),"%u",static_cast<unsigned>(state.sound_volume_percent));
-            else if (i == 3 || i == 4) duration(value,sizeof(value),i == 3 ? state.configured_duration_seconds : state.break_duration_seconds);
-            else if (i == 5) std::snprintf(value,sizeof(value),"%s",state.motion_config ? "ON" : "OFF");
-            else if (i == 7) std::snprintf(value,sizeof(value),"%u",state.display_brightness_percent);
-            else if (i == 8) {
-                if (state.display_timeout_minutes) std::snprintf(value,sizeof(value),"%u M",state.display_timeout_minutes);
-                else std::snprintf(value,sizeof(value),"OFF");
-            }
-            text(surface,value,88,20+row*10);
+        constexpr const char *names[]{"FACE","MUTE","VOLUME","WORK TIME","BREAK TIME","MOTION","TEST SOUND","BRIGHTNESS","SCREEN TIME","SLEEP NOW","BACK"};
+        const auto i=state.settings_index%11U;
+        char value[24]{};
+        if (i==0) std::snprintf(value,sizeof(value),"%s",assets::theme_names[static_cast<unsigned>(state.theme)%8]);
+        else if (i==1) std::snprintf(value,sizeof(value),"%s",state.sound_muted ? "ON" : "OFF");
+        else if (i==2 || i==7) std::snprintf(value,sizeof(value),"%u%%",i==2 ? state.sound_volume_percent : state.display_brightness_percent);
+        else if (i==3 || i==4) duration(value,sizeof(value),i==3 ? state.configured_duration_seconds : state.break_duration_seconds);
+        else if (i==5) std::snprintf(value,sizeof(value),"%s",state.motion_config ? "ON" : "OFF");
+        else if (i==8) {
+            if (state.display_timeout_minutes) std::snprintf(value,sizeof(value),"%u MIN",state.display_timeout_minutes);
+            else std::snprintf(value,sizeof(value),"OFF");
         }
+        card(surface,"SETTINGS",names[i],value,i==9 ? "SLEEP" : i==10 ? "BACK" : i==6 ? "PLAY" : "CHANGE",i,11);
         return;
     }
     if (state.screen == Screen::SettingEdit) {
+        constexpr const char *actions[]{"DECREASE","INCREASE","SAVE","CANCEL"};
+        const auto action=state.setting_action%4U;
         if (state.setting_key == SettingKey::Theme) {
-            const auto index = state.setting_draft % 8;
-            text(surface,assets::theme_names[index],2,1);
-            const auto &face = assets::faces[index][0];
-            bitmap(surface,face.brow_left,42,11); bitmap(surface,face.brow_right,86,11);
-            bitmap(surface,face.left,42,23); bitmap(surface,face.right,86,23);
-            bitmap(surface,face.mouth,64,34);
-        } else if (state.setting_key == SettingKey::Motion) {
-            text(surface,"MOTION REACTIONS",20,1);
-            text(surface,state.setting_draft & motion::kPickup ? "PICKUP ON" : "PICKUP OFF",24,13);
-            text(surface,state.setting_draft & motion::kRock ? "ROCK ON" : "ROCK OFF",24,23);
-            text(surface,state.setting_draft & motion::kRest ? "REST ON" : "REST OFF",24,33);
+            const auto index=state.setting_draft%8;
+            centered(surface,assets::theme_names[index],0,2);
+            const auto &face=assets::faces[index][0];
+            bitmap(surface,face.brow_left,42,15); bitmap(surface,face.brow_right,86,15);
+            bitmap(surface,face.left,42,28); bitmap(surface,face.right,86,28);
+            bitmap(surface,face.mouth,64,42);
+            selected_action(surface,actions[action],action,4);
         } else {
-            text(surface,state.setting_key == SettingKey::Mute ? "SOUND MUTE" :
-                state.setting_key == SettingKey::Brightness ? "BRIGHTNESS" :
-                state.setting_key == SettingKey::DisplayTimeout ? "SCREEN TIMEOUT" :
-                state.setting_key == SettingKey::FocusGoal ? "WORK ROUND GOAL" : "VOLUME",24,2);
-            char value[24];
-            if (state.setting_key == SettingKey::Mute)
-                std::snprintf(value,sizeof(value),"%s",state.setting_draft ? "MUTED" : "SOUND ON");
-            else if (state.setting_key == SettingKey::FocusGoal) {
-                if (!state.setting_draft) std::snprintf(value,sizeof(value),"CONTINUOUS");
-                else std::snprintf(value,sizeof(value),"%u ROUNDS",static_cast<unsigned>(state.setting_draft));
+            char value[24]{};
+            const char *title="VOLUME";
+            switch (state.setting_key) {
+            case SettingKey::Mute: title="MUTE"; std::snprintf(value,sizeof(value),"%s",state.setting_draft ? "ON" : "OFF"); break;
+            case SettingKey::Motion: {
+                title="MOTION";
+                constexpr const char *masks[]{"OFF","WAKE","ROCK","WAKE ROCK","REST","WAKE REST","ROCK REST","ALL ON"};
+                std::snprintf(value,sizeof(value),"%s",masks[state.setting_draft%8]); break;
             }
-            else if (state.setting_key == SettingKey::DisplayTimeout) {
-                if (!state.setting_draft) std::snprintf(value,sizeof(value),"OFF");
-                else std::snprintf(value,sizeof(value),"%u MIN",static_cast<unsigned>(state.setting_draft));
-            } else std::snprintf(value,sizeof(value),"%u PERCENT",static_cast<unsigned>(state.setting_draft));
-            text(surface,value,12,21,2);
-        }
-        constexpr const char *actions[]{"-","+","SAVE","CANCEL"};
-        for (unsigned i=0; i<4; ++i) {
-            const unsigned x=2+(i%2)*64,y=43+(i/2)*10;
-            if (state.setting_action == i) outline_rect(surface,x,y,60,9);
-            text(surface,actions[i],x+10,y+2);
+            case SettingKey::DisplayTimeout:
+                title="SCREEN TIME";
+                if (state.setting_draft) std::snprintf(value,sizeof(value),"%u MIN",state.setting_draft);
+                else std::snprintf(value,sizeof(value),"OFF");
+                break;
+            case SettingKey::FocusGoal:
+                title="ROUND GOAL";
+                if (state.setting_draft) std::snprintf(value,sizeof(value),"%u",state.setting_draft);
+                else std::snprintf(value,sizeof(value),"CONT");
+                break;
+            default:
+                title=state.setting_key == SettingKey::Brightness ? "BRIGHTNESS" : "VOLUME";
+                std::snprintf(value,sizeof(value),"%u%%",state.setting_draft); break;
+            }
+            card(surface,title,value,"",actions[action],action,4);
         }
         return;
     }
     if (state.screen == Screen::DurationEdit) {
-        char buffer[24];
-        text(surface,state.editing_break_duration ? "BREAK DURATION" :
-                     state.duration_return_screen == Screen::Settings ? "WORK/TIMER DURATION" :
-                     state.mode == Mode::Focus ? "WORK DURATION" : "TIMER DURATION",8,2);
-        std::snprintf(buffer,sizeof(buffer),"%u MIN",static_cast<unsigned>(state.draft_duration_seconds/60U));
-        text(surface,buffer,20,17,2);
-        text(surface,"1 MINUTE STEPS",36,33);
+        char value[24]; std::snprintf(value,sizeof(value),"%u MIN",state.draft_duration_seconds/60U);
         constexpr const char *actions[]{"-1 MIN","+1 MIN","SAVE","CANCEL"};
-        for (unsigned i=0; i<4; ++i) {
-            const unsigned x=2+(i%2)*64, y=43+(i/2)*10;
-            if (state.duration_action == i) outline_rect(surface,x,y,60,9);
-            text(surface,actions[i],x+10,y+2);
-        }
+        const auto i=state.duration_action%4U;
+        card(surface,state.editing_break_duration ? "BREAK TIME" : state.mode == Mode::Cooking ? "TIMER TIME" : "WORK TIME",value,"",actions[i],i,4);
         return;
     }
     if (state.screen == Screen::Tuner) {
-        text(surface,"TUNER",2,2);
-        text(surface,state.tuner_running ? "MIC ON" : "MIC OFF",96,2);
-        outline_rect(surface,2,10,124,6);
-        fill_rect(surface,4,12,state.tuner.level * 120U / 100U,2);
-        if (!state.microphone_ready) {
-            text(surface,"MIC UNAVAILABLE",4,25,2);
-            text(surface,"CHECK BUILD / LOGS",20,43);
-        } else if (!state.tuner_running) {
-            text(surface,"STOPPED",28,25,2);
-            text(surface,"D0 TO LISTEN",24,43);
-        } else if (state.tuner.signal == pitch::Signal::Detected) {
-            char note[12], cents[20];
-            std::snprintf(note,sizeof(note),"%s%d",pitch::note_name(state.tuner.note),static_cast<int>(state.tuner.note)/12-1);
-            text(surface,note,42,21,3);
-            const int offset = state.tuner.cents;
-            text(surface,offset < -5 ? "FLAT" : offset > 5 ? "SHARP" : "IN TUNE",44,40);
-            fill_rect(surface,14,53,102,1);
-            outline_rect(surface,59,49,11,9);
-            fill_rect(surface,static_cast<unsigned>(64+offset),50,2,8);
-            std::snprintf(cents,sizeof(cents),"%+d CENTS",offset);
-            text(surface,cents,2,59);
-            text(surface,"D0 STOP",96,59);
-            return;
-        } else {
-            const char *message = state.tuner.signal == pitch::Signal::Quiet ? "TOO QUIET" :
-                state.tuner.signal == pitch::Signal::Clipping ? "TOO LOUD" :
-                state.tuner.signal == pitch::Signal::Noisy ? "HOLD ONE NOTE" : "PLUCK ONE NOTE";
-            text(surface,message,12,28,2);
-        }
-        text(surface,"HOLD TO GO BACK",28,59);
+        char value[16]="--",context[24]{};
+        if (!state.microphone_ready) std::snprintf(value,sizeof(value),"NO MIC");
+        else if (!state.tuner_running) std::snprintf(context,sizeof(context),"STOPPED");
+        else if (state.tuner.signal == pitch::Signal::Detected) {
+            std::snprintf(value,sizeof(value),"%s%d",pitch::note_name(state.tuner.note),static_cast<int>(state.tuner.note)/12-1);
+            const int cents=state.tuner.cents;
+            if (cents>=-5 && cents<=5) std::snprintf(context,sizeof(context),"IN TUNE");
+            else std::snprintf(context,sizeof(context),"%s %d",cents<0 ? "FLAT" : "SHARP",cents<0 ? -cents : cents);
+        } else std::snprintf(context,sizeof(context),"%s",state.tuner.signal == pitch::Signal::Quiet ? "TOO QUIET" :
+            state.tuner.signal == pitch::Signal::Clipping ? "TOO LOUD" : state.tuner.signal == pitch::Signal::Noisy ? "ONE NOTE" : "PLUCK A NOTE");
+        card(surface,"TUNER",value,context,state.tuner_running ? "STOP" : "LISTEN");
         return;
     }
     if (state.screen == Screen::ReferenceTone) {
-        text(surface,"REFERENCE  A4=440",8,2);
-        char note[16],hz[24];
-        std::snprintf(note,sizeof(note),"%s%d",pitch::note_name(state.reference_note),static_cast<int>(state.reference_note)/12-1);
-        text(surface,note,44,13,3);
-        const auto frequency = audio::frequency_millihz(state.reference_note);
-        std::snprintf(hz,sizeof(hz),"%u.%03u HZ",frequency/1000U,frequency%1000U);
-        text(surface,hz,36,31);
-        text(surface,!state.audio_ready ? "SPEAKER UNAVAILABLE" :
-            state.sound_muted || !state.sound_volume_percent ? "MUTED" :
-            state.reference_playing ? "PLAYING - 2 SEC" : "READY",20,40);
-        const char *items[]{"NOTE-","NOTE+",state.reference_playing ? "STOP" : "PLAY","OCT-","OCT+","BACK"};
-        for (unsigned i=0; i<6; ++i) {
-            const auto x=1+(i%3)*42,y=48+(i/3)*8;
-            if (i == state.reference_index) outline_rect(surface,x,y,40,8);
-            text(surface,items[i],x+7,y+2);
-        }
+        char value[16],frequency[24];
+        std::snprintf(value,sizeof(value),"%s%d",pitch::note_name(state.reference_note),static_cast<int>(state.reference_note)/12-1);
+        const auto hz=audio::frequency_millihz(state.reference_note);
+        const auto tenths=(hz+50U)/100U;
+        std::snprintf(frequency,sizeof(frequency),"%u.%u HZ",tenths/10U,tenths%10U);
+        const char *actions[]{"NOTE -","NOTE +",state.reference_playing ? "STOP" : "PLAY","OCTAVE -","OCTAVE +","BACK"};
+        const auto i=state.reference_index%6U;
+        card(surface,!state.audio_ready ? "NO SPEAKER" : state.sound_muted || !state.sound_volume_percent ? "MUTED" :
+            state.reference_playing ? "PLAYING" : "REFERENCE",value,frequency,actions[i],i,6);
         return;
     }
     if (state.screen == Screen::Music) {
-        char buffer[24];
-        std::snprintf(buffer, sizeof(buffer), "%u BPM", static_cast<unsigned>(state.metronome_bpm));
-        text(surface, buffer, 8, 2, 2);
-        text(surface, state.sound_muted ? "MUTE" : "MUSIC", 104, 4);
-        for (unsigned i = 0; i < state.beats_per_bar; ++i) {
-            const unsigned x = 4 + i * 15;
-            if (state.metronome_running && state.beat_pulse && state.current_beat == i + 1)
-                fill_rect(surface, x, 18, 11, 12);
-            else outline_rect(surface, x, 18, 11, 12);
-        }
-        std::snprintf(buffer, sizeof(buffer), "BEAT %u/%u", static_cast<unsigned>(state.current_beat),
-                      static_cast<unsigned>(state.beats_per_bar));
-        text(surface, buffer, 4, 32);
-        text(surface, state.metronome_running ? "RUN" : "STOPPED", 88, 32);
-        const char *labels[]{"BPM-", "BPM+", state.metronome_running ? "STOP" : "START",
-                             "TAP", "BAR", "TUNER", "TONE", "HOME"};
-        for (unsigned i = 0; i < 8; ++i) {
-            const auto x = 1 + (i % 4) * 32, y = 41 + (i / 4) * 12;
-            if (i == state.music_index) outline_rect(surface, x, y, 30, 11);
-            text(surface, labels[i], x + 3, y + 3);
-        }
+        char value[16],context[24];
+        std::snprintf(value,sizeof(value),"%u",state.metronome_bpm);
+        if (state.metronome_running) std::snprintf(context,sizeof(context),"BEAT %u/%u",state.current_beat,state.beats_per_bar);
+        else std::snprintf(context,sizeof(context),"%u BEATS",state.beats_per_bar);
+        const char *actions[]{"BPM -","BPM +",state.metronome_running ? "STOP" : "START","TAP TEMPO","BEATS +","TUNER","REFERENCE","HOME"};
+        const auto i=state.music_index%8U;
+        card(surface,state.sound_muted || !state.sound_volume_percent ? "BPM / MUTED" : "BPM",value,context,actions[i],i,8);
+        if (state.metronome_running && state.beat_pulse) fill_rect(surface,32,35,64,2);
         return;
     }
     if (state.screen == Screen::Menu) {
@@ -369,85 +330,55 @@ void render_screen(const State &state, MonoSurface &surface)
         return;
     }
     if (state.screen == Screen::FocusSummary) {
-        text(surface,"FOCUS HISTORY",10,2,2);
-        text(surface,"SINCE BOOT",44,15);
-        if (!state.focus_history_count) {
-            text(surface,"NO COMPLETED WORK YET",12,30);
-            text(surface,"FINISH A WORK ROUND",20,42);
-        } else {
-            const auto index = state.focus_history_index % state.focus_history_count;
-            const auto &record = state.focus_history[index];
-            char summary[32];
-            std::snprintf(summary,sizeof(summary),"%u/%u %s",index+1,state.focus_history_count,
-                          record.finished ? "FINISHED" : "STOPPED EARLY");
-            text(surface,summary,8,25);
-            std::snprintf(summary,sizeof(summary),"%u WORK ROUNDS",record.rounds);
-            text(surface,summary,8,35);
-            duration(summary,sizeof(summary),record.work_seconds);
-            text(surface,summary,8,45);
-            text(surface,"WORK TIME",70,45);
+        if (!state.focus_history_count) card(surface,"HISTORY / BOOT","EMPTY","","BACK");
+        else {
+            const auto i=state.focus_history_index%state.focus_history_count;
+            const auto &record=state.focus_history[i];
+            char title[24],time[24],context[24];
+            std::snprintf(title,sizeof(title),"%u/%u THIS BOOT",i+1,state.focus_history_count);
+            duration(time,sizeof(time),record.work_seconds);
+            std::snprintf(context,sizeof(context),"%s %u",record.finished ? "DONE:" : "STOPPED:",record.rounds);
+            card(surface,title,time,context,"BACK",i,state.focus_history_count);
         }
-        text(surface,"NAV HISTORY  ACTION BACK",10,58);
         return;
     }
     if (state.screen == Screen::Unavailable) {
-        text(surface, "NOT READY", 8, 10, 2);
-        text(surface, "FEATURE NOT IMPLEMENTED", 4, 32);
-        text(surface, "SELECT TO GO BACK", 4, 48);
-        return;
+        card(surface,"UNAVAILABLE","NOT YET","","BACK"); return;
     }
-    char buffer[24];
-    duration(buffer, sizeof(buffer), state.timer_running || state.timer_paused ?
-             state.timer_remaining_seconds : state.configured_duration_seconds);
-    text(surface, state.mode == Mode::Focus && state.focus_finished ? "COMPLETE" :
-                  state.mode == Mode::Focus && state.focus_waiting ? "READY" : buffer, 24, 1, 2);
-    text(surface, state.timer_paused ? "PAUSED" : state.focus_waiting ?
-                  (state.focus_phase == FocusPhase::Work ? "BREAK READY" : "WORK READY") :
-                  state.focus_phase == FocusPhase::Break ? "BREAK TIMER" :
-                  state.mode == Mode::Cooking ? "COOKING TIMER" : "FOCUS TIMER", 20, 15);
-    if (state.mode == Mode::Focus) {
-        char progress[32];
-        const auto goal = state.focus_phase != FocusPhase::None || state.focus_finished ? state.active_focus_goal : state.focus_goal;
-        if (goal)
-            std::snprintf(progress,sizeof(progress),"%u/%u DONE",state.completed_work_sessions,
-                          goal);
-        else std::snprintf(progress,sizeof(progress),"%u DONE - CONTINUOUS",state.completed_work_sessions);
-        text(surface,progress,6,22);
-        if (state.timer_total_seconds && (state.timer_running || state.timer_paused)) {
-            outline_rect(surface,4,29,120,4);
-            fill_rect(surface,5,30,static_cast<unsigned>((static_cast<std::uint64_t>(state.timer_total_seconds-state.timer_remaining_seconds)*118U)/state.timer_total_seconds),2);
-        }
-        constexpr const char *items[]{"WORK DURATION","START TIMER","CANCEL","HOME","START CYCLE","BREAK DURATION","ROUND GOAL","HISTORY"};
-        const unsigned first=(state.utility_index/3)*3;
-        for (unsigned row=0; row<3 && first+row<8; ++row) {
-            const auto i=first+row;
-            const char *label=i == 1 && state.timer_running ? "PAUSE" : i == 1 && state.timer_paused ? "RESUME" :
-                i == 4 && state.focus_waiting ? "NEXT PHASE" : i == 4 && state.focus_phase != FocusPhase::None ? "CYCLE ACTIVE" : items[i];
-            text(surface,i == state.utility_index ? ">" : " ",2,36+row*9);
-            text(surface,label,10,36+row*9);
-            if (i == 0 || i == 5) {
-                duration(progress,sizeof(progress),i == 0 ? state.configured_duration_seconds : state.break_duration_seconds);
-                text(surface,progress,88,36+row*9);
-            } else if (i == 6) {
-                if (!state.focus_goal) text(surface,"CONT",100,36+row*9);
-                else { std::snprintf(progress,sizeof(progress),"%u",state.focus_goal); text(surface,progress,100,36+row*9); }
-            }
-        }
-        return;
-    }
-    constexpr const char *actions[]{"DURATION", "START", "CANCEL", "HOME", "WORK/BREAK", "BREAK"};
-    for (unsigned i = 0; i < (state.mode == Mode::Focus ? 6U : 4U); ++i) {
-        text(surface, state.utility_index == i ? ">" : " ", 2, 21 + i * 7);
-        const char *label = i == 1 && state.timer_running ? "PAUSE" :
-                            i == 1 && state.timer_paused ? "RESUME" :
-                            i == 4 && state.focus_waiting ? "NEXT PHASE" :
-                            i == 4 && state.focus_phase != FocusPhase::None ? "CYCLE ACTIVE" : actions[i];
-        text(surface, label, 10, 21 + i * 7);
-        if (i == 0 || i == 5) {
-            duration(buffer, sizeof(buffer), i == 5 ? state.break_duration_seconds : state.configured_duration_seconds);
-            text(surface, buffer, 64, 21+i*7);
-        }
-    }
+    // Focus/Cooking keep their existing actions; only the selected one is shown.
+    const bool focus=state.mode == Mode::Focus;
+    const auto count=focus ? 8U : 4U;
+    const auto i=state.utility_index%count;
+    char value[24],context[24]{};
+    const char *title=focus ? "FOCUS" : "COOKING";
+    duration(value,sizeof(value),state.timer_running || state.timer_paused ? state.timer_remaining_seconds : state.configured_duration_seconds);
+    const char *actions[]{focus ? "WORK TIME" : "TIMER TIME",state.timer_running ? "PAUSE" : state.timer_paused ? "RESUME" : "START TIMER",
+        "CANCEL","HOME",state.focus_waiting ? "NEXT PHASE" : state.focus_phase != FocusPhase::None ? "CYCLE ACTIVE" : "START CYCLE",
+        "BREAK TIME","ROUND GOAL","HISTORY"};
+    if (i==0 || i==5) {
+        title=i==5 ? "BREAK TIME" : focus ? "WORK TIME" : "TIMER TIME";
+        duration(value,sizeof(value),i==5 ? state.break_duration_seconds : state.configured_duration_seconds);
+    } else if (i==6) {
+        title="ROUND GOAL";
+        if (state.focus_goal) std::snprintf(value,sizeof(value),"%u",state.focus_goal);
+        else std::snprintf(value,sizeof(value),"CONT");
+        std::snprintf(context,sizeof(context),"NEXT SESSION");
+    } else if (i==7) {
+        title="HISTORY"; std::snprintf(value,sizeof(value),"%u",state.focus_history_count);
+        std::snprintf(context,sizeof(context),"THIS BOOT");
+    } else if (state.focus_waiting) {
+        std::snprintf(value,sizeof(value),"READY");
+        std::snprintf(context,sizeof(context),"%s",state.focus_phase == FocusPhase::Work ? "BREAK NEXT" : "WORK NEXT");
+    } else if (state.timer_paused) std::snprintf(context,sizeof(context),"PAUSED");
+    else if (focus && state.focus_phase != FocusPhase::None) {
+        title=state.focus_phase == FocusPhase::Break ? "BREAK" : "FOCUS";
+        if (state.active_focus_goal) std::snprintf(context,sizeof(context),"%u/%u DONE",state.completed_work_sessions,state.active_focus_goal);
+        else std::snprintf(context,sizeof(context),"%u DONE",state.completed_work_sessions);
+    } else std::snprintf(context,sizeof(context),"%s",state.timer_running ? "RUNNING" : "READY");
+    card(surface,title,value,context,actions[i],i,count);
+    if ((state.timer_running || state.timer_paused) && state.timer_total_seconds && surface.height>=56)
+        fill_rect(surface,4,48,static_cast<unsigned>(static_cast<std::uint64_t>(state.timer_total_seconds-state.timer_remaining_seconds)*120U/state.timer_total_seconds),1);
+
 }
 
 } // namespace

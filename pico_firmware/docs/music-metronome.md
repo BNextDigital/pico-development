@@ -9,7 +9,7 @@ on the existing XIAO/OLED/buttons; the amplifier is optional.
 
 ## On the device
 
-Open **Menu -> MUSIC**. D1 moves through six actions, D0 activates the selected
+Open **Menu -> MUSIC**. D1 moves through eight actions, D0 activates the selected
 action. START is selected initially.
 
 | Action | Behavior |
@@ -20,10 +20,11 @@ action. START is selected initially.
 | TAP | Tap D0 repeatedly along with a song to estimate BPM |
 | BAR | Cycle 1–8 beats per bar; default 4 |
 | TUNER | Open optional onboard microphone tuner; stops metronome |
+| REFERENCE | Open note/reference pitch screen; stops metronome |
 | HOME | Stop and return to Companion/Home |
 
-The screen shows BPM, numbered beat position and one box per beat. The current
-box fills briefly on each beat. The first beat gets a higher-pitched accent if
+The [pocket UI](pocket-ui.md) shows large BPM, beat position and one selected
+action. A short underline pulses on each beat. The first beat gets a higher-pitched accent if
 I2S audio is fitted/enabled. Runtime mute preserves visual beats.
 
 For the tuner profile see [music-tuner.md](music-tuner.md).
@@ -138,7 +139,7 @@ OLED/menu/work-break physical results belong to the prior firmware revision.
 
 On hardware:
 
-1. Open MUSIC, start at 120 BPM and verify alternating beat boxes and bar wrap.
+1. Open MUSIC, start at 120 BPM and verify the beat underline and bar wrap.
 2. Stop/start, set 30 and 240 BPM, and cycle BAR through 1–8.
 3. Select TAP, tap a steady rhythm and verify the displayed estimate; wait over
    two seconds, then tap a different rhythm to restart the estimate.

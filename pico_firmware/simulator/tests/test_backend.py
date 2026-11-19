@@ -230,6 +230,30 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(len(completed["state"]["focus_history"]), 4)
         self.assertTrue(all(entry["finished"] for entry in completed["state"]["focus_history"]))
 
+    def test_face_action_only_pets_and_preserves_waiting_cycle(self) -> None:
+        pet = self.harness.send("event FocusButtonTapped")
+        self.assertEqual(pet["state"]["mode_name"], "companion")
+        self.assertEqual(pet["state"]["mood_name"], "happy")
+        self.assertFalse(pet["state"]["timer_running"])
+        self.assertEqual(pet["state"]["interaction_count"], 1)
+        self.harness.send("event SetTimerDuration 1")
+        self.harness.send("event StartFocusCycle")
+        self.harness.send("advance 5")
+        waiting = self.harness.send("event FocusButtonTapped")
+        self.assertTrue(waiting["state"]["focus_waiting"])
+        self.assertFalse(waiting["state"]["timer_running"])
+        self.harness.send("event FocusButtonHeld")
+        self.assertTrue(self.harness.send("status")["state"]["focus_waiting"])
+
+    def test_green_heartbeat_does_not_become_solid_when_connected(self) -> None:
+        self.assertTrue(self.harness.initial["led_on"])
+        self.assertTrue(self.harness.send("advance_ms 199")["led_on"])
+        self.assertFalse(self.harness.send("advance_ms 1")["led_on"])
+        self.assertFalse(self.harness.send("event Connected")["led_on"])
+        self.assertFalse(self.harness.send("advance_ms 4999")["led_on"])
+        self.assertTrue(self.harness.send("advance_ms 1")["led_on"])
+        self.assertFalse(self.harness.send("advance_ms 200")["led_on"])
+
     def test_boot_and_interaction_use_real_core_and_renderer(self) -> None:
         boot = self.harness.initial
         self.assertEqual(boot["state"]["mode_name"], "companion")
@@ -355,7 +379,7 @@ class BackendTests(unittest.TestCase):
         waiting = self.harness.send("advance 60")
         self.assertFalse(waiting["state"]["timer_running"])
         self.assertTrue(waiting["state"]["focus_waiting"])
-        rest = self.harness.send("event FocusButtonTapped")
+        rest = self.harness.send("ble 21")
         self.assertEqual(rest["state"]["focus_phase"], 2)
         self.assertEqual(rest["state"]["timer_remaining_seconds"], 1)
         self.assertNotEqual(rest["frame_hex"], waiting["frame_hex"])

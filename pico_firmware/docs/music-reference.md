@@ -1,7 +1,7 @@
 # Music reference pitches
 
-Music now adds TONE beside Tuner. The eight Music actions are BPM-, BPM+, Start,
-Tap, Bar, Tuner, Tone, Home. Existing indices 0–5 retain meaning; Home moves to 7.
+Music adds REFERENCE beside Tuner. The eight Music actions are BPM-, BPM+, Start,
+Tap, Beats, Tuner, Reference, Home. Existing indices 0–5 retain meaning; Home moves to 7.
 The separate Reference screen has Note-, Note+, Play/Stop, Oct-, Oct+, Back.
 Navigate chooses a control; Action activates it. Hold/Back stops and exits.
 
@@ -14,12 +14,12 @@ Changing the selected note stops playback; press Play to hear the new pitch.
 The reference is fixed equal temperament at A4=440, with no alternate calibration.
 
 Playback requires the existing optional MAX98357/I2S audio profile. OLED-only
-builds still show note/frequency and SPEAKER UNAVAILABLE, and refuse Play. A PWM
+builds still show note/frequency and NO SPEAKER, and refuse Play. A PWM
 buzzer is not used as an inaccurate substitute. Mute or zero volume prevents
 playback; unmuting does not auto-replay. Volume is snapshotted per sound job.
 Small speakers may reproduce low fundamentals poorly; harmonics are expected.
 
-Opening Tone stops the metronome and microphone tuner. Starting tuner or
+Opening Reference stops the metronome and microphone tuner. Starting tuner or
 metronome, leaving the reference screen, changing mode/dock, opening Settings,
 muting, setting volume zero or a timer completion cancels the tone. Timer alerts
 retain priority and playback is refused during their completion overlay.
@@ -92,3 +92,6 @@ Target compilation, measured pitch/sample-clock accuracy, low-note speaker
 response, acoustic level and live DMA/cancellation behavior are unverified here.
 Bench power measurements remain deferred by request. Do not describe the
 mathematical oscillator as a calibrated physical tuning standard.
+
+The [pocket UI](pocket-ui.md) shows a large note, readable frequency and one
+selected action; all six Reference action indices remain unchanged.

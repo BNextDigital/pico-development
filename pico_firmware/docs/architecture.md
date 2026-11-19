@@ -221,3 +221,14 @@ finish or meaningful stop. Timer remains the only elapsed-time service. No
 persistence change or per-tick writes are introduced. Focus utility navigation
 has eight actions, plus appended summary screen and goal editor; all are shared
 with the simulator. See [Focus sessions](focus-sessions.md).
+
+## Pocket display and status LED
+
+The [pocket UI](pocket-ui.md) keeps navigation and feature dispatch in Core,
+with shared display cards showing a large value and one selected action.
+BLE, motion and dock status no longer add corner pixels to the face. Home
+Action routes only to interaction; timer/session commands remain explicit.
+`platform::StatusLed` owns a delayable-work heartbeat (200 ms on, 5000 ms off)
+independent of BLE and application deadlines. XIAO aliases choose green and
+keep red/blue inactive; the simulator uses the same portable timing constants.
+No protocol IDs, persistence bytes or main-loop polling interval change.

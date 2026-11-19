@@ -343,25 +343,11 @@ Effects Core::handle(const Event &event)
     case EventKind::OpenMenu: case EventKind::NavigateNext:
     case EventKind::NavigatePrevious: case EventKind::Select: case EventKind::Back:
         return navigate(event.kind);
-    case EventKind::FocusButtonTapped: {
+    case EventKind::FocusButtonTapped:
         if (state_.screen != Screen::Home) return navigate(EventKind::Select);
-        if (state_.focus_waiting) return handle({EventKind::NextFocusPhase, 0});
-        if (state_.timer_running || state_.timer_paused) return handle({EventKind::PrimaryPressed, 0});
-        if (state_.dock == Dock::Car) return effect(Effect::None);
-        Effects effects = set_mode(Mode::Focus);
-        effects |= handle({EventKind::StartTimer, state_.configured_duration_seconds});
-        effects |= handle({EventKind::PrimaryPressed, 0});
-        return effects;
-    }
-    case EventKind::FocusButtonHeld: {
-        if (state_.screen != Screen::Home) return navigate(EventKind::Back);
-        if (state_.dock == Dock::Car || state_.mode != Mode::Focus ||
-            (!state_.timer_running && !state_.timer_paused && !state_.focus_waiting)) return effect(Effect::None);
-        Effects effects = handle({EventKind::CancelTimer, 0});
-        effects |= set_mode(Mode::Companion);
-        effects |= set_mood(Mood::Neutral);
-        return effects;
-    }
+        return handle({EventKind::PrimaryPressed,0});
+    case EventKind::FocusButtonHeld:
+        return navigate(EventKind::Back);
     case EventKind::Connected:
         if (state_.connected) return effect(Effect::None);
         state_.connected = true; return Effect::Render | Effect::Notify;
