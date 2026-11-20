@@ -11,6 +11,7 @@ class Ble {
 public:
     bool init(EventSink sink);
     bool start_advertising();
+    bool forget_companions();
     void publish(const State &state, Capabilities capabilities);
     void publish_clock(const State &state,bool notify=true);
 

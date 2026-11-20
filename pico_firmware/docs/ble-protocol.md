@@ -203,3 +203,7 @@ control and Clock navigation. Existing IDs, mode IDs and the v1 16-byte status a
 unchanged. See [Clock protocol and companion integration](clock.md#companion-integration-contract)
 for layouts, connection/daily/DST sync policy and backward compatibility. Production
 companion app adoption remains separate from this firmware/protocol implementation.
+
+## Companion pairing recovery
+
+See [Pair Again recovery](ble-recovery.md) for a physical-button-confirmed reset of identity 0 companion bonds. Personality, clock settings and tracking ownership are preserved.

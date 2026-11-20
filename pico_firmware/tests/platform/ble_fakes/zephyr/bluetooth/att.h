@@ -1,0 +1,5 @@
+#pragma once
+#define BT_ATT_ERR_INVALID_OFFSET 7
+#define BT_ATT_ERR_VALUE_NOT_ALLOWED 19
+#define BT_ATT_ERR_INSUFFICIENT_RESOURCES 17
+#define BT_GATT_ERR(x) (-(x))

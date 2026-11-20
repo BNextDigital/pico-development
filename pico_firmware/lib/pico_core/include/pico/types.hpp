@@ -128,9 +128,10 @@ enum class EventKind : std::uint8_t {
     StopwatchResume,
     StopwatchReset,
     UsbPower,
+    PairingResetResult = 72,
 };
 
-enum class Screen : std::uint8_t { Home, Menu, Utility, Themes, Unavailable, Music, Tuner, DurationEdit, Settings, SettingEdit, FocusSummary = 10, ReferenceTone = 11, Clock = 12, Alarms, Stopwatch, ClockEdit, AlarmEdit, ClockOptions };
+enum class Screen : std::uint8_t { Home, Menu, Utility, Themes, Unavailable, Music, Tuner, DurationEdit, Settings, SettingEdit, FocusSummary = 10, ReferenceTone = 11, Clock = 12, Alarms, Stopwatch, ClockEdit, AlarmEdit, ClockOptions, PairingRecovery = 18 };
 
 enum class SettingKey : std::uint8_t { Theme, Mute, Volume, Motion, Brightness, DisplayTimeout, FocusGoal };
 
@@ -150,6 +151,7 @@ enum class Effect : std::uint16_t {
     Chirp = 1U << 3,
     PersistClock = 1U << 4,
     NotifyClock = 1U << 5,
+    ForgetCompanionBonds = 1U << 6,
 };
 
 using Effects = std::uint16_t;
@@ -174,7 +176,10 @@ constexpr bool has_effect(Effects effects, Effect wanted)
     return (effects & effect(wanted)) != 0U;
 }
 
+enum class PairingResetState : std::uint8_t { Confirm, Pending, Cleared, Failed };
+
 struct State {
+    PairingResetState pairing_reset{PairingResetState::Confirm};
     clock::State clock{};
     clock::Date clock_draft{};
     clock::Alarm alarm_draft{};

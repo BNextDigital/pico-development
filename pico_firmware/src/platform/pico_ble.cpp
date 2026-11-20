@@ -11,6 +11,7 @@
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/gatt.h>
+#include <zephyr/bluetooth/hci.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/util.h>
@@ -124,7 +125,7 @@ ssize_t write_command(bt_conn *, const bt_gatt_attr *, const void *buffer,
                 static_cast<unsigned int>(decoded.status));
         return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
     }
-    if (!emit(decoded.event.kind, decoded.event.value)) {
+    if (event_sink == nullptr || !event_sink(decoded.event)) {
         return BT_GATT_ERR(BT_ATT_ERR_INSUFFICIENT_RESOURCES);
     }
     return length;
@@ -334,6 +335,32 @@ bool Ble::init(EventSink sink)
     }
     ready_ = true;
     LOG_INF("Bluetooth initialized");
+    return true;
+}
+
+bool Ble::forget_companions()
+{
+    if (!ready_) return false;
+    unsigned bond_count=0;
+    bt_foreach_bond(BT_ID_DEFAULT,[](const bt_bond_info *,void *context) {
+        ++*static_cast<unsigned *>(context);
+    },&bond_count);
+    LOG_INF("Local recovery requested; identity 0 has %u saved bond(s)",bond_count);
+    // End failed/unbonded identity-0 sessions too. Never disconnect identity 1.
+    bt_conn_foreach(BT_CONN_TYPE_LE,[](bt_conn *conn,void *) {
+        bt_conn_info info{};
+        if (bt_conn_get_info(conn,&info)==0 && info.id==BT_ID_DEFAULT) {
+            const int error=bt_conn_disconnect(conn,BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+            if (error && error!=-ENOTCONN) LOG_WRN("Companion disconnect failed (%d)",error);
+        }
+    },nullptr);
+    // This API deletes only companion keys/CCCs using the SDK's persistence path.
+    // Keep Bluetooth identity/address, pico/state, pico_clock/config and FP data.
+    const int error=bt_unpair(BT_ID_DEFAULT,BT_ADDR_LE_ANY);
+    if (error) { LOG_ERR("Companion bond reset failed (%d)",error); return false; }
+    LOG_INF("Companion bonds cleared (identity 0); forget Pico on phone, then Bond again");
+    // Existing connection-recycled callback restarts advertising after disconnect.
+    // If no link was active, advertising was never stopped.
     return true;
 }
 

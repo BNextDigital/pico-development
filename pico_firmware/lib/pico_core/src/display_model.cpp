@@ -288,6 +288,14 @@ void render_screen(const State &state, MonoSurface &surface)
         centered(surface,"PICO HERE",surface.height-11U,2);
         return;
     }
+    if (state.screen==Screen::PairingRecovery) {
+        const auto status=state.pairing_reset;
+        card(surface,"PAIR AGAIN",status==PairingResetState::Cleared ? "CLEARED" :
+            status==PairingResetState::Failed ? "FAILED" : status==PairingResetState::Pending ? "WAIT" : "FORGET?",
+            status==PairingResetState::Confirm ? "ALL PHONES" : status==PairingResetState::Cleared ? "PAIR IN APP" : "",
+            status==PairingResetState::Confirm ? "HOLD ACTION" : "BACK");
+        return;
+    }
     if (state.screen>=Screen::Clock) { render_clock_utility(state,surface); return; }
     if (state.screen == Screen::Home || state.screen == Screen::Themes) {
         if (state.screen==Screen::Home && state.clock.settings.usb_desk && state.clock.usb_powered && state.mood!=Mood::Happy) {
@@ -301,8 +309,8 @@ void render_screen(const State &state, MonoSurface &surface)
         return;
     }
     if (state.screen == Screen::Settings) {
-        constexpr const char *names[]{"FACE","MUTE","VOLUME","WORK TIME","BREAK TIME","MOTION","TEST SOUND","BRIGHTNESS","SCREEN TIME","SLEEP NOW","BACK"};
-        const auto i=state.settings_index%11U;
+        constexpr const char *names[]{"FACE","MUTE","VOLUME","WORK TIME","BREAK TIME","MOTION","TEST SOUND","BRIGHTNESS","SCREEN TIME","SLEEP NOW","BACK","PAIR AGAIN"};
+        const auto i=state.settings_index%12U;
         char value[24]{};
         if (i==0) std::snprintf(value,sizeof(value),"%s",assets::theme_names[static_cast<unsigned>(state.theme)%8]);
         else if (i==1) std::snprintf(value,sizeof(value),"%s",state.sound_muted ? "ON" : "OFF");
@@ -313,7 +321,7 @@ void render_screen(const State &state, MonoSurface &surface)
             if (state.display_timeout_minutes) std::snprintf(value,sizeof(value),"%u MIN",state.display_timeout_minutes);
             else std::snprintf(value,sizeof(value),"OFF");
         }
-        card(surface,"SETTINGS",names[i],value,i==9 ? "SLEEP" : i==10 ? "BACK" : i==6 ? "PLAY" : "CHANGE",i,11);
+        card(surface,"SETTINGS",names[i],value,i==9 ? "SLEEP" : i==10 ? "BACK" : i==11 ? "OPEN" : i==6 ? "PLAY" : "CHANGE",i,12);
         return;
     }
     if (state.screen == Screen::SettingEdit) {
