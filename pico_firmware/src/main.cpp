@@ -51,6 +51,13 @@ void apply_effects(pico::Effects effects, pico::Core &core,
                    pico::platform::Storage &storage,
                    pico::platform::Ble &ble, pico::Capabilities capabilities)
 {
+    if (pico::has_effect(effects,pico::Effect::ClosePairing)) ble.close_pairing();
+    if (pico::has_effect(effects,pico::Effect::OpenPairing)) {
+        if (!(display.capabilities() & pico::capability(pico::Capability::Display)) || !ble.open_pairing(core.state().pairing.token)) {
+            effects|=core.handle({pico::EventKind::PairingFailed,255U,core.state().pairing.token});
+            ble.close_pairing();
+        }
+    }
     if (pico::has_effect(effects,pico::Effect::ForgetCompanionBonds)) {
         const bool reset=ble.forget_companions();
         effects|=core.handle({pico::EventKind::PairingResetResult,reset ? 0U : 1U});

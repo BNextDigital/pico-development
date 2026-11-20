@@ -149,6 +149,10 @@ std::string event_name(pico::EventKind kind)
 {
     switch (kind) {
     case pico::EventKind::PairingResetResult: return "PairingResetResult";
+    case pico::EventKind::PairingPasskey: return "PairingPasskey";
+    case pico::EventKind::PairingComplete: return "PairingComplete";
+    case pico::EventKind::PairingFailed: return "PairingFailed";
+    case pico::EventKind::CancelPairing: return "CancelPairing";
     case pico::EventKind::OpenClock: return "OpenClock";
     case pico::EventKind::SyncTime: return "SyncTime";
     case pico::EventKind::SetClockOptions: return "SetClockOptions";
@@ -254,7 +258,7 @@ std::string event_name(pico::EventKind kind)
 
 std::optional<pico::EventKind> parse_event_kind(const std::string &token)
 {
-    constexpr std::array<pico::EventKind, 73> kinds{
+    constexpr std::array<pico::EventKind, 77> kinds{
         pico::EventKind::Boot,          pico::EventKind::Tick,
         pico::EventKind::PrimaryPressed, pico::EventKind::SecondaryPressed,
         pico::EventKind::Connected,     pico::EventKind::Disconnected,
@@ -305,7 +309,7 @@ std::optional<pico::EventKind> parse_event_kind(const std::string &token)
         pico::EventKind::PlayReference,
         pico::EventKind::StopReference,
         pico::EventKind::AudioReady,
-        pico::EventKind::PairingResetResult,
+        pico::EventKind::PairingResetResult, pico::EventKind::PairingPasskey, pico::EventKind::PairingComplete, pico::EventKind::PairingFailed, pico::EventKind::CancelPairing,
         pico::EventKind::OpenClock,
         pico::EventKind::SyncTime,
         pico::EventKind::SetClockOptions,
@@ -627,6 +631,10 @@ public:
                << "\"clock\":" << clock_json() << ','
                << "\"theme\":" << static_cast<unsigned>(state.theme) << ','
                << "\"screen\":" << static_cast<unsigned>(state.screen) << ','
+               << "\"pairing_stage\":" << static_cast<unsigned>(state.pairing.stage) << ','
+               << "\"pairing_token\":" << state.pairing.token << ','
+               << "\"pairing_active\":" << (state.pairing.active() ? "true" : "false") << ','
+               << "\"pairing_error\":" << unsigned(state.pairing.error) << ','
                << "\"menu_index\":" << static_cast<unsigned>(state.menu_index) << ','
                << "\"eyes_closed\":" << (state.eyes_closed ? "true" : "false") << ','
                << "\"settings_index\":" << static_cast<unsigned>(state.settings_index) << ','
@@ -842,6 +850,7 @@ private:
         append(pico::Effect::PersistClock, "PersistClock");
         append(pico::Effect::NotifyClock, "NotifyClock");
         append(pico::Effect::ForgetCompanionBonds,"ForgetCompanionBonds");
+        append(pico::Effect::OpenPairing,"OpenPairing"); append(pico::Effect::ClosePairing,"ClosePairing");
         output << ']';
         return output.str();
     }

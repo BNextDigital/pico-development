@@ -130,6 +130,14 @@ Effects Core::navigate(EventKind kind)
 {
     if (state_.dock == Dock::Car) return effect(Effect::None);
     activity();
+    if (state_.screen == Screen::Pairing) {
+        if (kind==EventKind::Back || kind==EventKind::OpenMenu) {
+            const auto effects=close_pairing(PairingStage::Confirm);
+            state_.screen=kind==EventKind::OpenMenu ? Screen::Menu : Screen::Settings;
+            return effects | Effect::Render;
+        }
+        return effect(Effect::None);
+    }
     if (state_.screen == Screen::PairingRecovery) {
         if (kind==EventKind::Back || kind==EventKind::OpenMenu) {
             state_.screen=kind==EventKind::OpenMenu ? Screen::Menu : Screen::Settings;
@@ -189,7 +197,7 @@ Effects Core::navigate(EventKind kind)
         if (state_.screen == Screen::Menu)
             state_.menu_index = static_cast<std::uint8_t>((state_.menu_index + 10 + direction) % 10);
         else if (state_.screen == Screen::Settings)
-            state_.settings_index = static_cast<std::uint8_t>((state_.settings_index+12+direction)%12);
+            state_.settings_index = static_cast<std::uint8_t>((state_.settings_index+13+direction)%13);
         else if (state_.screen == Screen::Utility) {
             const int count = state_.mode == Mode::Focus ? 8 : 4;
             state_.utility_index = static_cast<std::uint8_t>((state_.utility_index + count + direction) % count);
@@ -231,6 +239,11 @@ Effects Core::navigate(EventKind kind)
         case 8: return open_setting(SettingKey::DisplayTimeout);
         case 9: return handle({EventKind::SleepDisplay,0});
         case 10: state_.screen = Screen::Menu; break;
+        case 12:
+            state_.pairing.stage=PairingStage::Confirm;
+            state_.pairing.passkey=0;
+            state_.screen=Screen::Pairing;
+            break;
         case 11:
             state_.pairing_reset=PairingResetState::Confirm;
             state_.screen=Screen::PairingRecovery;
@@ -270,6 +283,39 @@ Effects Core::navigate(EventKind kind)
 }
 Effects Core::handle(const Event &event)
 {
+    if (event.kind==EventKind::CancelPairing) return close_pairing(PairingStage::Confirm);
+    if (state_.pairing.active() && (event.kind==EventKind::Back || event.kind==EventKind::OpenMenu ||
+        event.kind==EventKind::FocusButtonHeld)) {
+        const auto effects=close_pairing(PairingStage::Confirm);
+        state_.screen=event.kind==EventKind::OpenMenu ? Screen::Menu : Screen::Settings;
+        return effects | Effect::Render;
+    }
+    if (event.kind==EventKind::PairingPasskey || event.kind==EventKind::PairingComplete || event.kind==EventKind::PairingFailed) {
+        if (!state_.pairing.active() || event.auxiliary!=state_.pairing.token) return effect(Effect::None);
+        if (event.kind==EventKind::PairingPasskey) {
+            if (event.value>999999U) return effect(Effect::None);
+            state_.pairing.passkey=event.value; state_.pairing.stage=PairingStage::Passkey;
+            state_.display_asleep=false;
+            return effect(Effect::Render);
+        }
+        state_.pairing.error=static_cast<std::uint8_t>(event.value);
+        return close_pairing(event.kind==EventKind::PairingComplete ? PairingStage::Paired : PairingStage::Failed);
+    }
+    if (event.kind==EventKind::FocusButtonHeld && state_.screen==Screen::Pairing && !state_.display_asleep &&
+        !state_.clock.ringing && !state_.finding && !state_.timer_completed && state_.dock!=Dock::Car) {
+        if (state_.pairing.active()) return close_pairing(PairingStage::Confirm);
+        if (state_.pairing.stage!=PairingStage::Confirm) return navigate(EventKind::Back);
+        ++state_.pairing.token;
+        state_.pairing.started=state_.uptime_seconds;
+        state_.pairing.stage=PairingStage::Waiting; state_.pairing.passkey=0; state_.pairing.error=0;
+        activity();
+        return Effect::Render | Effect::OpenPairing;
+    }
+    if (state_.pairing.active() && (event.kind==EventKind::StartFinding || event.kind==EventKind::DockChanged ||
+        event.kind==EventKind::SetMode || event.kind==EventKind::OpenClock || event.kind==EventKind::OpenSettings)) {
+        const auto effects=close_pairing(PairingStage::Confirm);
+        return handle(event) | effects;
+    }
     if (event.kind==EventKind::PairingResetResult) {
         if (state_.pairing_reset!=PairingResetState::Pending || event.value>1) return effect(Effect::None);
         state_.pairing_reset=event.value==0 ? PairingResetState::Cleared : PairingResetState::Failed;
@@ -365,11 +411,12 @@ Effects Core::handle(const Event &event)
         state_.display_timeout_minutes = static_cast<std::uint8_t>(event.value);
         activity(); return Effect::Render | Effect::Persist;
     case EventKind::SleepDisplay:
-        if (state_.clock.ringing || state_.finding || state_.timer_completed || state_.tuner_running || state_.metronome_running || state_.reference_playing)
+        if (state_.pairing.active() || state_.clock.ringing || state_.finding || state_.timer_completed || state_.tuner_running || state_.metronome_running || state_.reference_playing)
             return effect(Effect::None);
         state_.screen = Screen::Home; state_.display_asleep = true;
         return effect(Effect::Render);
     case EventKind::Boot:
+        state_.pairing=PairingState{};
         clock_.reboot(state_.clock);
         locator_.stop(); state_.finding=false; state_.finding_remaining_seconds=0;
         state_.mode = Mode::Companion;
@@ -614,7 +661,8 @@ Effects Core::handle(const Event &event)
         if (state_.dock == Dock::Car) return effect(Effect::None);
         metronome_.stop(); sync_metronome(); state_.tuner_running = false;
         state_.screen = Screen::Settings; activity(); return Effect::Render | Effect::Notify;
-    case EventKind::PairingResetResult: break;
+    case EventKind::PairingResetResult: case EventKind::PairingPasskey: case EventKind::PairingComplete:
+    case EventKind::PairingFailed: case EventKind::CancelPairing: break;
     case EventKind::OpenClock: case EventKind::SyncTime: case EventKind::SetClockOptions:
     case EventKind::ConfigureAlarm: case EventKind::DismissAlarm: case EventKind::StopwatchStart:
     case EventKind::StopwatchPause: case EventKind::StopwatchResume: case EventKind::StopwatchReset:
@@ -622,6 +670,12 @@ Effects Core::handle(const Event &event)
     case EventKind::RequestStatus: return Effect::Notify | Effect::NotifyClock;
     }
     return effect(Effect::None);
+}
+Effects Core::close_pairing(PairingStage stage)
+{
+    const bool active=state_.pairing.active();
+    state_.pairing.passkey=0; state_.pairing.stage=stage;
+    return active ? Effect::Render | Effect::ClosePairing : effect(Effect::None);
 }
 Effects Core::on_tick(std::uint32_t now)
 {
@@ -633,6 +687,8 @@ Effects Core::on_tick(std::uint32_t now)
     Effects effects = advance_clock(now);
     if (previous != state_.timer_remaining_seconds) effects |= Effect::Render | Effect::Notify;
     if (complete) effects |= timer_complete();
+    if (state_.pairing.active() && (now-state_.pairing.started>=120U || state_.timer_completed || state_.clock.ringing))
+        effects |= close_pairing(now-state_.pairing.started>=120U ? PairingStage::TimedOut : PairingStage::Confirm);
     effects |= handle({EventKind::AnimationTick, animation_ms_});
     return effects;
 }

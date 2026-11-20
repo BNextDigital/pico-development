@@ -35,3 +35,7 @@ Flash `build-bond-recovery/zephyr/zephyr.uf2` using the factory UF2 bootloader. 
 Host tests cover explicit confirmation, wake-only behavior, failed/successful results and durable-settings preservation. Simulator tests model the recovery effect without a radio. Production BLE-adapter tests with fake Zephyr APIs cover identity isolation, disconnect/unpair failure, full Event forwarding, queue rejection and GATT identity authorization. Both XIAO profiles must link before delivery.
 
 Physical phone rebonding, stored-key deletion across power loss, live identity concurrency and speaker behavior remain unverified. The separate silent-speaker issue remains open. Recovery tests do not qualify physical BLE or flash durability.
+
+## Passkey firmware migration
+
+Firmware 0.14.2 requires authenticated Secure Connections for private Pico GATT. After clearing old companion bonds, open **Settings → Pair Phone** with a physical Action-button hold, then enter the OLED passkey on the phone. See [PIN pairing](pin-pairing.md) for the two-minute window, recovery and hardware acceptance steps. Command IDs, status bytes and durable settings schemas are unchanged.

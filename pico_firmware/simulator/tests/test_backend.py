@@ -803,11 +803,34 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(self.harness.send("status")["state"]["clock"]["stopwatch_seconds"],0)
 
 
+    def test_pin_pairing_window_passkey_timeout_and_reboot(self):
+        self.harness.send("event OpenSettings")
+        self.harness.send("event NavigatePrevious")
+        opened=self.harness.send("event Select")
+        self.assertEqual(opened["state"]["screen"],19)
+        self.assertNotIn("OpenPairing",self.harness.send("ble 13")["effect_names"])
+        active=self.harness.send("event FocusButtonHeld")
+        self.assertIn("OpenPairing",active["effect_names"])
+        token=active["state"]["pairing_token"]
+        pin=self.harness.send(f"event PairingPasskey 37 {token}")
+        self.assertEqual(pin["state"]["pairing_stage"],2)
+        self.assertNotEqual(pin["frame_hex"],active["frame_hex"])
+        self.assertFalse(pin["persist_queued"])
+        expired=self.harness.send("advance 120")
+        self.assertFalse(expired["state"]["pairing_active"])
+        self.assertEqual(expired["state"]["pairing_stage"],5)
+        stale=self.harness.send(f"event PairingPasskey 123456 {token}")
+        self.assertEqual(stale["state"]["pairing_stage"],5)
+        reboot=self.harness.send("power_cycle")
+        self.assertFalse(reboot["state"]["pairing_active"])
+        self.assertEqual(reboot["state"]["screen"],0)
+
     def test_pair_again_requires_local_hold_and_preserves_durables(self):
         self.harness.send("ble 07 04")
         self.harness.send("ble 61 06")
         self.harness.send("event Connected")
         self.harness.send("event OpenSettings")
+        self.harness.send("event NavigatePrevious")
         self.harness.send("event NavigatePrevious")
         confirmed=self.harness.send("event Select")
         self.assertEqual(confirmed["state"]["screen"],18)

@@ -17,8 +17,8 @@ struct bt_gatt_authorization_cb { bool (*read_authorize)(bt_conn *,const bt_gatt
 #define BT_GATT_CHRC_NOTIFY 2
 #define BT_GATT_CHRC_WRITE 4
 #define BT_GATT_CHRC_WRITE_WITHOUT_RESP 8
-#define BT_GATT_PERM_READ_ENCRYPT 1
-#define BT_GATT_PERM_WRITE_ENCRYPT 2
+#define BT_GATT_PERM_READ_AUTHEN 1
+#define BT_GATT_PERM_WRITE_AUTHEN 2
 ssize_t bt_gatt_attr_read(bt_conn *,const bt_gatt_attr *,void *,std::uint16_t,std::uint16_t,const void *,std::size_t);
 int bt_gatt_notify(bt_conn *,const bt_gatt_attr *,const void *,std::size_t);
 int bt_gatt_authorization_cb_register(const bt_gatt_authorization_cb *);

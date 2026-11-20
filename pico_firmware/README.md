@@ -2,9 +2,9 @@
 
 Offline-first Zephyr/C++17 firmware for Pico, a small BLE companion with expressive 128×64 monochrome face, contextual docks and local tools. Target hardware: **Seeed Studio XIAO nRF52840 Sense** with **nRF Connect SDK 3.4.2**.
 
-**Snapshot (November 19, 2026):** the source build-version default is `0.14.1-bond-recovery` (`Kconfig` and `VERSION`). This is a software milestone, **not a hardware-validated release**. Earlier XIAO OLED, BLE and D0 behavior were physically demonstrated; compilation and acceptance of the latest combined profile are still pending.
+**Snapshot (November 19, 2026):** the source build-version default is `0.14.2-pin-pairing` (`Kconfig` and `VERSION`). This is a software milestone, **not a hardware-validated release**. Earlier XIAO OLED, BLE and D0 behavior were physically demonstrated; compilation and acceptance of the latest combined profile are still pending.
 
-Pairing recovery: [local companion-bond reset](docs/ble-recovery.md).
+Pairing: [local six-digit passkey flow](docs/pin-pairing.md), with a [separate companion-bond reset](docs/ble-recovery.md). Older companion bonds require a one-time re-pair.
 
 ## Implemented software
 
@@ -16,10 +16,10 @@ Pairing recovery: [local companion-bond reset](docs/ble-recovery.md).
 | Music | Visual metronome, optional Sense PDM chromatic tuner and E2–C6 reference pitches through optional I2S audio |
 | Motion | Optional Sense IMU pickup/rock/rest classification and personality behavior mask |
 | Audio | Optional MAX98357A I2S sound cues, volume/mute and visual-only fallback |
-| Settings | Twelve menu items: theme, mute, volume, work/timer, break, motion, test sound, brightness, screen time, sleep now, back and Pair Again |
+| Settings | Thirteen menu items: theme, mute, volume, work/timer, break, motion, test sound, brightness, screen time, sleep now, back, Pair Again and Pair Phone |
 | OLED power | 5–100% brightness, Off/1–30-minute inactivity timeout, wake-only first input, timer-alert wake |
 | Persistence | 32-byte **storage v5**, migration from v1–v4, coalesced saves; transient timers and editors not restored |
-| BLE | Encrypted custom GATT protocol v1, 16-byte status, additive commands; bonds stored separately |
+| BLE | Authenticated LE Secure Connections custom GATT protocol v1, 16-byte status, additive commands; bonds stored separately |
 
 Optional peripherals have hardware adapters and host coverage, but **target compilation, audio/acoustic accuracy, OLED contrast, button interrupts, sensor thresholds and current draw need real-board validation**. Wayfinding GPS/compass, Notes recording, complete dock electronics and final battery/power hardware are not implemented.
 
