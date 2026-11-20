@@ -17,7 +17,7 @@ public:
     Effects handle(const Event &event);
     std::uint32_t next_animation_ms(std::uint32_t now) const
     {
-        if (state_.display_asleep) return UINT32_MAX;
+        if (state_.display_asleep || state_.pairing.active()) return UINT32_MAX;
         auto delay = personality_.next_update_ms(state_, now);
         if (display::auto_sleep_allowed(state_)) {
             const auto elapsed = now - display_activity_ms_;
@@ -41,6 +41,7 @@ public:
     bool restore(const PersistedState &persisted);
 
 private:
+    Effects close_pairing(PairingStage stage);
     Effects clock_event(const Event &event);
     Effects clock_navigation(EventKind kind);
     Effects advance_clock(std::uint32_t now);

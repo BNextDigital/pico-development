@@ -16,8 +16,17 @@ int unpair_result;
 unsigned unpair_identity=255;
 const bt_addr_le_t *unpair_address;
 bool accepting=true;
+unsigned auth_cancels=0,security_requests=0;
+int security_error=0;
 bool sink(const pico::Event &event) { if (!accepting) return false; events.push_back(event); return true; }
 }
+bt_conn *bt_conn_ref(bt_conn *conn) { ++conn->refs; return conn; }
+void bt_conn_unref(bt_conn *conn) { assert(conn->refs); --conn->refs; }
+int bt_conn_auth_cancel(bt_conn *) { ++auth_cancels; return 0; }
+int bt_conn_set_security(bt_conn *conn,bt_security_t level) {
+ assert(conn->id==0 && level==BT_SECURITY_L4); ++security_requests; return security_error;
+}
+bt_security_t bt_conn_get_security(bt_conn *conn) { return conn->security; }
 int bt_conn_get_info(bt_conn *conn,bt_conn_info *info) { *info={conn->id,conn->connected ? 1 : 0}; return 0; }
 void bt_conn_foreach(int,void (*cb)(bt_conn *,void *),void *data) { cb(&companion,data); cb(&network,data); }
 int bt_conn_disconnect(bt_conn *conn,std::uint8_t reason) {
@@ -63,5 +72,58 @@ int main() {
  assert(!pico_authorized(&network,&pico_service.attrs[10]));
  assert(!pico_authorized(&network,&pico_service.attrs[13]));
  assert(pico_authorized(&companion,&pico_service.attrs[10]));
+ // Local window and actual production authentication callbacks.
+ accepting=true; events.clear(); companion.connected=false; network.connected=true;
+ assert(accept_pairing(&companion,nullptr)==BT_SECURITY_ERR_PAIR_NOT_ALLOWED);
+ assert(ble.open_pairing(10));
+ assert(accept_pairing(&network,nullptr)==BT_SECURITY_ERR_PAIR_NOT_ALLOWED);
+ assert(accept_pairing(&companion,nullptr)==BT_SECURITY_ERR_SUCCESS);
+ bt_conn intruder{0,true};
+ assert(accept_pairing(&intruder,nullptr)==BT_SECURITY_ERR_PAIR_NOT_ALLOWED);
+ authentication_callbacks.passkey_display(&companion,37);
+ assert(events.back().kind==pico::EventKind::PairingPasskey && events.back().value==37 && events.back().auxiliary==10);
+ companion.security=BT_SECURITY_L4;
+ pairing_callbacks.pairing_complete(&companion,true);
+ assert(events.back().kind==pico::EventKind::PairingComplete && events.back().auxiliary==10);
+ const auto disconnects=disconnected_companion;
+ ble.close_pairing(); assert(companion.refs==0 && disconnected_companion==disconnects);
+ // Cancel, strict deadline, late callbacks and identity separation.
+ companion.security=2; assert(ble.open_pairing(11));
+ assert(accept_pairing(&companion,nullptr)==BT_SECURITY_ERR_SUCCESS);
+ fake_uptime=121000; // Exactly 120 seconds after opening.
+ assert(accept_pairing(&intruder,nullptr)==BT_SECURITY_ERR_PAIR_NOT_ALLOWED);
+ const auto before_expired=events.size();
+ authentication_callbacks.passkey_display(&companion,123456);
+ assert(events.size()==before_expired); // Expired code never reaches UI.
+ ble.close_pairing(); assert(companion.refs==0 && network.connected);
+ fake_uptime=122000; assert(ble.open_pairing(12));
+ companion.connected=true;
+ connected(&companion,0); assert(security_requests>0);
+ accepting=false;
+ const auto cancels=auth_cancels;
+ authentication_callbacks.passkey_display(&companion,654321);
+ assert(auth_cancels>cancels && !companion.connected);
+ accepting=true; ble.close_pairing(); assert(companion.refs==0);
+ assert(ble.open_pairing(13));
+ assert(accept_pairing(&companion,nullptr)==BT_SECURITY_ERR_SUCCESS);
+ pairing_callbacks.pairing_failed(&companion,BT_SECURITY_ERR_AUTH_FAIL);
+ assert(events.back().kind==pico::EventKind::PairingFailed && events.back().auxiliary==13);
+ ble.close_pairing(); assert(companion.refs==0);
+ // No identity-1 UI callback may cancel its separate transport.
+ const auto network_cancels=auth_cancels;
+ authentication_callbacks.passkey_display(&network,123456);
+ assert(network.connected && auth_cancels==network_cancels);
+ // Low-memory/security API failure fails closed and releases its reference.
+ companion.connected=true; security_error=-ENOMEM;
+ assert(ble.open_pairing(15));
+ assert(events.back().kind==pico::EventKind::PairingFailed && events.back().auxiliary==15);
+ ble.close_pairing(); assert(companion.refs==0);
+ security_error=0;
+ // An unauthenticated/nonbonded completion is not success.
+ assert(ble.open_pairing(14));
+ assert(accept_pairing(&companion,nullptr)==BT_SECURITY_ERR_SUCCESS);
+ pairing_callbacks.pairing_complete(&companion,false);
+ assert(events.back().kind==pico::EventKind::PairingFailed);
+ ble.close_pairing(); assert(companion.refs==0);
  std::cout << "BLE adapter identity-scoped reset and atomic command forwarding models passed\n";
 }

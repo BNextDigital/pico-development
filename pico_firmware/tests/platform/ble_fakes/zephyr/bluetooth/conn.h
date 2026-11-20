@@ -1,6 +1,6 @@
 #pragma once
 #include <cstdint>
-struct bt_conn { std::uint8_t id; bool connected; };
+struct bt_conn { std::uint8_t id; bool connected; unsigned security{2}; unsigned refs{0}; };
 struct bt_conn_info { std::uint8_t id; int state; };
 struct bt_conn_pairing_feat {};
 using bt_security_t=unsigned;
@@ -10,7 +10,7 @@ enum bt_security_err { BT_SECURITY_ERR_SUCCESS, BT_SECURITY_ERR_AUTH_FAIL,
  BT_SECURITY_ERR_PAIR_NOT_ALLOWED, BT_SECURITY_ERR_INVALID_PARAM,
  BT_SECURITY_ERR_KEY_REJECTED, BT_SECURITY_ERR_UNSPECIFIED };
 struct bt_conn_auth_info_cb { void (*pairing_complete)(bt_conn *,bool); void (*pairing_failed)(bt_conn *,bt_security_err); };
-struct bt_conn_auth_cb { bt_security_err (*pairing_accept)(bt_conn *,const bt_conn_pairing_feat *); };
+struct bt_conn_auth_cb { bt_security_err (*pairing_accept)(bt_conn *,const bt_conn_pairing_feat *); void (*passkey_display)(bt_conn *,unsigned); void (*cancel)(bt_conn *); };
 struct bt_conn_cb {
  void (*connected)(bt_conn *,std::uint8_t);
  void (*disconnected)(bt_conn *,std::uint8_t);
@@ -27,3 +27,11 @@ int bt_conn_disconnect(bt_conn *,std::uint8_t);
 int bt_conn_auth_info_cb_register(bt_conn_auth_info_cb *);
 int bt_conn_auth_info_cb_unregister(bt_conn_auth_info_cb *);
 int bt_conn_auth_cb_register(const bt_conn_auth_cb *);
+
+#define BT_SECURITY_L4 4
+#define BT_CONN_STATE_CONNECTED 1
+bt_conn *bt_conn_ref(bt_conn *);
+void bt_conn_unref(bt_conn *);
+int bt_conn_auth_cancel(bt_conn *);
+int bt_conn_set_security(bt_conn *,bt_security_t);
+bt_security_t bt_conn_get_security(bt_conn *);

@@ -288,6 +288,20 @@ void render_screen(const State &state, MonoSurface &surface)
         centered(surface,"PICO HERE",surface.height-11U,2);
         return;
     }
+    if (state.screen==Screen::Pairing || state.pairing.active()) {
+        const auto &pair=state.pairing;
+        char value[16]{};
+        if (pair.stage==PairingStage::Passkey) std::snprintf(value,sizeof(value),"%06u",static_cast<unsigned>(pair.passkey));
+        else std::snprintf(value,sizeof(value),"%s",pair.stage==PairingStage::Confirm ? "READY?" :
+            pair.stage==PairingStage::Waiting ? "PAIRING" : pair.stage==PairingStage::Paired ? "PAIRED" :
+            pair.stage==PairingStage::TimedOut ? "EXPIRED" : "FAILED");
+        char context[24]{};
+        if (pair.stage==PairingStage::Failed) std::snprintf(context,sizeof(context),"ERROR %u",pair.error);
+        else std::snprintf(context,sizeof(context),"%s",pair.stage==PairingStage::Passkey ? "ENTER ON PHONE" :
+            pair.stage==PairingStage::Waiting ? "CONNECT IN APP" : "");
+        card(surface,"PAIR PHONE",value,context,pair.stage==PairingStage::Confirm ? "HOLD ACTION" : "BACK");
+        return;
+    }
     if (state.screen==Screen::PairingRecovery) {
         const auto status=state.pairing_reset;
         card(surface,"PAIR AGAIN",status==PairingResetState::Cleared ? "CLEARED" :
@@ -309,8 +323,8 @@ void render_screen(const State &state, MonoSurface &surface)
         return;
     }
     if (state.screen == Screen::Settings) {
-        constexpr const char *names[]{"FACE","MUTE","VOLUME","WORK TIME","BREAK TIME","MOTION","TEST SOUND","BRIGHTNESS","SCREEN TIME","SLEEP NOW","BACK","PAIR AGAIN"};
-        const auto i=state.settings_index%12U;
+        constexpr const char *names[]{"FACE","MUTE","VOLUME","WORK TIME","BREAK TIME","MOTION","TEST SOUND","BRIGHTNESS","SCREEN TIME","SLEEP NOW","BACK","PAIR AGAIN","PAIR PHONE"};
+        const auto i=state.settings_index%13U;
         char value[24]{};
         if (i==0) std::snprintf(value,sizeof(value),"%s",assets::theme_names[static_cast<unsigned>(state.theme)%8]);
         else if (i==1) std::snprintf(value,sizeof(value),"%s",state.sound_muted ? "ON" : "OFF");
@@ -321,7 +335,7 @@ void render_screen(const State &state, MonoSurface &surface)
             if (state.display_timeout_minutes) std::snprintf(value,sizeof(value),"%u MIN",state.display_timeout_minutes);
             else std::snprintf(value,sizeof(value),"OFF");
         }
-        card(surface,"SETTINGS",names[i],value,i==9 ? "SLEEP" : i==10 ? "BACK" : i==11 ? "OPEN" : i==6 ? "PLAY" : "CHANGE",i,12);
+        card(surface,"SETTINGS",names[i],value,i==9 ? "SLEEP" : i==10 ? "BACK" : i>=11 ? "OPEN" : i==6 ? "PLAY" : "CHANGE",i,13);
         return;
     }
     if (state.screen == Screen::SettingEdit) {

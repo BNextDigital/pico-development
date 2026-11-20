@@ -66,3 +66,7 @@ The [nRF52840 DK overlay](../overlays/nrf52840dk_ssd1306.overlay) is historical/
 ## Companion pairing recovery
 
 See [Pair Again recovery](ble-recovery.md) for a physical-button-confirmed reset of identity 0 companion bonds. Personality, clock settings and tracking ownership are preserved.
+
+## Passkey firmware migration
+
+Firmware 0.14.2 requires authenticated Secure Connections for private Pico GATT. After clearing old companion bonds, open **Settings → Pair Phone** with a physical Action-button hold, then enter the OLED passkey on the phone. See [PIN pairing](pin-pairing.md) for the two-minute window, recovery and hardware acceptance steps. Command IDs, status bytes and durable settings schemas are unchanged.

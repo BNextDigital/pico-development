@@ -142,23 +142,23 @@ BT_GATT_SERVICE_DEFINE(
     BT_GATT_PRIMARY_SERVICE(BT_UUID_PICO_SERVICE),
     BT_GATT_CHARACTERISTIC(BT_UUID_PICO_STATUS,
                            BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,
-                           BT_GATT_PERM_READ_ENCRYPT, read_status, nullptr, nullptr),
+                           BT_GATT_PERM_READ_AUTHEN, read_status, nullptr, nullptr),
     BT_GATT_CCC(status_subscription_changed,
-                BT_GATT_PERM_READ_ENCRYPT | BT_GATT_PERM_WRITE_ENCRYPT),
+                BT_GATT_PERM_READ_AUTHEN | BT_GATT_PERM_WRITE_AUTHEN),
     BT_GATT_CHARACTERISTIC(BT_UUID_PICO_COMMAND,
                            BT_GATT_CHRC_WRITE | BT_GATT_CHRC_WRITE_WITHOUT_RESP,
-                           BT_GATT_PERM_WRITE_ENCRYPT, nullptr, write_command,
+                           BT_GATT_PERM_WRITE_AUTHEN, nullptr, write_command,
                            nullptr),
     BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(BT_UUID_PICO_LOCATOR_VAL),
                            BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,
-                           BT_GATT_PERM_READ_ENCRYPT,read_locator,nullptr,nullptr),
+                           BT_GATT_PERM_READ_AUTHEN,read_locator,nullptr,nullptr),
     BT_GATT_CCC(status_subscription_changed,
-                BT_GATT_PERM_READ_ENCRYPT | BT_GATT_PERM_WRITE_ENCRYPT),
+                BT_GATT_PERM_READ_AUTHEN | BT_GATT_PERM_WRITE_AUTHEN),
     BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(BT_UUID_128_ENCODE(0x8e7b0005,0x54f2,0x4d9b,0xa3d1,0x9f150000c001)),
-        BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,BT_GATT_PERM_READ_ENCRYPT,read_clock,nullptr,nullptr),
-    BT_GATT_CCC(status_subscription_changed,BT_GATT_PERM_READ_ENCRYPT | BT_GATT_PERM_WRITE_ENCRYPT),
+        BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,BT_GATT_PERM_READ_AUTHEN,read_clock,nullptr,nullptr),
+    BT_GATT_CCC(status_subscription_changed,BT_GATT_PERM_READ_AUTHEN | BT_GATT_PERM_WRITE_AUTHEN),
     BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(BT_UUID_128_ENCODE(0x8e7b0006,0x54f2,0x4d9b,0xa3d1,0x9f150000c001)),
-        BT_GATT_CHRC_READ,BT_GATT_PERM_READ_ENCRYPT,read_clock_config,nullptr,nullptr));
+        BT_GATT_CHRC_READ,BT_GATT_PERM_READ_AUTHEN,read_clock_config,nullptr,nullptr));
 
 const bt_data advertising_data[] = {
     BT_DATA_BYTES(BT_DATA_FLAGS, BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR),
@@ -170,12 +170,12 @@ const bt_data scan_response_data[] = {
             sizeof(CONFIG_BT_DEVICE_NAME) - 1U),
 };
 
-#if defined(CONFIG_PICO_FIND_HUB)
 bool is_companion(bt_conn *conn)
 {
     bt_conn_info info{};
-    return bt_conn_get_info(conn, &info) == 0 && pico::tracking::companion_identity(info.id);
+    return bt_conn_get_info(conn, &info) == 0 && info.id==BT_ID_DEFAULT;
 }
+#if defined(CONFIG_PICO_FIND_HUB)
 struct ConnectionCounts { unsigned companion{}, total{}; };
 void count_connections(bt_conn *conn, void *data)
 {
@@ -185,6 +185,7 @@ void count_connections(bt_conn *conn, void *data)
     ++counts.total;
     if (pico::tracking::companion_identity(info.id)) ++counts.companion;
 }
+#endif
 bool pico_authorized(bt_conn *conn, const bt_gatt_attr *attr)
 {
     const auto address = reinterpret_cast<std::uintptr_t>(attr);
@@ -195,12 +196,81 @@ bool pico_authorized(bt_conn *conn, const bt_gatt_attr *attr)
 const bt_gatt_authorization_cb authorization_callbacks = {
     .read_authorize = pico_authorized, .write_authorize = pico_authorized,
 };
+// A referenced connection owns each local window. No passkey is logged or stored.
+K_MUTEX_DEFINE(pairing_mutex);
+struct PairingWindow {
+    bt_conn *connection{};
+    std::uint32_t token{};
+    std::int64_t deadline{};
+    bool active{}, successful{};
+} pairing_window;
+
+bool pairing_live()
+{ return pairing_window.active && k_uptime_get()/1000 < pairing_window.deadline; }
+
+bool claim_pairing(bt_conn *conn)
+{
+    if (!is_companion(conn)) return false;
+    k_mutex_lock(&pairing_mutex,K_FOREVER);
+    const bool allowed=pairing_live() && (!pairing_window.connection || pairing_window.connection==conn);
+    if (allowed && !pairing_window.connection) pairing_window.connection=bt_conn_ref(conn);
+    k_mutex_unlock(&pairing_mutex);
+    return allowed;
+}
+
+void pairing_result(bt_conn *conn,pico::EventKind kind,unsigned value)
+{
+    k_mutex_lock(&pairing_mutex,K_FOREVER);
+    const bool owned=pairing_window.connection==conn && pairing_live();
+    const auto token=pairing_window.token;
+    if (owned) {
+        pairing_window.active=false;
+        pairing_window.successful=kind==pico::EventKind::PairingComplete;
+    }
+    k_mutex_unlock(&pairing_mutex);
+    if (owned && (event_sink==nullptr || !event_sink({kind,value,token}))) {
+        // A full UI queue must never silently authorize an unseen pairing.
+        bt_conn_auth_cancel(conn);
+        bt_conn_disconnect(conn,BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+    }
+}
+
 bt_security_err accept_pairing(bt_conn *conn, const bt_conn_pairing_feat *)
 {
-    return is_companion(conn) ? BT_SECURITY_ERR_SUCCESS : BT_SECURITY_ERR_PAIR_NOT_ALLOWED;
+    return claim_pairing(conn) ? BT_SECURITY_ERR_SUCCESS : BT_SECURITY_ERR_PAIR_NOT_ALLOWED;
 }
-const bt_conn_auth_cb authentication_callbacks = { .pairing_accept = accept_pairing };
-#endif
+void display_passkey(bt_conn *conn,unsigned passkey)
+{
+    if (!is_companion(conn)) return;
+    k_mutex_lock(&pairing_mutex,K_FOREVER);
+    const bool owned=pairing_window.connection==conn && pairing_live() && passkey<=999999U;
+    const auto token=pairing_window.token;
+    k_mutex_unlock(&pairing_mutex);
+    if (!owned || event_sink==nullptr || !event_sink({pico::EventKind::PairingPasskey,passkey,token})) {
+        pairing_result(conn,pico::EventKind::PairingFailed,BT_SECURITY_ERR_UNSPECIFIED);
+        bt_conn_auth_cancel(conn);
+        bt_conn_disconnect(conn,BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+    }
+}
+void cancel_pairing_request(bt_conn *conn)
+{ pairing_result(conn,pico::EventKind::PairingFailed,BT_SECURITY_ERR_AUTH_FAIL); }
+const bt_conn_auth_cb authentication_callbacks = {
+    .pairing_accept = accept_pairing,
+    .passkey_display = display_passkey,
+    .cancel = cancel_pairing_request,
+};
+
+void request_pin_security(bt_conn *conn)
+{
+    if (!claim_pairing(conn)) return;
+    const int error=bt_conn_set_security(conn,BT_SECURITY_L4);
+    if (error && error!=-EALREADY) {
+        LOG_WRN("PIN security request failed (%d)",error);
+        pairing_result(conn,pico::EventKind::PairingFailed,BT_SECURITY_ERR_UNSPECIFIED);
+    }
+    else if (bt_conn_get_security(conn)>=BT_SECURITY_L4)
+        pairing_result(conn,pico::EventKind::PairingComplete,0);
+}
 
 int begin_advertising()
 {
@@ -227,15 +297,8 @@ void connected(bt_conn *connection, std::uint8_t error)
 #endif
     LOG_INF("BLE central connected");
     emit(pico::EventKind::Connected);
-#if defined(CONFIG_PICO_BLE_AUTO_SECURITY)
-    const int security_error = bt_conn_set_security(connection, BT_SECURITY_L2);
-    if (security_error != 0 && security_error != -EALREADY) {
-        LOG_WRN("Could not request encrypted link (%d)", security_error);
-    }
-#else
-    ARG_UNUSED(connection);
-    LOG_INF("Waiting for phone-initiated pairing; use Bond in nRF Connect");
-#endif
+    request_pin_security(connection);
+    LOG_INF("Companion connected; new pairing requires local Pair Phone window");
 }
 
 void disconnected(bt_conn *connection, std::uint8_t reason)
@@ -245,6 +308,7 @@ void disconnected(bt_conn *connection, std::uint8_t reason)
 #else
     ARG_UNUSED(connection);
 #endif
+    pairing_result(connection,pico::EventKind::PairingFailed,BT_SECURITY_ERR_UNSPECIFIED);
     LOG_INF("BLE central disconnected (0x%02x)", reason);
     emit(pico::EventKind::Disconnected);
 }
@@ -257,10 +321,12 @@ void connection_recycled()
     }
 }
 
-void security_changed(bt_conn *, bt_security_t level, enum bt_security_err error)
+void security_changed(bt_conn *conn, bt_security_t level, enum bt_security_err error)
 {
+    if (!is_companion(conn)) return;
     if (error != BT_SECURITY_ERR_SUCCESS) {
         LOG_WRN("BLE security failed (%u)", static_cast<unsigned int>(error));
+        pairing_result(conn,pico::EventKind::PairingFailed,error);
         return;
     }
 
@@ -285,13 +351,19 @@ const char *security_error_name(bt_security_err error)
     }
 }
 
-void pairing_complete(bt_conn *, bool bonded)
+void pairing_complete(bt_conn *conn, bool bonded)
 {
+    if (!is_companion(conn)) return;
+    pairing_result(conn,bonded && bt_conn_get_security(conn)>=BT_SECURITY_L4 ?
+        pico::EventKind::PairingComplete : pico::EventKind::PairingFailed,
+        bonded && bt_conn_get_security(conn)>=BT_SECURITY_L4 ? 0 : BT_SECURITY_ERR_AUTH_REQUIREMENT);
     LOG_INF("BLE pairing complete; bonded=%u", static_cast<unsigned int>(bonded));
 }
 
-void pairing_failed(bt_conn *, enum bt_security_err reason)
+void pairing_failed(bt_conn *conn, enum bt_security_err reason)
 {
+    if (!is_companion(conn)) return;
+    pairing_result(conn,pico::EventKind::PairingFailed,reason);
     LOG_WRN("BLE pairing failed: %s (%u)", security_error_name(reason),
             static_cast<unsigned int>(reason));
 }
@@ -315,13 +387,11 @@ namespace pico::platform {
 bool Ble::init(EventSink sink)
 {
     event_sink = sink;
-#if defined(CONFIG_PICO_FIND_HUB)
     if (bt_conn_auth_cb_register(&authentication_callbacks) ||
         bt_gatt_authorization_cb_register(&authorization_callbacks)) {
         LOG_ERR("Could not install identity isolation");
         return false;
     }
-#endif
     const int callback_error = bt_conn_auth_info_cb_register(&pairing_callbacks);
     if (callback_error != 0) {
         LOG_ERR("Could not register pairing diagnostics (%d)", callback_error);
@@ -338,9 +408,42 @@ bool Ble::init(EventSink sink)
     return true;
 }
 
+bool Ble::open_pairing(std::uint32_t token)
+{
+    if (!ready_) return false;
+    close_pairing();
+    k_mutex_lock(&pairing_mutex,K_FOREVER);
+    pairing_window.token=token;
+    pairing_window.deadline=k_uptime_get()/1000+120;
+    pairing_window.active=true; pairing_window.successful=false;
+    k_mutex_unlock(&pairing_mutex);
+    LOG_INF("Local PIN pairing window opened (120 s)");
+    bt_conn_foreach(BT_CONN_TYPE_LE,[](bt_conn *conn,void *) {
+        bt_conn_info info{};
+        if (bt_conn_get_info(conn,&info)==0 && info.state==BT_CONN_STATE_CONNECTED) request_pin_security(conn);
+    },nullptr);
+    return true;
+}
+void Ble::close_pairing()
+{
+    k_mutex_lock(&pairing_mutex,K_FOREVER);
+    auto *conn=pairing_window.connection;
+    const bool successful=pairing_window.successful;
+    pairing_window.connection=nullptr; pairing_window.active=false; pairing_window.successful=false;
+    k_mutex_unlock(&pairing_mutex);
+    if (conn) {
+        if (!successful) {
+            bt_conn_auth_cancel(conn);
+            bt_conn_disconnect(conn,BT_HCI_ERR_REMOTE_USER_TERM_CONN);
+        }
+        bt_conn_unref(conn);
+    }
+}
+
 bool Ble::forget_companions()
 {
     if (!ready_) return false;
+    close_pairing();
     unsigned bond_count=0;
     bt_foreach_bond(BT_ID_DEFAULT,[](const bt_bond_info *,void *context) {
         ++*static_cast<unsigned *>(context);
