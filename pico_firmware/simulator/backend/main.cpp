@@ -148,6 +148,7 @@ std::string focus_history_json(const pico::State &state)
 std::string event_name(pico::EventKind kind)
 {
     switch (kind) {
+    case pico::EventKind::PairingResetResult: return "PairingResetResult";
     case pico::EventKind::OpenClock: return "OpenClock";
     case pico::EventKind::SyncTime: return "SyncTime";
     case pico::EventKind::SetClockOptions: return "SetClockOptions";
@@ -253,7 +254,7 @@ std::string event_name(pico::EventKind kind)
 
 std::optional<pico::EventKind> parse_event_kind(const std::string &token)
 {
-    constexpr std::array<pico::EventKind, 72> kinds{
+    constexpr std::array<pico::EventKind, 73> kinds{
         pico::EventKind::Boot,          pico::EventKind::Tick,
         pico::EventKind::PrimaryPressed, pico::EventKind::SecondaryPressed,
         pico::EventKind::Connected,     pico::EventKind::Disconnected,
@@ -304,6 +305,7 @@ std::optional<pico::EventKind> parse_event_kind(const std::string &token)
         pico::EventKind::PlayReference,
         pico::EventKind::StopReference,
         pico::EventKind::AudioReady,
+        pico::EventKind::PairingResetResult,
         pico::EventKind::OpenClock,
         pico::EventKind::SyncTime,
         pico::EventKind::SetClockOptions,
@@ -717,6 +719,10 @@ private:
     }
     void apply_effects(Result &result)
     {
+        if (pico::has_effect(result.effects,pico::Effect::ForgetCompanionBonds)) {
+            result.effects|=core_.handle({pico::EventKind::Disconnected,0});
+            result.effects|=core_.handle({pico::EventKind::PairingResetResult,0});
+        }
         if (pico::has_effect(result.effects,pico::Effect::PersistClock)) {
             pending_clock_=pico::clock::encode(core_.clock_settings());
             clock_dirty_=true;
@@ -835,6 +841,7 @@ private:
         append(pico::Effect::Chirp, "Chirp");
         append(pico::Effect::PersistClock, "PersistClock");
         append(pico::Effect::NotifyClock, "NotifyClock");
+        append(pico::Effect::ForgetCompanionBonds,"ForgetCompanionBonds");
         output << ']';
         return output.str();
     }

@@ -62,3 +62,7 @@ Only after a successful build, double-tap reset and copy `build-xiao/zephyr/zeph
 | `zephyr,display` | Selected OLED |
 
 The [nRF52840 DK overlay](../overlays/nrf52840dk_ssd1306.overlay) is historical/separate hardware, not a XIAO flash target. Do not infer success on a DK or simulator proves physical XIAO behavior.
+
+## Companion pairing recovery
+
+See [Pair Again recovery](ble-recovery.md) for a physical-button-confirmed reset of identity 0 companion bonds. Personality, clock settings and tracking ownership are preserved.

@@ -36,3 +36,9 @@ ${CXX:-c++} -std=c++17 -Wall -Wextra -Wpedantic -Werror \
     "$project_dir"/lib/pico_core/src/*.cpp "$project_dir/tests/host/clock_tests.cpp" \
     -o "$build_dir/clock_tests"
 "$build_dir/clock_tests"
+
+${CXX:-c++} -std=c++17 -Wall -Wextra -Wpedantic -Werror \
+    -I"$project_dir/lib/pico_core/include" \
+    "$project_dir"/lib/pico_core/src/*.cpp "$project_dir/tests/host/bond_recovery_tests.cpp" \
+    -o "$build_dir/bond_recovery_tests"
+"$build_dir/bond_recovery_tests"

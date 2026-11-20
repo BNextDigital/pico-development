@@ -17,7 +17,7 @@ config PICO_RUNTIME_PROFILE
 
 config PICO_FIRMWARE_VERSION
     string "Firmware version"
-    default "0.14.0-clock"
+    default "0.14.1-bond-recovery"
 
 config PICO_DISPLAY
     bool "Render Pico on the chosen monochrome display"

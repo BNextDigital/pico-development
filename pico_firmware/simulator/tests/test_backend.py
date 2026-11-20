@@ -803,6 +803,25 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(self.harness.send("status")["state"]["clock"]["stopwatch_seconds"],0)
 
 
+    def test_pair_again_requires_local_hold_and_preserves_durables(self):
+        self.harness.send("ble 07 04")
+        self.harness.send("ble 61 06")
+        self.harness.send("event Connected")
+        self.harness.send("event OpenSettings")
+        self.harness.send("event NavigatePrevious")
+        confirmed=self.harness.send("event Select")
+        self.assertEqual(confirmed["state"]["screen"],18)
+        tap=self.harness.send("ble 13")
+        self.assertNotIn("ForgetCompanionBonds",tap["effect_names"])
+        held=self.harness.send("event FocusButtonHeld")
+        self.assertIn("ForgetCompanionBonds",held["effect_names"])
+        self.assertFalse(held["state"]["connected"])
+        self.assertEqual(held["state"]["theme"],4)
+        self.assertTrue(held["state"]["clock"]["glance"])
+        self.assertTrue(held["state"]["clock"]["usb_desk"])
+        repeated=self.harness.send("event FocusButtonHeld")
+        self.assertNotIn("ForgetCompanionBonds",repeated["effect_names"])
+
 class UiHelperTests(unittest.TestCase):
     def test_duration_format(self) -> None:
         self.assertEqual(format_duration(65), "01:05")

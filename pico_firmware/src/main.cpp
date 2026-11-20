@@ -51,6 +51,10 @@ void apply_effects(pico::Effects effects, pico::Core &core,
                    pico::platform::Storage &storage,
                    pico::platform::Ble &ble, pico::Capabilities capabilities)
 {
+    if (pico::has_effect(effects,pico::Effect::ForgetCompanionBonds)) {
+        const bool reset=ble.forget_companions();
+        effects|=core.handle({pico::EventKind::PairingResetResult,reset ? 0U : 1U});
+    }
     const auto &state=core.state();
     const bool alarm=state.clock.ringing && !state.timer_completed;
     audio.set_owner(state.timer_completed ? pico::audio::Owner::Timer : alarm ? pico::audio::Owner::Alarm :

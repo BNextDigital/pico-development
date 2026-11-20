@@ -130,6 +130,13 @@ Effects Core::navigate(EventKind kind)
 {
     if (state_.dock == Dock::Car) return effect(Effect::None);
     activity();
+    if (state_.screen == Screen::PairingRecovery) {
+        if (kind==EventKind::Back || kind==EventKind::OpenMenu) {
+            state_.screen=kind==EventKind::OpenMenu ? Screen::Menu : Screen::Settings;
+            return effect(Effect::Render);
+        }
+        return effect(Effect::None); // Short taps/remote Select cannot erase bonds.
+    }
     if (state_.screen >= Screen::Clock) return clock_navigation(kind);
     if (state_.screen == Screen::ReferenceTone) {
         if (kind == EventKind::Back || kind == EventKind::OpenMenu) {
@@ -182,7 +189,7 @@ Effects Core::navigate(EventKind kind)
         if (state_.screen == Screen::Menu)
             state_.menu_index = static_cast<std::uint8_t>((state_.menu_index + 10 + direction) % 10);
         else if (state_.screen == Screen::Settings)
-            state_.settings_index = static_cast<std::uint8_t>((state_.settings_index+11+direction)%11);
+            state_.settings_index = static_cast<std::uint8_t>((state_.settings_index+12+direction)%12);
         else if (state_.screen == Screen::Utility) {
             const int count = state_.mode == Mode::Focus ? 8 : 4;
             state_.utility_index = static_cast<std::uint8_t>((state_.utility_index + count + direction) % count);
@@ -224,6 +231,10 @@ Effects Core::navigate(EventKind kind)
         case 8: return open_setting(SettingKey::DisplayTimeout);
         case 9: return handle({EventKind::SleepDisplay,0});
         case 10: state_.screen = Screen::Menu; break;
+        case 11:
+            state_.pairing_reset=PairingResetState::Confirm;
+            state_.screen=Screen::PairingRecovery;
+            break;
         }
     } else if (state_.screen == Screen::Tuner) {
         return handle({state_.tuner_running ? EventKind::StopTuner : EventKind::StartTuner,0});
@@ -259,6 +270,20 @@ Effects Core::navigate(EventKind kind)
 }
 Effects Core::handle(const Event &event)
 {
+    if (event.kind==EventKind::PairingResetResult) {
+        if (state_.pairing_reset!=PairingResetState::Pending || event.value>1) return effect(Effect::None);
+        state_.pairing_reset=event.value==0 ? PairingResetState::Cleared : PairingResetState::Failed;
+        return effect(Effect::Render);
+    }
+    if (event.kind==EventKind::FocusButtonHeld && state_.screen==Screen::PairingRecovery &&
+        !state_.display_asleep && !state_.clock.ringing && !state_.finding && !state_.timer_completed) {
+        if (state_.pairing_reset==PairingResetState::Pending) return effect(Effect::None);
+        if (state_.pairing_reset==PairingResetState::Confirm) {
+            activity(); state_.pairing_reset=PairingResetState::Pending;
+            return Effect::Render | Effect::ForgetCompanionBonds;
+        }
+        return navigate(EventKind::Back);
+    }
     const bool physical_style = event.kind==EventKind::PrimaryPressed || event.kind==EventKind::SecondaryPressed ||
         event.kind==EventKind::FocusButtonTapped || event.kind==EventKind::FocusButtonHeld ||
         event.kind==EventKind::NavigateNext || event.kind==EventKind::NavigatePrevious ||
@@ -589,6 +614,7 @@ Effects Core::handle(const Event &event)
         if (state_.dock == Dock::Car) return effect(Effect::None);
         metronome_.stop(); sync_metronome(); state_.tuner_running = false;
         state_.screen = Screen::Settings; activity(); return Effect::Render | Effect::Notify;
+    case EventKind::PairingResetResult: break;
     case EventKind::OpenClock: case EventKind::SyncTime: case EventKind::SetClockOptions:
     case EventKind::ConfigureAlarm: case EventKind::DismissAlarm: case EventKind::StopwatchStart:
     case EventKind::StopwatchPause: case EventKind::StopwatchResume: case EventKind::StopwatchReset:

@@ -36,3 +36,11 @@ ${CXX:-c++} -std=c++17 -Wall -Wextra -Wpedantic -Werror \
     "$project_dir/lib/pico_core/src/persistence.cpp" "$project_dir/lib/pico_core/src/clock.cpp" -o "$project_dir/build-host/storage_adapter_tests"
 "$project_dir/build-host/storage_adapter_tests"
 printf '%s\n' 'Storage namespace/write failure model checks passed'
+
+${CXX:-c++} -std=c++20 -Wall -Wextra -Wpedantic -Werror \
+    -I"$project_dir/tests/platform/ble_fakes" \
+    -I"$project_dir/lib/pico_core/include" -I"$project_dir/src" \
+    "$project_dir/tests/platform/ble_recovery_tests.cpp" \
+    "$project_dir/lib/pico_core/src/protocol.cpp" "$project_dir/lib/pico_core/src/clock.cpp" \
+    -o "$project_dir/build-host/ble_recovery_tests"
+"$project_dir/build-host/ble_recovery_tests"
