@@ -3,6 +3,7 @@
 #include <pico/protocol.hpp>
 #include <pico/display_model.hpp>
 #include <array>
+#include <cstring>
 #include <cassert>
 #include <iostream>
 using namespace pico;
@@ -28,6 +29,8 @@ int main() {
  const auto start=core.handle({EventKind::FocusButtonHeld,0});
  assert(has_effect(start,Effect::OpenPairing) && !has_effect(start,Effect::Persist));
  const auto token=core.state().pairing.token;
+ std::uint8_t public_before[protocol::kStatusSize]{},public_after[protocol::kStatusSize]{};
+ protocol::encode_status(core.state(),0,public_before);
  assert(core.state().pairing.active());
  core.handle({EventKind::PairingPasskey,37,token+1});
  assert(core.state().pairing.stage==PairingStage::Waiting);
@@ -35,6 +38,8 @@ int main() {
  assert(core.state().pairing.stage==PairingStage::Waiting);
  core.handle({EventKind::PairingPasskey,37,token});
  assert(core.state().pairing.stage==PairingStage::Passkey && core.state().pairing.passkey==37);
+ protocol::encode_status(core.state(),0,public_after);
+ assert(std::memcmp(public_before,public_after,sizeof(public_before))==0); // OLED-only passkeys cannot enter Protocol v1 status.
  core.handle({EventKind::SleepDisplay,0}); assert(!core.state().display_asleep);
  std::array<std::uint8_t,1024> frame{};
  display::MonoSurface surface{frame.data(),frame.size(),128,64,display::MonoLayout::HorizontalMsb};
