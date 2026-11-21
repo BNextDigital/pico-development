@@ -27,7 +27,7 @@ namespace {
 
 constexpr std::uint32_t kSaveDelaySeconds = 5;
 constexpr pico::Capabilities kSimulatedCapabilities =
-    pico::capability(pico::Capability::Locator) |
+    pico::capability(pico::Capability::Clock) | pico::capability(pico::Capability::Locator) |
     pico::capability(pico::Capability::Display) |
     pico::capability(pico::Capability::Speaker) |
     pico::capability(pico::Capability::HomeDock) |
@@ -148,6 +148,21 @@ std::string focus_history_json(const pico::State &state)
 std::string event_name(pico::EventKind kind)
 {
     switch (kind) {
+    case pico::EventKind::PairingResetResult: return "PairingResetResult";
+    case pico::EventKind::PairingPasskey: return "PairingPasskey";
+    case pico::EventKind::PairingComplete: return "PairingComplete";
+    case pico::EventKind::PairingFailed: return "PairingFailed";
+    case pico::EventKind::CancelPairing: return "CancelPairing";
+    case pico::EventKind::OpenClock: return "OpenClock";
+    case pico::EventKind::SyncTime: return "SyncTime";
+    case pico::EventKind::SetClockOptions: return "SetClockOptions";
+    case pico::EventKind::ConfigureAlarm: return "ConfigureAlarm";
+    case pico::EventKind::DismissAlarm: return "DismissAlarm";
+    case pico::EventKind::StopwatchStart: return "StopwatchStart";
+    case pico::EventKind::StopwatchPause: return "StopwatchPause";
+    case pico::EventKind::StopwatchResume: return "StopwatchResume";
+    case pico::EventKind::StopwatchReset: return "StopwatchReset";
+    case pico::EventKind::UsbPower: return "UsbPower";
     case pico::EventKind::StartFocusCycle: return "StartFocusCycle";
     case pico::EventKind::NextFocusPhase: return "NextFocusPhase";
     case pico::EventKind::SetBreakDuration: return "SetBreakDuration";
@@ -243,7 +258,7 @@ std::string event_name(pico::EventKind kind)
 
 std::optional<pico::EventKind> parse_event_kind(const std::string &token)
 {
-    constexpr std::array<pico::EventKind, 62> kinds{
+    constexpr std::array<pico::EventKind, 77> kinds{
         pico::EventKind::Boot,          pico::EventKind::Tick,
         pico::EventKind::PrimaryPressed, pico::EventKind::SecondaryPressed,
         pico::EventKind::Connected,     pico::EventKind::Disconnected,
@@ -294,6 +309,17 @@ std::optional<pico::EventKind> parse_event_kind(const std::string &token)
         pico::EventKind::PlayReference,
         pico::EventKind::StopReference,
         pico::EventKind::AudioReady,
+        pico::EventKind::PairingResetResult, pico::EventKind::PairingPasskey, pico::EventKind::PairingComplete, pico::EventKind::PairingFailed, pico::EventKind::CancelPairing,
+        pico::EventKind::OpenClock,
+        pico::EventKind::SyncTime,
+        pico::EventKind::SetClockOptions,
+        pico::EventKind::ConfigureAlarm,
+        pico::EventKind::DismissAlarm,
+        pico::EventKind::StopwatchStart,
+        pico::EventKind::StopwatchPause,
+        pico::EventKind::StopwatchResume,
+        pico::EventKind::StopwatchReset,
+        pico::EventKind::UsbPower,
         pico::EventKind::StartFinding,
         pico::EventKind::StopFinding,
         pico::EventKind::SetFocusGoal,
@@ -388,6 +414,7 @@ public:
         : core_(seed), seed_(seed), state_path_(std::move(state_path))
     {
         load_state();
+        load_clock();
         core_.handle({pico::EventKind::MotionReady,1});
         core_.handle({pico::EventKind::MicrophoneReady,1});
         core_.handle({pico::EventKind::AudioReady,1});
@@ -516,6 +543,7 @@ public:
     Result power_cycle(bool factory_reset)
     {
         pending_dirty_ = false;
+        clock_dirty_=false;
         save_due_seconds_ = 0;
         now_seconds_ = 0;
         now_ms_ = 0;
@@ -525,8 +553,10 @@ public:
         if (factory_reset) {
             std::error_code error;
             std::filesystem::remove(state_path_, error);
+            std::filesystem::remove(state_path_.string()+".clock",error);
         } else {
             load_state();
+            load_clock();
         }
 
         core_.handle({pico::EventKind::MotionReady,1});
@@ -570,7 +600,7 @@ public:
                << "\"storage_saved\":"
                << (result.storage_saved ? "true" : "false") << ','
                << "\"storage_pending\":"
-               << (pending_dirty_ ? "true" : "false") << ','
+               << ((pending_dirty_ || clock_dirty_) ? "true" : "false") << ','
                << "\"save_due_seconds\":" << save_due_seconds_ << ','
                << "\"next_core_wake_ms\":" << pico::schedule::wait_ms(now_ms_, now_seconds_,
                     core_.next_animation_ms(static_cast<std::uint32_t>(now_ms_)),
@@ -598,8 +628,13 @@ public:
                << "\"timer_total_seconds\":" << state.timer_total_seconds << ','
                << "\"timer_remaining_seconds\":"
                << state.timer_remaining_seconds << ','
+               << "\"clock\":" << clock_json() << ','
                << "\"theme\":" << static_cast<unsigned>(state.theme) << ','
                << "\"screen\":" << static_cast<unsigned>(state.screen) << ','
+               << "\"pairing_stage\":" << static_cast<unsigned>(state.pairing.stage) << ','
+               << "\"pairing_token\":" << state.pairing.token << ','
+               << "\"pairing_active\":" << (state.pairing.active() ? "true" : "false") << ','
+               << "\"pairing_error\":" << unsigned(state.pairing.error) << ','
                << "\"menu_index\":" << static_cast<unsigned>(state.menu_index) << ','
                << "\"eyes_closed\":" << (state.eyes_closed ? "true" : "false") << ','
                << "\"settings_index\":" << static_cast<unsigned>(state.settings_index) << ','
@@ -655,6 +690,34 @@ public:
     }
 
 private:
+    std::string clock_json() const
+    {
+        const auto &s=core_.state().clock;
+        char value[16]="--:--",date[24]="UNSET";
+        if (s.valid) {
+            const auto d=pico::clock::from_epoch(static_cast<std::int64_t>(s.utc)+s.settings.offset_minutes*60);
+            pico::clock::format_time(value,sizeof(value),d,s.settings.hour24);
+            pico::clock::format_date(date,sizeof(date),d);
+        }
+        std::ostringstream out;
+        out << "{\"valid\":" << (s.valid ? "true" : "false") << ",\"utc\":" << s.utc
+            << ",\"offset_minutes\":" << s.settings.offset_minutes << ",\"sync_due\":" << (s.sync_due ? "true" : "false")
+            << ",\"sync_age\":" << s.sync_age << ",\"ringing\":" << unsigned(s.ringing)
+            << ",\"hour24\":" << (s.settings.hour24 ? "true" : "false")
+            << ",\"glance\":" << (s.settings.glance ? "true" : "false")
+            << ",\"usb_desk\":" << (s.settings.usb_desk ? "true" : "false")
+            << ",\"usb_powered\":" << (s.usb_powered ? "true" : "false")
+            << ",\"stopwatch_seconds\":" << s.stopwatch_seconds
+            << ",\"stopwatch_running\":" << (s.stopwatch_running ? "true" : "false")
+            << ",\"local_time\":" << quoted(value) << ",\"local_date\":" << quoted(date) << ",\"alarms\":[";
+        for (unsigned i=0;i<pico::clock::kAlarmCount;++i) {
+            const auto &a=s.settings.alarms[i];
+            if (i) out << ',';
+            out << "{\"minute\":" << a.minute << ",\"weekdays\":" << unsigned(a.weekdays)
+                << ",\"enabled\":" << (a.enabled ? "true" : "false") << ",\"once_day\":" << a.once_day << '}';
+        }
+        return out.str()+"]}";
+    }
     pico::motion::Detector motion_detector_;
     pico::Capabilities capabilities() const
     {
@@ -664,6 +727,17 @@ private:
     }
     void apply_effects(Result &result)
     {
+        if (pico::has_effect(result.effects,pico::Effect::ForgetCompanionBonds)) {
+            result.effects|=core_.handle({pico::EventKind::Disconnected,0});
+            result.effects|=core_.handle({pico::EventKind::PairingResetResult,0});
+        }
+        if (pico::has_effect(result.effects,pico::Effect::PersistClock)) {
+            pending_clock_=pico::clock::encode(core_.clock_settings());
+            clock_dirty_=true;
+            clock_save_due_=now_seconds_+kSaveDelaySeconds;
+            result.persist_queued=true;
+        }
+        if (pico::has_effect(result.effects,pico::Effect::NotifyClock)) result.notified=true;
         if (pico::has_effect(result.effects, pico::Effect::Persist)) {
             pending_blob_ = pico::persistence::encode(core_.persistent_state());
             pending_dirty_ = true;
@@ -693,8 +767,17 @@ private:
 
     bool flush_if_due()
     {
+        bool clock_saved=false;
+        if (clock_dirty_ && now_seconds_>=clock_save_due_) {
+            std::ofstream output(state_path_.string()+".clock",std::ios::binary | std::ios::trunc);
+            if (output) {
+                output.write(reinterpret_cast<const char *>(pending_clock_.data()),pending_clock_.size());
+                output.close();
+                if (output) { clock_dirty_=false; clock_saved=true; }
+            }
+        }
         if (!pending_dirty_ || now_seconds_ < save_due_seconds_) {
-            return false;
+            return clock_saved;
         }
 
         std::error_code error;
@@ -720,6 +803,15 @@ private:
         return true;
     }
 
+    void load_clock()
+    {
+        std::ifstream input(state_path_.string()+".clock",std::ios::binary);
+        pico::clock::Blob blob{};
+        input.read(reinterpret_cast<char *>(blob.data()),blob.size());
+        pico::clock::Settings settings;
+        if (input.gcount()==static_cast<std::streamsize>(blob.size()) && input.peek()==std::char_traits<char>::eof() &&
+            pico::clock::decode(blob.data(),blob.size(),settings)) core_.restore_clock(settings);
+    }
     void load_state()
     {
         std::ifstream input(state_path_, std::ios::binary);
@@ -755,6 +847,10 @@ private:
         append(pico::Effect::Notify, "Notify");
         append(pico::Effect::Persist, "Persist");
         append(pico::Effect::Chirp, "Chirp");
+        append(pico::Effect::PersistClock, "PersistClock");
+        append(pico::Effect::NotifyClock, "NotifyClock");
+        append(pico::Effect::ForgetCompanionBonds,"ForgetCompanionBonds");
+        append(pico::Effect::OpenPairing,"OpenPairing"); append(pico::Effect::ClosePairing,"ClosePairing");
         output << ']';
         return output.str();
     }
@@ -795,6 +891,9 @@ private:
     std::uint64_t now_ms_{0};
     pico::persistence::Blob pending_blob_{};
     bool pending_dirty_{false};
+    pico::clock::Blob pending_clock_{};
+    bool clock_dirty_{false};
+    std::uint32_t clock_save_due_{};
     std::uint32_t save_due_seconds_{0};
     bool restored_{false};
     std::array<std::uint8_t, pico::display::kDefaultBufferSize> frame_buffer_{};
@@ -848,16 +947,18 @@ int main(int argc, char **argv)
             break;
         } else if (command == "event") {
             std::string kind_token;
-            std::string value_token{"0"};
+            std::string value_token{"0"}, auxiliary_token{"0"};
             input >> kind_token;
             if (!(input >> value_token)) {
                 value_token = "0";
             }
+            input >> auxiliary_token;
+            const auto auxiliary=parse_u32(auxiliary_token);
             const auto kind = parse_event_kind(kind_token);
             const auto value = parse_u32(value_token);
-            result = !kind.has_value() || !value.has_value()
+            result = !kind.has_value() || !value.has_value() || !auxiliary.has_value()
                          ? command_error("Usage: event EVENT_NAME_OR_ID [VALUE]")
-                         : simulator.dispatch({*kind, *value});
+                         : simulator.dispatch({*kind, *value, *auxiliary});
         } else if (command == "advance") {
             std::string seconds_token;
             input >> seconds_token;

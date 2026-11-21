@@ -18,6 +18,7 @@ enum class Capability : std::uint16_t {
     Compass = 1U << 6,
     Motion = 1U << 7,
     Locator = 1U << 8,
+    Clock = 1U << 9,
 };
 
 using Capabilities = std::uint16_t;

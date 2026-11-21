@@ -15,7 +15,7 @@ for profile in enabled absent; do
     ${CXX:-c++} -std=c++17 -Wall -Wextra -Wpedantic -Werror ${CXXFLAGS:-} $display_options \
         -I"$project_dir/tests/platform/fakes" -I"$project_dir/lib/pico_core/include" \
         -I"$project_dir/src" "$project_dir/src/platform/pico_display.cpp" \
-        "$project_dir/lib/pico_core/src/display_model.cpp" "$project_dir/lib/pico_core/src/pitch.cpp" "$project_dir/lib/pico_core/src/audio.cpp" \
+        "$project_dir/lib/pico_core/src/display_model.cpp" "$project_dir/lib/pico_core/src/clock.cpp" "$project_dir/lib/pico_core/src/pitch.cpp" "$project_dir/lib/pico_core/src/audio.cpp" \
         "$project_dir/tests/platform/display_adapter_tests.cpp" \
         -o "$project_dir/build-host/display_adapter_$profile"
     "$project_dir/build-host/display_adapter_$profile"
@@ -28,3 +28,19 @@ ${CXX:-c++} -std=c++17 -Wall -Wextra -Wpedantic -Werror ${CXXFLAGS:-} \
     "$project_dir/tests/platform/audio_reference_tests.cpp" \
     "$project_dir/lib/pico_core/src/audio.cpp" -o "$project_dir/build-host/audio_reference_tests"
 "$project_dir/build-host/audio_reference_tests"
+
+${CXX:-c++} -std=c++17 -Wall -Wextra -Wpedantic -Werror \
+    -I"$project_dir/tests/platform/storage_fakes" -I"$project_dir/tests/platform/fakes" \
+    -I"$project_dir/lib/pico_core/include" -I"$project_dir/src" \
+    "$project_dir/tests/platform/storage_adapter_tests.cpp" \
+    "$project_dir/lib/pico_core/src/persistence.cpp" "$project_dir/lib/pico_core/src/clock.cpp" -o "$project_dir/build-host/storage_adapter_tests"
+"$project_dir/build-host/storage_adapter_tests"
+printf '%s\n' 'Storage namespace/write failure model checks passed'
+
+${CXX:-c++} -std=c++20 -Wall -Wextra -Wpedantic -Werror \
+    -I"$project_dir/tests/platform/ble_fakes" \
+    -I"$project_dir/lib/pico_core/include" -I"$project_dir/src" \
+    "$project_dir/tests/platform/ble_recovery_tests.cpp" \
+    "$project_dir/lib/pico_core/src/protocol.cpp" "$project_dir/lib/pico_core/src/clock.cpp" \
+    -o "$project_dir/build-host/ble_recovery_tests"
+"$project_dir/build-host/ble_recovery_tests"

@@ -13,9 +13,11 @@ constexpr std::size_t kFrames = 128;
 constexpr std::size_t kBytes = kFrames * 2 * sizeof(std::int16_t);
 const device *audio_device = DEVICE_DT_GET(DT_ALIAS(pico_i2s));
 K_MEM_SLAB_DEFINE(audio_slab, kBytes, 4, 4);
-struct SoundJob { pico::audio::Cue cue; std::uint8_t volume; std::uint8_t note; atomic_val_t generation; };
+struct SoundJob { pico::audio::Cue cue; std::uint8_t volume; std::uint8_t note; atomic_val_t generation; atomic_val_t owner_generation; };
 K_MSGQ_DEFINE(audio_queue, sizeof(SoundJob), 4, 4);
 atomic_t audio_ready;
+atomic_t audio_owner;
+atomic_t owner_generation;
 atomic_t audio_muted;
 atomic_t audio_playing;
 atomic_t metronome_enabled;
@@ -23,7 +25,7 @@ atomic_t reference_request;
 atomic_t reference_generation;
 bool cancelled(const SoundJob &job)
 {
-    return atomic_get(&audio_muted) || (job.cue == pico::audio::Cue::ReferenceTone &&
+    return atomic_get(&audio_muted) || job.owner_generation!=atomic_get(&owner_generation) || (job.cue == pico::audio::Cue::ReferenceTone &&
         (!(atomic_get(&reference_request) & 1) || atomic_get(&reference_generation) != job.generation));
 }
 bool beat_cue(pico::audio::Cue cue)
@@ -139,6 +141,17 @@ void Audio::set_metronome_running(bool running)
     ARG_UNUSED(running);
 #endif
 }
+void Audio::set_owner(audio::Owner owner)
+{
+#if defined(CONFIG_PICO_AUDIO_I2S) && DT_NODE_HAS_STATUS(DT_ALIAS(pico_i2s), okay)
+    if (atomic_set(&audio_owner,static_cast<atomic_val_t>(owner))!=static_cast<atomic_val_t>(owner)) {
+        atomic_inc(&owner_generation);
+        k_msgq_purge(&audio_queue);
+    }
+#else
+    ARG_UNUSED(owner);
+#endif
+}
 void Audio::set_muted(bool muted)
 {
 #if defined(CONFIG_PICO_AUDIO_I2S) && DT_NODE_HAS_STATUS(DT_ALIAS(pico_i2s), okay)
@@ -164,7 +177,7 @@ void Audio::play(audio::Cue cue,unsigned volume_percent,std::uint8_t note)
     if (cue == audio::Cue::ReferenceTone &&
         (!(atomic_get(&reference_request) & 1) || !audio::frequency_millihz(note))) return;
     const SoundJob job{cue,static_cast<std::uint8_t>(volume_percent > 100 ? 100 : volume_percent),
-                       note,atomic_get(&reference_generation)};
+                       note,atomic_get(&reference_generation),atomic_get(&owner_generation)};
     if (beat_cue(cue)) {
         if (!atomic_get(&metronome_enabled) || atomic_get(&audio_playing) ||
             k_msgq_num_used_get(&audio_queue)) return; // Never queue stale beats behind other audio.
@@ -180,3 +193,15 @@ void Audio::play(audio::Cue cue,unsigned volume_percent,std::uint8_t note)
 #endif
 }
 }
+
+#if defined(CONFIG_PICO_RUNTIME_PROFILE)
+#include "pico_runtime_profile.hpp"
+namespace pico::platform {
+void profile_audio()
+{
+#if defined(CONFIG_PICO_AUDIO_I2S)
+    profile_slab("audio_slab", &audio_slab);
+#endif
+}
+}
+#endif

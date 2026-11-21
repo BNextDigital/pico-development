@@ -4,6 +4,7 @@
 #include <array>
 #include <cstdint>
 #include <pico/audio.hpp>
+#include <pico/clock.hpp>
 #include <pico/pitch.hpp>
 #include <pico/motion.hpp>
 #include <pico/focus_session.hpp>
@@ -117,18 +118,31 @@ enum class EventKind : std::uint8_t {
     AudioReady,
     StartFinding,
     StopFinding,
+    OpenClock = 62,
+    SyncTime,
+    SetClockOptions,
+    ConfigureAlarm,
+    DismissAlarm,
+    StopwatchStart,
+    StopwatchPause,
+    StopwatchResume,
+    StopwatchReset,
+    UsbPower,
+    PairingResetResult = 72,
+    PairingPasskey = 73, PairingComplete, PairingFailed, CancelPairing,
 };
 
-enum class Screen : std::uint8_t { Home, Menu, Utility, Themes, Unavailable, Music, Tuner, DurationEdit, Settings, SettingEdit, FocusSummary = 10, ReferenceTone = 11 };
+enum class Screen : std::uint8_t { Home, Menu, Utility, Themes, Unavailable, Music, Tuner, DurationEdit, Settings, SettingEdit, FocusSummary = 10, ReferenceTone = 11, Clock = 12, Alarms, Stopwatch, ClockEdit, AlarmEdit, ClockOptions, PairingRecovery = 18, Pairing = 19 };
 
 enum class SettingKey : std::uint8_t { Theme, Mute, Volume, Motion, Brightness, DisplayTimeout, FocusGoal };
 
 struct Event {
     EventKind kind{EventKind::Boot};
     std::uint32_t value{0};
+    std::uint32_t auxiliary{0}; // One atomic queued time/configuration transaction.
 };
 
-static_assert(sizeof(Event) <= 8, "Events must stay cheap enough for the firmware queue");
+static_assert(sizeof(Event) <= 12, "Events must stay cheap enough for the firmware queue");
 
 enum class Effect : std::uint16_t {
     None = 0,
@@ -136,6 +150,10 @@ enum class Effect : std::uint16_t {
     Notify = 1U << 1,
     Persist = 1U << 2,
     Chirp = 1U << 3,
+    PersistClock = 1U << 4,
+    NotifyClock = 1U << 5,
+    ForgetCompanionBonds = 1U << 6,
+    OpenPairing = 1U << 7, ClosePairing = 1U << 8,
 };
 
 using Effects = std::uint16_t;
@@ -160,7 +178,24 @@ constexpr bool has_effect(Effects effects, Effect wanted)
     return (effects & effect(wanted)) != 0U;
 }
 
+enum class PairingResetState : std::uint8_t { Confirm, Pending, Cleared, Failed };
+
+enum class PairingStage : std::uint8_t { Confirm, Waiting, Passkey, Paired, Failed, TimedOut };
+struct PairingState {
+    PairingStage stage{PairingStage::Confirm};
+    std::uint32_t token{0}, started{0}, passkey{0};
+    std::uint8_t error{0};
+    bool active() const { return stage==PairingStage::Waiting || stage==PairingStage::Passkey; }
+};
+
 struct State {
+    PairingState pairing{};
+    PairingResetState pairing_reset{PairingResetState::Confirm};
+    clock::State clock{};
+    clock::Date clock_draft{};
+    clock::Alarm alarm_draft{};
+    std::int16_t clock_offset_draft{0};
+    std::uint8_t clock_index{0}, alarm_index{0}, clock_edit_field{0}, clock_action{1};
     Mode mode{Mode::Companion};
     Mood mood{Mood::Neutral};
     Dock dock{Dock::None};

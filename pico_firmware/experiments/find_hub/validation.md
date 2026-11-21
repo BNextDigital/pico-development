@@ -66,3 +66,19 @@ wiring, cancellation latency, output level and requested-volume handling; real
 battery reporting; separated-motion/DULT behavior; Fast Pair/FHN provisioning,
 clock recovery, encrypted crowd reports, unprovisioning/reset and current draw.
 Official network approval/certification is not established.
+
+## Recheck after synchronizing with Pico 0.14.2
+
+Both standalone XIAO Sense profiles linked locally with SDK 3.4.2 and Zephyr
+SDK 1.0.1. The build helper verified the generated configuration and devicetree
+partition layout.
+
+| Standalone profile | Flash used | Static RAM used |
+| --- | ---: | ---: |
+| OLED + Sense IMU | 344,024 B | 57,780 B |
+| OLED + Sense IMU + MAX98357 I2S | 351,756 B | 62,564 B |
+
+The host suite, all 42 simulator tests, and the standalone checks including
+registration format parity with the pinned Nordic tool passed. Hardware
+operation, network provisioning, and certification still require separate
+validation.

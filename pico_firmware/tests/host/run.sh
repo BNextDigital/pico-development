@@ -22,5 +22,32 @@ sh "$project_dir/tests/host/check_nordic_limits.sh"
 
 sh "$project_dir/tests/platform/run.sh"
 
-# Isolated network prototype: portable flash-layout and button-policy guards.
+${CXX:-c++} -std=c++17 -Wall -Wextra -Wpedantic -Werror \
+    -I"$project_dir/lib/pico_core/include" \
+    "$project_dir/tests/host/tracking_policy_tests.cpp" \
+    -o "$build_dir/tracking_policy_tests"
+"$build_dir/tracking_policy_tests"
+printf '%s\n' 'Tracking policy checks passed (live alert routing remains gated)'
+
+python3 "$project_dir/tests/host/test_combined_report.py"
+
+${CXX:-c++} -std=c++17 -Wall -Wextra -Wpedantic -Werror \
+    -I"$project_dir/lib/pico_core/include" \
+    "$project_dir"/lib/pico_core/src/*.cpp "$project_dir/tests/host/clock_tests.cpp" \
+    -o "$build_dir/clock_tests"
+"$build_dir/clock_tests"
+
+${CXX:-c++} -std=c++17 -Wall -Wextra -Wpedantic -Werror \
+    -I"$project_dir/lib/pico_core/include" \
+    "$project_dir"/lib/pico_core/src/*.cpp "$project_dir/tests/host/bond_recovery_tests.cpp" \
+    -o "$build_dir/bond_recovery_tests"
+"$build_dir/bond_recovery_tests"
+
+${CXX:-c++} -std=c++17 -Wall -Wextra -Wpedantic -Werror \
+    -I"$project_dir/lib/pico_core/include" \
+    "$project_dir"/lib/pico_core/src/*.cpp "$project_dir/tests/host/pin_pairing_tests.cpp" \
+    -o "$build_dir/pin_pairing_tests"
+"$build_dir/pin_pairing_tests"
+
+# Standalone Find Hub experiment: portable image and button-policy checks.
 sh "$project_dir/experiments/find_hub/tests/run.sh"

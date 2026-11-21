@@ -2,6 +2,10 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/sys/atomic.h>
+#if defined(CONFIG_PICO_RUNTIME_PROFILE)
+#include "platform/pico_runtime_profile.hpp"
+#endif
 
 #include <pico/core.hpp>
 #include <pico/service_schedule.hpp>
@@ -13,6 +17,9 @@
 #include "platform/pico_display.hpp"
 #include "platform/pico_hardware.hpp"
 #include "platform/pico_storage.hpp"
+#if defined(CONFIG_PICO_FIND_HUB)
+#include "platform/pico_find_hub.h"
+#endif
 
 LOG_MODULE_REGISTER(pico_main, CONFIG_PICO_LOG_LEVEL);
 
@@ -20,10 +27,17 @@ namespace {
 
 K_MSGQ_DEFINE(event_queue, sizeof(pico::Event), CONFIG_PICO_EVENT_QUEUE_SIZE, 4);
 
+#if defined(CONFIG_PICO_RUNTIME_PROFILE)
+atomic_t queue_drops;
+std::uint32_t queue_peak;
+#endif
 bool queue_event(const pico::Event &event)
 {
     const int error = k_msgq_put(&event_queue, &event, K_NO_WAIT);
     if (error != 0) {
+#if defined(CONFIG_PICO_RUNTIME_PROFILE)
+        atomic_inc(&queue_drops);
+#endif
         LOG_WRN("Event queue full; dropped event %u",
                 static_cast<unsigned int>(event.kind));
         return false;
@@ -37,15 +51,32 @@ void apply_effects(pico::Effects effects, pico::Core &core,
                    pico::platform::Storage &storage,
                    pico::platform::Ble &ble, pico::Capabilities capabilities)
 {
-    audio.set_muted(core.state().sound_muted || core.state().tuner_running || core.state().sound_volume_percent == 0);
+    if (pico::has_effect(effects,pico::Effect::ClosePairing)) ble.close_pairing();
+    if (pico::has_effect(effects,pico::Effect::OpenPairing)) {
+        if (!(display.capabilities() & pico::capability(pico::Capability::Display)) || !ble.open_pairing(core.state().pairing.token)) {
+            effects|=core.handle({pico::EventKind::PairingFailed,255U,core.state().pairing.token});
+            ble.close_pairing();
+        }
+    }
+    if (pico::has_effect(effects,pico::Effect::ForgetCompanionBonds)) {
+        const bool reset=ble.forget_companions();
+        effects|=core.handle({pico::EventKind::PairingResetResult,reset ? 0U : 1U});
+    }
+    const auto &state=core.state();
+    const bool alarm=state.clock.ringing && !state.timer_completed;
+    audio.set_owner(state.timer_completed ? pico::audio::Owner::Timer : alarm ? pico::audio::Owner::Alarm :
+        state.finding ? pico::audio::Owner::LocalFind : pico::audio::Owner::Feature);
+    audio.set_muted(!alarm && (state.sound_muted || state.tuner_running || state.sound_volume_percent == 0));
     audio.set_reference(core.state().reference_playing,core.state().reference_note);
-    microphone.sync(core.state().tuner_running,core.state().tuner_session);
+    microphone.sync(state.tuner_running && !state.clock.ringing,state.tuner_session);
     audio.set_metronome_running(core.state().metronome_running);
+    if (pico::has_effect(effects,pico::Effect::PersistClock)) storage.save_clock(core.clock_settings());
+    if (pico::has_effect(effects,pico::Effect::NotifyClock)) ble.publish_clock(state);
     if (pico::has_effect(effects, pico::Effect::Persist)) {
         storage.save(core.persistent_state());
     }
-    if (pico::has_effect(effects, pico::Effect::Chirp) && !core.state().sound_muted && !core.state().tuner_running && core.state().sound_volume_percent > 0) {
-        if (audio.ready()) audio.play(core.state().sound_cue,core.state().sound_volume_percent,core.state().reference_note);
+    if (pico::has_effect(effects, pico::Effect::Chirp) && (alarm || (!state.sound_muted && !state.tuner_running && state.sound_volume_percent > 0))) {
+        if (audio.ready()) audio.play(state.sound_cue,alarm ? std::max<unsigned>(25,state.sound_volume_percent) : state.sound_volume_percent,state.reference_note);
         else if (core.state().sound_cue < pico::audio::Cue::MetronomeClick) hardware.chirp();
     }
     if (pico::has_effect(effects, pico::Effect::Render)) {
@@ -68,6 +99,10 @@ int main()
 {
     LOG_INF("Pico firmware %s starting", CONFIG_PICO_FIRMWARE_VERSION);
 
+#if defined(CONFIG_PICO_FIND_HUB)
+    const int layout_error = pico_find_hub_measurement_init();
+    if (layout_error) LOG_ERR("Find Hub geometry check failed (%d); activation unavailable", layout_error);
+#endif
     pico::Core core;
     pico::platform::Hardware hardware;
     pico::platform::Motion motion;
@@ -88,12 +123,15 @@ int main()
         core.restore(persisted);
     }
 
+    pico::clock::Settings clock_settings;
+    if (storage_ready && storage.load_clock(clock_settings)) core.restore_clock(clock_settings);
+
     core.handle({pico::EventKind::MotionReady,motion.init(queue_event) ? 1U : 0U});
     core.handle({pico::EventKind::AudioReady,audio.init() ? 1U : 0U});
     core.handle({pico::EventKind::MicrophoneReady, microphone.init(queue_event) ? 1U : 0U});
     display.init();
     hardware.init(queue_event);
-    const auto capabilities = pico::capability(pico::Capability::Locator) | hardware.capabilities() | display.capabilities() |
+    const auto capabilities = pico::capability(pico::Capability::Clock) | pico::capability(pico::Capability::Locator) | hardware.capabilities() | display.capabilities() |
         (audio.ready() ? pico::capability(pico::Capability::Speaker) : 0U) |
         (microphone.ready() ? pico::capability(pico::Capability::Microphone) : 0U);
 
@@ -112,9 +150,14 @@ int main()
         const auto seconds = static_cast<std::uint32_t>(now / MSEC_PER_SEC);
         if (seconds != last_tick) {
             last_tick = seconds;
+            apply_effects(core.handle({pico::EventKind::UsbPower,hardware.usb_powered() ? 1U : 0U}),
+                          core,hardware,audio,microphone,display,storage,ble,capabilities);
             apply_effects(core.handle({pico::EventKind::Tick, seconds}), core, hardware,
                           audio, microphone, display, storage, ble, capabilities);
             hardware.reflect(core.state());
+            // Refresh the read cache without radio traffic. Keeps millisecond
+            // stopwatch anchoring safe across long runs and uint32 ms rollover.
+            ble.publish_clock(core.state(),false);
 #if defined(CONFIG_PICO_BRINGUP_DIAGNOSTICS)
             if (seconds % 5U == 0U) display.diagnose(core.state());
 #endif
@@ -128,6 +171,16 @@ int main()
     };
     while (true) {
         service_clocks();
+#if defined(CONFIG_PICO_RUNTIME_PROFILE)
+        const auto used = k_msgq_num_used_get(&event_queue);
+        if (used > queue_peak) queue_peak = used;
+        static std::uint32_t last_profile;
+        const auto profile_now = k_uptime_get_32();
+        if (profile_now - last_profile >= 60000U) {
+            last_profile = profile_now;
+            pico::platform::profile_sample(used, queue_peak, atomic_get(&queue_drops));
+        }
+#endif
         motion.poll(core.state().motion_config);
         if (core.state().motion_ready != motion.ready()) {
             apply_effects(core.handle({pico::EventKind::MotionReady,motion.ready() ? 1U : 0U}),
@@ -149,7 +202,7 @@ int main()
         const auto ms = static_cast<std::uint32_t>(now);
         const auto wait = pico::schedule::wait_ms(now, last_tick,
             core.next_animation_ms(ms), core.next_music_ms(ms),
-            motion.next_poll_ms(core.state().motion_config, ms), core.state().tuner_running);
+            motion.next_poll_ms(core.state().motion_config, ms), core.state().tuner_running && !core.state().clock.ringing);
         pico::Event event{};
         if (k_msgq_get(&event_queue, &event, K_MSEC(wait)) == 0) {
             service_clocks();

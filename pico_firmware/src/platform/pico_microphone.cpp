@@ -157,3 +157,15 @@ void Microphone::poll()
 #endif
 }
 }
+
+#if defined(CONFIG_PICO_RUNTIME_PROFILE)
+#include "pico_runtime_profile.hpp"
+namespace pico::platform {
+void profile_microphone()
+{
+#if defined(CONFIG_PICO_MICROPHONE)
+    profile_slab("mic_slab", &mic_slab);
+#endif
+}
+}
+#endif

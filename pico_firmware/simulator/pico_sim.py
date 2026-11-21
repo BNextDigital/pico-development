@@ -8,6 +8,9 @@ and saved-state encoding come from the same C++ core used by board firmware.
 from __future__ import annotations
 
 import argparse
+import datetime
+import time
+import struct
 import json
 import os
 from pathlib import Path
@@ -354,6 +357,14 @@ class PicoSimulatorApp:
 
         ttk.Button(timer_box, text="Settings", command=lambda: self._send("event OpenSettings")).grid(row=8,column=2,columnspan=2)
 
+        ttk.Button(timer_box,text="Clock",command=lambda: self._send("event OpenClock")).grid(row=9,column=0)
+        ttk.Button(timer_box,text="Sync phone time",command=self._sync_phone_time).grid(row=9,column=1,columnspan=2)
+        ttk.Button(timer_box,text="Dismiss alarm",command=lambda: self._send("event DismissAlarm")).grid(row=9,column=3)
+        self.usb_power_var=tk.BooleanVar(value=False)
+        ttk.Checkbutton(timer_box,text="USB power",variable=self.usb_power_var,command=lambda: self._send(
+            "event UsbPower "+str(int(self.usb_power_var.get())))).grid(row=10,column=0,columnspan=2)
+        ttk.Button(timer_box,text="Start stopwatch",command=lambda: self._send("event StopwatchStart")).grid(row=10,column=2,columnspan=2)
+
         time_box = ttk.LabelFrame(parent, text="Simulation clock", padding=10)
         time_box.grid(row=4, column=0, sticky="ew", pady=(0, 8))
         self.paused_var = tk.BooleanVar(value=False)
@@ -620,6 +631,12 @@ class PicoSimulatorApp:
             "Clear the simulated flash record and reboot Pico?",
         ):
             self._send("factory_reset")
+
+    def _sync_phone_time(self) -> None:
+        now=datetime.datetime.now().astimezone()
+        offset=int(now.utcoffset().total_seconds()//60)
+        packet=bytes([0x60])+struct.pack("<Ih",int(time.time()),offset)
+        self._send("ble "+packet.hex())
 
     def _clock_tick(self) -> None:
         if self.closed:

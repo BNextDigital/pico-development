@@ -13,6 +13,7 @@ public:
     void reflect(const State &state);
     void chirp();
     Capabilities capabilities() const;
+    bool usb_powered() const;
 };
 
 } // namespace pico::platform

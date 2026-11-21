@@ -6,6 +6,9 @@
 #include <zephyr/drivers/gpio.h>
 #include <zephyr/drivers/pwm.h>
 #include <zephyr/kernel.h>
+#if defined(CONFIG_SOC_NRF52840)
+#include <hal/nrf_power.h>
+#endif
 #include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(pico_hardware, CONFIG_PICO_LOG_LEVEL);
@@ -283,6 +286,15 @@ void Hardware::chirp()
 #endif
 }
 
+bool Hardware::usb_powered() const
+{
+#if defined(CONFIG_SOC_NRF52840)
+    // Read-only VBUS detect from the already-powered Nordic POWER peripheral.
+    return nrf_power_usbregstatus_vbusdet_get(NRF_POWER);
+#else
+    return false;
+#endif
+}
 Capabilities Hardware::capabilities() const
 {
     Capabilities result = capability(Capability::None);

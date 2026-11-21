@@ -4,9 +4,20 @@ source "Kconfig.zephyr"
 
 menu "Pico"
 
+config PICO_FIND_HUB
+    bool "Link optional Find Hub measurement integration (activation disabled)"
+    default n
+    depends on BT && SETTINGS && FLASH_MAP
+
+config PICO_RUNTIME_PROFILE
+    bool "Sample thread, slab and queue high water marks"
+    default n
+    depends on THREAD_MONITOR && THREAD_STACK_INFO && INIT_STACKS
+
+
 config PICO_FIRMWARE_VERSION
     string "Firmware version"
-    default "0.13.0-locator"
+    default "0.14.2-pin-pairing"
 
 config PICO_DISPLAY
     bool "Render Pico on the chosen monochrome display"
@@ -40,12 +51,13 @@ config PICO_SETTINGS
     default y
 
 config PICO_BLE_AUTO_SECURITY
-    bool "Request BLE encryption immediately on connection"
+    bool "Legacy BLE auto-security compatibility flag"
     depends on BT_SMP
     default y
     help
-      Disable to let the central initiate pairing. Encrypted GATT
-      permissions still prevent unencrypted command and status access.
+      Compatibility symbol for older build configurations. Pair Phone now
+      controls authenticated security requests independently of this legacy
+      flag; new pairing always requires a locally opened window.
 
 config PICO_BRINGUP_DIAGNOSTICS
     bool "Repeat display and I2C diagnostics on the console"

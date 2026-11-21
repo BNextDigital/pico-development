@@ -220,3 +220,14 @@ The simulator uses the same [pocket UI](pocket-ui.md) renderer and pet-only
 Home Action mapping. `led_on` follows the 200/5000 ms heartbeat; connection
 state does not force it on. The GUI preview magnifies pixels; assess text
 readability on the actual 128×64 OLED before signing off hardware acceptance.
+
+## Clock
+
+The simulator exposes the production [Clock utility](clock.md): use the Clock icon
+or GUI Clock button. Sync Phone Time injects the host UTC/current offset using the BLE
+packet decoder; USB Power simulates VBUS. Clock, alarm editing and stopwatch are also
+accessible with the virtual physical controls. `event SyncTime UTC OFFSET_PLUS_840`
+accepts an auxiliary event word; existing two-word events still work. Clock settings
+persist separately at the simulator state path plus `.clock`; power_cycle preserves
+committed settings but invalidates time and stopwatch. Factory reset removes both
+simulator state files. These are software models, not measured sleep/power/phone tests.

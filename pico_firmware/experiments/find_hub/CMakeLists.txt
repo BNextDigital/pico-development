@@ -24,7 +24,8 @@ target_sources(app PRIVATE "${FHN_SAMPLE}/src/main.c" "${FHN_SAMPLE}/src/factory
   "${FHN_SAMPLE}/src/ring.c" "${FHN_SAMPLE}/src/ui/common.c" src/xiao.cpp
   "${PICO_FW}/src/platform/pico_display.cpp" "${PICO_FW}/src/platform/pico_audio.cpp"
   "${PICO_FW}/src/platform/pico_motion.cpp" "${PICO_FW}/src/platform/pico_status_led.cpp"
-  "${PICO_FW}/lib/pico_core/src/display_model.cpp" "${PICO_FW}/lib/pico_core/src/audio.cpp"
+  "${PICO_FW}/lib/pico_core/src/display_model.cpp" "${PICO_FW}/lib/pico_core/src/clock.cpp"
+  "${PICO_FW}/lib/pico_core/src/audio.cpp"
   "${PICO_FW}/lib/pico_core/src/pitch.cpp" "${PICO_FW}/lib/pico_core/src/motion.cpp")
 zephyr_linker_sources(SECTIONS "${FHN_SAMPLE}/src/factory_reset_callbacks.ld")
 zephyr_linker_sources(DATA_SECTIONS "${FHN_SAMPLE}/src/ui/request_listener.ld")
