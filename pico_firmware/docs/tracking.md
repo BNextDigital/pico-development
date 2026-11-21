@@ -48,11 +48,9 @@ reports capability/settings, not measured acoustic output. CCC access requires
 encryption. Companion app 0.2.0 discovers this characteristic optionally and
 disables Call on older firmware. Old apps can ignore the added capability.
 
-The existing Just Works BLE bonding/encrypted GATT policy remains. This is not
-exclusive owner provisioning or MITM-authenticated ownership. Product-grade
-ownership/pairing windows, address/beacon privacy and unwanted-tracking handling
-must be designed before general distribution or crowd-network integration.
-Do not advertise this prototype as Find Hub/Find My compatible.
+Firmware 0.14.2 uses [passkey pairing](pin-pairing.md) for companion GATT.
+Find Hub ownership, network provisioning and unwanted-tracking validation are
+separate milestones.
 
 ## Phone responsibilities
 
@@ -82,19 +80,20 @@ separated-motion ringing, reference hardware with speaker/motion/battery, and
 MCUboot-based DFU on the nRF52840 DK. Its application-specific configurations
 and UI cannot be copied directly over Pico's factory UF2 bootloader layout.
 
-Next feasibility gates, in order:
+Find Hub feasibility and remaining gates:
 
 1. Build the unmodified pinned sample for its supported nRF52840 DK in a
-   separate build directory; record flash/RAM and configuration. **Do not flash
-   a DK image or sample bootloader onto the XIAO.** No such build ran here.
+   separate build directory. The [standalone validation notes](../experiments/find_hub/validation.md)
+   record this build. **Do not flash a DK image or sample bootloader onto the XIAO.**
 2. Audit sample license/components, debug provisioning limitations and Google's
    [current partner process](https://developers.google.com/nearby/fast-pair/landing-page-find-hub).
    Product distribution requires approval, registration, testing/certification
    and activation; no application has been submitted on the user's behalf.
-3. Prove an isolated XIAO port with preserved bootloader/settings partitions,
-   key storage, battery reporting, real sound, IMU and physical deactivation.
-4. Measure fit and coexistence: Pico custom GATT plus Fast Pair/FHN advertising,
-   security, identity/address rotation, storage, recovery and bounded audio.
+3. Validate the [standalone XIAO port](../experiments/find_hub/README.md) on
+   hardware, including partition preservation, real sound, IMU and physical
+   deactivation. Battery reporting remains unavailable in the prototype.
+4. Use the [combined measurement profile](combined-find-hub.md) for linked
+   footprint and partition verification. Live coexistence still needs validation.
 5. Implement/test the network's ownership, DULT and sound requirements. Ordinary
    runtime mute must not silently disable mandated unwanted-tracking indications.
 6. Measure current/advertising duty cycle on battery before selecting production
@@ -127,8 +126,8 @@ reset is required. On the updated phone app:
 5. Follow companion Android acceptance for association, absence/reunion, Doze,
    reboot, radio toggles, permission loss and dated location data.
 
-No SDK target build, full APK build, physical BLE/OLED/audio/power result,
-network enrollment or crowd locating is claimed by this delivery.
+These checks describe the original local-locator milestone. See the standalone
+validation notes and combined report for subsequent build results.
 
 ## Combined image measurement milestone
 

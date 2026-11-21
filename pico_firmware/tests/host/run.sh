@@ -48,3 +48,6 @@ ${CXX:-c++} -std=c++17 -Wall -Wextra -Wpedantic -Werror \
     "$project_dir"/lib/pico_core/src/*.cpp "$project_dir/tests/host/pin_pairing_tests.cpp" \
     -o "$build_dir/pin_pairing_tests"
 "$build_dir/pin_pairing_tests"
+
+# Standalone Find Hub experiment: portable image and button-policy checks.
+sh "$project_dir/experiments/find_hub/tests/run.sh"

@@ -8,5 +8,6 @@ Firmware, simulator, hardware adapters and documentation for **Pico**, an offlin
 - [Architecture](pico_firmware/docs/architecture.md) and [BLE protocol](pico_firmware/docs/ble-protocol.md)
 - [Simulator](pico_firmware/docs/simulator.md) and [product map](pico_firmware/docs/product-map.md)
 - [Separate Flutter companion app](https://github.com/BNextDigital/pico-companion)
+- [Standalone Find Hub bench experiment](pico_firmware/experiments/find_hub/README.md)
 
-**Current source milestone:** `0.13.0-locator` (November 19, 2026). Earlier baseline OLED/BLE/D0 checks do not validate the current combined build. Target compilation, new peripheral acceptance and current measurements remain outstanding. Sprint documents are retained as historical records.
+**Current source milestone:** `0.14.2-pin-pairing`. The Pico and optional combined XIAO profiles have linked locally. Physical pairing, new peripheral acceptance and current measurements remain outstanding. Sprint documents are retained as historical records.

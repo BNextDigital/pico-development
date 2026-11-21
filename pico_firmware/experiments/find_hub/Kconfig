@@ -1,0 +1,22 @@
+# SDK app symbols and Zephyr configuration are defined by the pinned sample.
+source "$(PICO_FHN_SAMPLE_DIR)/Kconfig"
+menu "Pico isolated Find Hub prototype"
+config PICO_LOG_LEVEL
+    int
+    default 3
+config PICO_DISPLAY
+    bool
+    default y
+    depends on DISPLAY
+config PICO_MOTION
+    bool
+    default y
+    depends on SENSOR && LSM6DSL
+config PICO_AUDIO_I2S
+    bool "Optional MAX98357 I2S speaker"
+    depends on I2S
+    default n
+config PICO_AUDIO_VOLUME_PERCENT
+    int
+    default 25
+endmenu
