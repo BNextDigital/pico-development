@@ -35,3 +35,6 @@ void bt_conn_unref(bt_conn *);
 int bt_conn_auth_cancel(bt_conn *);
 int bt_conn_set_security(bt_conn *,bt_security_t);
 bt_security_t bt_conn_get_security(bt_conn *);
+
+struct bt_addr_le_t;
+const bt_addr_le_t *bt_conn_get_dst(const bt_conn *conn);

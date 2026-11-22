@@ -21,3 +21,5 @@ struct bt_data { int unused; };
 int bt_le_adv_start(const void *,const bt_data *,std::size_t,const bt_data *,std::size_t);
 int bt_enable(void *);
 int bt_unpair(std::uint8_t,const bt_addr_le_t *);
+
+bool bt_le_bond_exists(std::uint8_t id,const bt_addr_le_t *address);

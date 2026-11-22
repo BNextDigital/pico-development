@@ -79,8 +79,11 @@ void apply_effects(pico::Effects effects, pico::Core &core,
         if (audio.ready()) audio.play(state.sound_cue,alarm ? std::max<unsigned>(25,state.sound_volume_percent) : state.sound_volume_percent,state.reference_note);
         else if (core.state().sound_cue < pico::audio::Cue::MetronomeClick) hardware.chirp();
     }
-    if (pico::has_effect(effects, pico::Effect::Render)) {
-        display.render(core.state());
+    if (pico::has_effect(effects, pico::Effect::Render) &&
+        !display.render(state) && state.pairing.active()) {
+        LOG_WRN("OLED failed during local pairing; closing the pairing window");
+        effects|=core.handle({pico::EventKind::PairingFailed,255U,state.pairing.token});
+        ble.close_pairing();
     }
     if (pico::has_effect(effects, pico::Effect::Notify)) {
         const auto microphone_bit = pico::capability(pico::Capability::Microphone);

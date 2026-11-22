@@ -158,6 +158,12 @@ App sequence:
 6. Older firmware lacking capability/characteristics must continue with its existing
    protocol. All old command IDs and the legacy status length remain valid.
 
+Pico Companion 0.3.0 uses this flow. It obtains the full settings value with a
+native characteristic read and verifies the length and checksum. The platform
+handles ATT Read Blob continuation, including a 23-byte MTU. The app does not
+request an MTU before bonding. The firmware adapter regression models reads at
+offsets 0, 22 and 44. Actual Android/XIAO radio validation remains a separate gate.
+
 Clock status bytes (little-endian):
 
 | Byte(s) | Meaning |
