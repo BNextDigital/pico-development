@@ -7,7 +7,9 @@
 #include "platform/pico_ble.cpp"
 #include <cassert>
 #include <vector>
+#include <cstdio>
 #include <iostream>
+#include <string_view>
 namespace {
 bt_conn companion{0,true}, network{1,true};
 std::vector<pico::Event> events;
@@ -18,7 +20,15 @@ const bt_addr_le_t *unpair_address;
 bool accepting=true;
 unsigned auth_cancels=0,security_requests=0;
 int security_error=0;
+bool companion_bonded=false;
+bt_addr_le_t companion_address{};
 bool sink(const pico::Event &event) { if (!accepting) return false; events.push_back(event); return true; }
+}
+const bt_addr_le_t *bt_conn_get_dst(const bt_conn *conn) {
+ assert(conn==&companion); return &companion_address;
+}
+bool bt_le_bond_exists(std::uint8_t id,const bt_addr_le_t *address) {
+ return id==0 && address==&companion_address && companion_bonded;
 }
 bt_conn *bt_conn_ref(bt_conn *conn) { ++conn->refs; return conn; }
 void bt_conn_unref(bt_conn *conn) { assert(conn->refs); --conn->refs; }
@@ -49,7 +59,10 @@ ssize_t bt_gatt_attr_read(bt_conn *,const bt_gatt_attr *,void *out,std::uint16_t
  const auto copied=std::min<std::size_t>(n,size-off); std::memcpy(out,static_cast<const char *>(data)+off,copied); return copied;
 }
 int bt_gatt_notify(bt_conn *,const bt_gatt_attr *,const void *,std::size_t) { return 0; }
-int main() {
+int main(int argc, char **argv) {
+ assert(argc<=2);
+ const bool export_clock=argc==2 && std::string_view(argv[1])=="--clock-fixture";
+ assert(argc==1 || export_clock);
  pico::platform::Ble ble;
  assert(!ble.forget_companions()); assert(ble.init(sink));
  connection_callbacks.connected(&network,0); assert(events.empty());
@@ -72,6 +85,40 @@ int main() {
  assert(!pico_authorized(&network,&pico_service.attrs[10]));
  assert(!pico_authorized(&network,&pico_service.attrs[13]));
  assert(pico_authorized(&companion,&pico_service.attrs[10]));
+ // Read the production attributes through a 23-byte ATT MTU model.
+ pico::State clock_state;
+ clock_state.clock.valid=true;
+ clock_state.clock.sync_due=false;
+ clock_state.clock.utc=1795381200;
+ clock_state.clock.sync_age=10;
+ clock_state.clock.settings.offset_minutes=-300;
+ clock_state.clock.settings.hour24=false;
+ clock_state.clock.settings.glance=true;
+ clock_state.clock.settings.alarms[0]={420,31,true,-1};
+ clock_state.clock.settings.alarms[2]={1230,0,true,20780};
+ clock_state.clock.ringing=1;
+ clock_state.clock.stopwatch_seconds=90;
+ clock_state.clock.stopwatch_fraction_ms=250;
+ ble.publish_clock(clock_state);
+ std::array<std::uint8_t,20> wire_status;
+ pico::clock::Blob wire_config;
+ assert(read_clock(&companion,nullptr,wire_status.data(),22,0)==20);
+ assert(read_clock_config(&companion,nullptr,wire_config.data(),22,0)==22);
+ assert(read_clock_config(&companion,nullptr,wire_config.data()+22,22,22)==22);
+ assert(read_clock_config(&companion,nullptr,wire_config.data(),22,44)==0);
+ assert(read_clock_config(&companion,nullptr,wire_config.data(),22,45)<0);
+ assert(wire_config==pico::clock::encode(clock_state.clock.settings));
+ auto print_hex=[](const auto &bytes) {
+     for (const auto byte : bytes) std::printf("%02x",unsigned(byte));
+ };
+ if (export_clock) {
+     std::printf("{\n  \"status\": \"");
+     print_hex(wire_status);
+     std::printf("\",\n  \"config\": \"");
+     print_hex(wire_config);
+     std::printf("\"\n}\n");
+     return 0;
+ }
  // Local window and actual production authentication callbacks.
  accepting=true; events.clear(); companion.connected=false; network.connected=true;
  assert(accept_pairing(&companion,nullptr)==BT_SECURITY_ERR_PAIR_NOT_ALLOWED);
@@ -82,11 +129,23 @@ int main() {
  assert(accept_pairing(&intruder,nullptr)==BT_SECURITY_ERR_PAIR_NOT_ALLOWED);
  authentication_callbacks.passkey_display(&companion,37);
  assert(events.back().kind==pico::EventKind::PairingPasskey && events.back().value==37 && events.back().auxiliary==10);
- companion.security=BT_SECURITY_L4;
+ companion.security=BT_SECURITY_L4; companion_bonded=true;
+ const auto before_fresh_encryption=events.size();
+ security_changed(&companion,BT_SECURITY_L4,BT_SECURITY_ERR_SUCCESS);
+ assert(events.size()==before_fresh_encryption+1 && events.back().kind==pico::EventKind::RequestStatus);
  pairing_callbacks.pairing_complete(&companion,true);
  assert(events.back().kind==pico::EventKind::PairingComplete && events.back().auxiliary==10);
  const auto disconnects=disconnected_companion;
  ble.close_pairing(); assert(companion.refs==0 && disconnected_companion==disconnects);
+ // Resuming a saved bond emits security_changed without pairing_complete.
+ companion.connected=true; companion.security=2;
+ assert(ble.open_pairing(16));
+ companion.security=BT_SECURITY_L4;
+ security_changed(&companion,BT_SECURITY_L4,BT_SECURITY_ERR_SUCCESS);
+ assert(events[events.size()-2].kind==pico::EventKind::PairingComplete);
+ assert(events[events.size()-2].auxiliary==16);
+ ble.close_pairing(); assert(companion.refs==0 && disconnected_companion==disconnects);
+ companion_bonded=false;
  // Cancel, strict deadline, late callbacks and identity separation.
  companion.security=2; assert(ble.open_pairing(11));
  assert(accept_pairing(&companion,nullptr)==BT_SECURITY_ERR_SUCCESS);

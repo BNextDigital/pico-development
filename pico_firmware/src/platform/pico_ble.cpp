@@ -202,26 +202,28 @@ struct PairingWindow {
     bt_conn *connection{};
     std::uint32_t token{};
     std::int64_t deadline{};
-    bool active{}, successful{};
+    bool active{}, successful{}, fresh_pairing{};
 } pairing_window;
 
 bool pairing_live()
 { return pairing_window.active && k_uptime_get()/1000 < pairing_window.deadline; }
 
-bool claim_pairing(bt_conn *conn)
+bool claim_pairing(bt_conn *conn, bool fresh = false)
 {
     if (!is_companion(conn)) return false;
     k_mutex_lock(&pairing_mutex,K_FOREVER);
     const bool allowed=pairing_live() && (!pairing_window.connection || pairing_window.connection==conn);
     if (allowed && !pairing_window.connection) pairing_window.connection=bt_conn_ref(conn);
+    if (allowed && fresh) pairing_window.fresh_pairing=true;
     k_mutex_unlock(&pairing_mutex);
     return allowed;
 }
 
-void pairing_result(bt_conn *conn,pico::EventKind kind,unsigned value)
+void pairing_result(bt_conn *conn,pico::EventKind kind,unsigned value,bool resumed = false)
 {
     k_mutex_lock(&pairing_mutex,K_FOREVER);
-    const bool owned=pairing_window.connection==conn && pairing_live();
+    const bool owned=pairing_window.connection==conn && pairing_live() &&
+        (!resumed || !pairing_window.fresh_pairing);
     const auto token=pairing_window.token;
     if (owned) {
         pairing_window.active=false;
@@ -237,7 +239,7 @@ void pairing_result(bt_conn *conn,pico::EventKind kind,unsigned value)
 
 bt_security_err accept_pairing(bt_conn *conn, const bt_conn_pairing_feat *)
 {
-    return claim_pairing(conn) ? BT_SECURITY_ERR_SUCCESS : BT_SECURITY_ERR_PAIR_NOT_ALLOWED;
+    return claim_pairing(conn,true) ? BT_SECURITY_ERR_SUCCESS : BT_SECURITY_ERR_PAIR_NOT_ALLOWED;
 }
 void display_passkey(bt_conn *conn,unsigned passkey)
 {
@@ -260,6 +262,14 @@ const bt_conn_auth_cb authentication_callbacks = {
     .cancel = cancel_pairing_request,
 };
 
+void complete_existing_bond(bt_conn *conn)
+{
+    if (bt_le_bond_exists(BT_ID_DEFAULT,bt_conn_get_dst(conn))) {
+        // Fresh SMP still needs the pairing_complete callback after key distribution.
+        pairing_result(conn,pico::EventKind::PairingComplete,0,true);
+    }
+}
+
 void request_pin_security(bt_conn *conn)
 {
     if (!claim_pairing(conn)) return;
@@ -269,7 +279,7 @@ void request_pin_security(bt_conn *conn)
         pairing_result(conn,pico::EventKind::PairingFailed,BT_SECURITY_ERR_UNSPECIFIED);
     }
     else if (bt_conn_get_security(conn)>=BT_SECURITY_L4)
-        pairing_result(conn,pico::EventKind::PairingComplete,0);
+        complete_existing_bond(conn);
 }
 
 int begin_advertising()
@@ -331,6 +341,7 @@ void security_changed(bt_conn *conn, bt_security_t level, enum bt_security_err e
     }
 
     LOG_INF("BLE link security level %u", static_cast<unsigned int>(level));
+    if (level>=BT_SECURITY_L4) complete_existing_bond(conn);
     emit(pico::EventKind::RequestStatus);
 }
 
@@ -415,7 +426,7 @@ bool Ble::open_pairing(std::uint32_t token)
     k_mutex_lock(&pairing_mutex,K_FOREVER);
     pairing_window.token=token;
     pairing_window.deadline=k_uptime_get()/1000+120;
-    pairing_window.active=true; pairing_window.successful=false;
+    pairing_window.active=true; pairing_window.successful=false; pairing_window.fresh_pairing=false;
     k_mutex_unlock(&pairing_mutex);
     LOG_INF("Local PIN pairing window opened (120 s)");
     bt_conn_foreach(BT_CONN_TYPE_LE,[](bt_conn *conn,void *) {
