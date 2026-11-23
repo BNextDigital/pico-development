@@ -149,3 +149,57 @@ partitions, or bonds.
 reports returned TX buffers. Successful recurring metronome beats are
 quiet in the log. Physical clock captures and acoustic validation are
 pending.
+
+## Optional power-on audio diagnostic
+
+From `pico_firmware/` in the nRF Connect SDK 3.4.2 terminal, build the
+Combined diagnostic image:
+
+```powershell
+python tools/build_combined.py --sdk-root C:/ncs/v3.4.2 --build-dir build-post-combined --profile combined --post-beep
+```
+
+The flag adds `configs/xiao_audio_post.conf` to the existing audio
+configuration. Without the flag, `CONFIG_PICO_AUDIO_POST_BEEP` defaults
+to disabled. The option depends on `PICO_AUDIO_I2S`. The OLED-only
+profile needs no extra configuration. Combined still leaves Find Hub
+activation disabled.
+
+The boot sequence restores mute and volume, initializes the audio
+adapter, brings up the display and Bluetooth, then services Clock
+before offering the POST cue to the existing worker. The queue
+submission does not wait for playback. A higher-priority audio owner
+can suppress a pending beep or preempt one already in progress. A
+skipped or failed attempt never automatically retries.
+
+The cue uses the existing bounded 880 Hz triangle oscillator. At the
+configured sample rate the tone is 4,761 stereo frames (100 ms) with
+238-frame attack and release. The existing three 128-frame startup
+silence blocks precede the tone. The saved sound level applies and
+there is no PWM fallback for the POST.
+
+### Bench acceptance
+
+1. Keep the previously working Combined UF2. Double-tap the XIAO reset
+   button and copy `build-post-combined/zephyr/zephyr.uf2` to the
+   bootloader volume.
+2. Open the serial console at 115200 baud with DTR enabled. For the
+   external UART, keep the console attached across reset. For USB CDC,
+   reopen its COM port when it re-enumerates if your terminal drops it.
+   A console that attaches late may miss the one-shot logs.
+3. Reset or power-cycle once with sound unmuted and a nonzero volume.
+   Check the I²S configure result, the POST queue decision, and the
+   START/DRAIN results. Listen for one short beep.
+4. Verify the OLED, Clock and companion connection operate normally.
+   Enable mute, let the preference save, and reset again. Expect a
+   muted skip and no POST transfer. A saved zero volume also skips it.
+5. Reflash the known-good Combined image, or build Combined without
+   `--post-beep`, to check the default silent startup.
+
+A queue acceptance line confirms submission to the audio worker.
+`I2S START accepted` confirms the driver accepted the start request.
+`MCU-side I2S transmission completed` means DRAIN was accepted and
+the driver's DMA buffers were released. START or DRAIN errors and
+release timeouts follow the existing DROP recovery path. Acoustic
+output requires hearing the beep or measuring the speaker output
+separately. No wiring or gain changes are part of this test.

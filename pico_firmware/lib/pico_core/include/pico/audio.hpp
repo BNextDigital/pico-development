@@ -4,7 +4,7 @@
 namespace pico::audio {
 // Single worker ownership; changing owner invalidates queued/in-flight stale cues.
 enum class Owner : std::uint8_t { Feature, LocalFind, Timer, Alarm, NetworkRing, UnwantedTracking };
-enum class Cue : std::uint8_t { Interact, TimerComplete, WorkComplete, BreakComplete, MetronomeClick, MetronomeAccent, ReferenceTone, Count };
+enum class Cue : std::uint8_t { Interact, TimerComplete, WorkComplete, BreakComplete, MetronomeClick, MetronomeAccent, ReferenceTone, PostBeep, Count };
 // nRF52840 PCLK32M_HFXO, MCK /21, MCK/LRCLK 32, 16-bit stereo.
 // Request the integer rate selected by nrfx so synthesis and DMA agree.
 inline constexpr std::uint32_t kClockSourceHz = 32000000;

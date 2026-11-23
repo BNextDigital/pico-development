@@ -39,6 +39,14 @@ config PICO_AUDIO_I2S
     depends on I2S
     default n
 
+config PICO_AUDIO_POST_BEEP
+    bool "Play one diagnostic I2S beep at boot"
+    depends on PICO_AUDIO_I2S
+    default n
+    help
+      Queue one short startup tone after restoring audio preferences.
+      Intended for hardware bring-up. Honors mute and volume.
+
 config PICO_AUDIO_VOLUME_PERCENT
     int "Default sound cue volume percent (saved settings override)"
     depends on PICO_AUDIO_I2S

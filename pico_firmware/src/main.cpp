@@ -151,7 +151,7 @@ int main()
 
     std::uint32_t last_tick = UINT32_MAX;
     // Service clocks before actions, so a pause/tap uses the actual wake time.
-    const auto service_clocks = [&] {
+    const auto service_clocks = [&](bool boot = false) {
         const auto now = k_uptime_get();
         const auto seconds = static_cast<std::uint32_t>(now / MSEC_PER_SEC);
         if (seconds != last_tick) {
@@ -174,9 +174,10 @@ int main()
                       audio, microphone, display, storage, ble, capabilities);
         apply_effects(core.handle({pico::EventKind::AnimationTick, ms}), core, hardware,
                       audio, microphone, display, storage, ble, capabilities);
+        if (boot) audio.submit_post_beep(core.state().sound_muted, core.state().sound_volume_percent);
     };
     while (true) {
-        service_clocks();
+        service_clocks(last_tick == UINT32_MAX);
 #if defined(CONFIG_PICO_RUNTIME_PROFILE)
         const auto used = k_msgq_num_used_get(&event_queue);
         if (used > queue_peak) queue_peak = used;

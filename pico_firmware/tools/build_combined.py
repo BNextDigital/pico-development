@@ -20,6 +20,7 @@ def main():
     parser.add_argument('--build-dir', type=Path, required=True)
     parser.add_argument('--profile', choices=['pico', 'pico-lto', 'combined', 'profile'], default='combined')
     parser.add_argument('--report-only', action='store_true')
+    parser.add_argument('--post-beep', action='store_true', help='Enable the one-shot I2S diagnostic')
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     build = args.build_dir.resolve()
@@ -35,6 +36,8 @@ def main():
         if args.profile in ('combined', 'profile'):
             overlays.append('overlays/xiao_find_hub.overlay')
             configs.append('configs/xiao_find_hub.conf')
+        if args.post_beep:
+            configs.append('configs/xiao_audio_post.conf')
         if args.profile == 'pico-lto':
             configs.append('configs/xiao_size.conf')
         if args.profile == 'profile':
