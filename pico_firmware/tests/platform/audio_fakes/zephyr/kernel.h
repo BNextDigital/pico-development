@@ -5,15 +5,18 @@
 #include <deque>
 #include <vector>
 #include <cerrno>
-struct k_mem_slab { std::size_t bytes; unsigned used{0}; };
+struct k_mem_slab { std::size_t bytes; unsigned capacity; unsigned used{0}; };
 struct fake_queue { std::size_t bytes, depth; std::deque<std::vector<unsigned char>> entries{}; };
-#define K_MEM_SLAB_DEFINE(name, bytes, count, align) k_mem_slab name{bytes}
+#define K_MEM_SLAB_DEFINE(name, bytes, count, align) k_mem_slab name{bytes,count}
 #define K_MSGQ_DEFINE(name, bytes, depth, align) fake_queue name{bytes,depth,{}}
 #define K_THREAD_DEFINE(name, stack, entry, a,b,c,prio,options,delay) [[maybe_unused]] static auto name = entry
 #define K_MSEC(x) (x)
 #define K_NO_WAIT 0
 #define K_FOREVER -1
-inline int k_mem_slab_alloc(k_mem_slab *slab,void **data,int) { *data=new unsigned char[slab->bytes]; ++slab->used; return 0; }
+inline int k_mem_slab_alloc(k_mem_slab *slab,void **data,int) {
+ if (slab->used >= slab->capacity) return -ENOMEM;
+ *data=new unsigned char[slab->bytes]; ++slab->used; return 0;
+}
 inline void k_mem_slab_free(k_mem_slab *slab,void *data) { delete[] static_cast<unsigned char *>(data); --slab->used; }
 inline unsigned k_mem_slab_num_used_get(k_mem_slab *slab) { return slab->used; }
 inline void k_msgq_purge(fake_queue *queue) { queue->entries.clear(); }

@@ -29,17 +29,17 @@ std::int16_t sample(Cue cue, std::uint32_t frame, unsigned volume)
 {
     const auto s = score(cue);
     for (std::size_t i=0; i<s.count; ++i) {
-        const auto count = s.notes[i].ms * kSampleRate / 1000U;
+        const auto count = frames_for_ms(s.notes[i].ms);
         if (frame >= count) { frame -= count; continue; }
         if (!s.notes[i].frequency) return 0;
         const auto phase = static_cast<unsigned>((static_cast<std::uint64_t>(frame) *
             s.notes[i].frequency * 65536U / kSampleRate) & 65535U);
         const int triangle = phase < 32768U ? static_cast<int>(phase) * 2 - 32768 :
                                              98303 - static_cast<int>(phase) * 2;
-        const auto fade = std::min({frame, count-1-frame, kSampleRate / 200U});
+        const auto fade = std::min({frame, count-1-frame, frames_for_ms(5)});
         const auto scaled = static_cast<std::int64_t>(triangle) * kPeakLimit *
                             std::min(volume,100U) * fade;
-        return static_cast<std::int16_t>(scaled / (32768LL * 100 * (kSampleRate / 200U)));
+        return static_cast<std::int16_t>(scaled / (32768LL * 100 * (frames_for_ms(5))));
     }
     return 0;
 }
@@ -49,7 +49,7 @@ std::uint32_t frames(Cue cue)
     if (cue == Cue::ReferenceTone) return kReferenceFrames;
     const auto s = score(cue);
     std::uint32_t total=0;
-    for (std::size_t i=0; i<s.count; ++i) total += s.notes[i].ms * kSampleRate / 1000U;
+    for (std::size_t i=0; i<s.count; ++i) total += frames_for_ms(s.notes[i].ms);
     return total;
 }
 void render(Cue cue, std::uint32_t first, std::int16_t *out, std::size_t count, unsigned volume)
@@ -80,9 +80,9 @@ void render_reference(std::uint8_t note, std::uint32_t first, std::int16_t *out,
         if (hz && frame < kReferenceFrames) {
             const auto phase = static_cast<unsigned>((frame * hz * 65536U / (kSampleRate * 1000ULL)) & 65535U);
             const int triangle = phase < 32768U ? static_cast<int>(phase)*2-32768 : 98303-static_cast<int>(phase)*2;
-            const auto fade = std::min({frame, kReferenceFrames-1-frame, static_cast<std::uint64_t>(kSampleRate/200U)});
+            const auto fade = std::min({frame, kReferenceFrames-1-frame, static_cast<std::uint64_t>(frames_for_ms(5))});
             value = static_cast<std::int16_t>(static_cast<std::int64_t>(triangle)*kPeakLimit*
-                std::min(volume,100U)*static_cast<std::int64_t>(fade)/(32768LL*100*(kSampleRate/200U)));
+                std::min(volume,100U)*static_cast<std::int64_t>(fade)/(32768LL*100*(frames_for_ms(5))));
         }
         out[2*i] = out[2*i+1] = value;
     }

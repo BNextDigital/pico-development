@@ -16,7 +16,7 @@ void test_reference_pcm_frequency_bounds_and_chunks()
         for (unsigned frame=1; frame<kReferenceFrames; ++frame) {
             CHECK(full[frame*2] == full[frame*2+1]);
             CHECK(std::abs(static_cast<int>(full[frame*2])) <= kPeakLimit);
-            if (frame > 3125 && frame <= 3125+kSampleRate && full[(frame-1)*2] <= 0 && full[frame*2] > 0) ++crossings;
+            if (frame > kSampleRate/10 && frame <= kSampleRate/10+kSampleRate && full[(frame-1)*2] <= 0 && full[frame*2] > 0) ++crossings;
         }
         CHECK(std::abs(static_cast<double>(crossings)-frequency_millihz(note)/1000.0) < 1.1);
         CHECK(full[0] == 0 && full[(kReferenceFrames-1)*2] == 0 && full[kReferenceFrames*2] == 0);
@@ -43,9 +43,9 @@ void test_reference_lifecycle_and_priority()
     c.handle({E::AudioReady,1});
     c.handle({E::MusicTick,UINT32_MAX-100U});
     CHECK(pico::has_effect(c.handle({E::PlayReference,0}),pico::Effect::Chirp));
-    CHECK(c.next_music_ms(UINT32_MAX-100U) == 2000);
-    c.handle({E::MusicTick,1898}); CHECK(c.state().reference_playing);
-    c.handle({E::MusicTick,1899}); CHECK(!c.state().reference_playing);
+    CHECK(c.next_music_ms(UINT32_MAX-100U) == pico::audio::kReferencePlaybackMs);
+    c.handle({E::MusicTick,pico::audio::kReferencePlaybackMs-102U}); CHECK(c.state().reference_playing);
+    c.handle({E::MusicTick,pico::audio::kReferencePlaybackMs-101U}); CHECK(!c.state().reference_playing);
     c.handle({E::PlayReference,0}); c.handle({E::SetReferenceNote,40}); CHECK(!c.state().reference_playing);
     CHECK(c.handle({E::SetReferenceNote,39}) == pico::effect(pico::Effect::None));
     c.handle({E::PlayReference,0}); c.handle({E::SetMuted,1}); CHECK(!c.state().reference_playing);
