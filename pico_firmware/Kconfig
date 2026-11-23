@@ -17,7 +17,7 @@ config PICO_RUNTIME_PROFILE
 
 config PICO_FIRMWARE_VERSION
     string "Firmware version"
-    default "0.15.0-rc1"
+    default "0.16.0-rc1"
 
 config PICO_DISPLAY
     bool "Render Pico on the chosen monochrome display"
