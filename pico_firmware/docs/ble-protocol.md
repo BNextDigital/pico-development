@@ -211,3 +211,10 @@ See [Pair Again recovery](ble-recovery.md) for a physical-button-confirmed reset
 ## Passkey firmware migration
 
 Firmware 0.14.2 requires authenticated Secure Connections for private Pico GATT. After clearing old companion bonds, open **Settings → Pair Phone** with a physical Action-button hold, then enter the OLED passkey on the phone. See [PIN pairing](pin-pairing.md) for the two-minute window, recovery and hardware acceptance steps. Command IDs, status bytes and durable settings schemas are unchanged.
+
+## Parking Recall extension
+
+Capability bit 10, authenticated status characteristic 0007 and commands
+0x70–0x71 support a physical Park Here request and its application-level
+result. The 16-byte primary status and previous commands are unchanged.
+See [Parking Recall](parking.md) for the wire format and lifecycle.

@@ -15,6 +15,7 @@ public:
     bool open_pairing(std::uint32_t token);
     void close_pairing();
     void publish(const State &state, Capabilities capabilities);
+    void publish_parking(const State &state);
     void publish_clock(const State &state,bool notify=true);
 
 private:

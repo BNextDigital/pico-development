@@ -12,7 +12,11 @@ struct bt_gatt_authorization_cb { bool (*read_authorize)(bt_conn *,const bt_gatt
 #define BT_GATT_PRIMARY_SERVICE(...) {nullptr,nullptr,nullptr}
 #define BT_GATT_CHARACTERISTIC(uuid,props,perm,read,write,user) {read,write,nullptr},{read,write,nullptr}
 #define BT_GATT_CCC(changed,perm) {nullptr,nullptr,changed}
+#define BT_GATT_CCC_WITH_WRITE_CB(changed,write,perm) {nullptr,nullptr,changed}
+#define BT_ATT_ERR_READ_NOT_PERMITTED 2
+#define BT_ATT_ERR_WRITE_NOT_PERMITTED 3
 #define BT_GATT_CCC_NOTIFY 1
+bool bt_gatt_is_subscribed(bt_conn *,const bt_gatt_attr *,std::uint16_t);
 #define BT_GATT_CHRC_READ 1
 #define BT_GATT_CHRC_NOTIFY 2
 #define BT_GATT_CHRC_WRITE 4

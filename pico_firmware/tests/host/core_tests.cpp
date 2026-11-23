@@ -349,6 +349,7 @@ void test_focus_button_standalone_controls()
 #include "sprint01_tests.hpp"
 #include "sprint02_tests.hpp"
 #include "music_tests.hpp"
+#include "parking_tests.hpp"
 #include "tuner_tests.hpp"
 #include "motion_tests.hpp"
 #include "duration_tests.hpp"
@@ -383,6 +384,8 @@ int main()
     test_locator_service_and_protocol();
     test_locator_priority_and_acknowledgement();
     run_music_tests();
+    test_parking_recall();
+    test_parking_protocol_validation();
     test_reference_pcm_frequency_bounds_and_chunks();
     test_reference_lifecycle_and_priority();
     run_tuner_tests();

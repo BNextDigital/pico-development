@@ -98,9 +98,9 @@ void test_metronome_exit_and_completion_priority()
     CHECK(!core.state().metronome_running && core.state().metronome_bpm == 120);
     CHECK(core.state().mode == pico::Mode::Companion);
     core.handle({E::OpenMenu,0});
-    for (unsigned i=0; i<4; ++i) core.handle({E::NavigateNext,0});
+    for (unsigned i=0; i<5; ++i) core.handle({E::NavigateNext,0});
     core.handle({E::Select,0});
-    CHECK(core.state().screen == pico::Screen::Unavailable); // Wayfinding still unavailable.
+    CHECK(core.state().screen == pico::Screen::Unavailable); // Notes still unavailable.
 }
 void test_music_wire_commands_and_rendering()
 {

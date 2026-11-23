@@ -77,3 +77,9 @@ history](focus-sessions.md). Physical power measurements are deferred by user
 request. Existing automatic checks continue; measurement-based battery and
 shutdown decisions remain outstanding. Durable/calendar-based history, custom
 phase sequences and long-break scheduling remain future Focus work.
+
+## Sprint 04 · Parking Recall
+
+The former Wayfinding menu entry opens Parking Recall. Explicit phone or
+Pico button requests save a phone-local location, available offline through
+the companion. [Protocol and physical controls](parking.md).

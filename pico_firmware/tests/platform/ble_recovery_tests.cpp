@@ -58,11 +58,20 @@ ssize_t bt_gatt_attr_read(bt_conn *,const bt_gatt_attr *,void *out,std::uint16_t
  if(off>size) return -7;
  const auto copied=std::min<std::size_t>(n,size-off); std::memcpy(out,static_cast<const char *>(data)+off,copied); return copied;
 }
-int bt_gatt_notify(bt_conn *,const bt_gatt_attr *,const void *,std::size_t) { return 0; }
+static unsigned parking_notifications;
+bool bt_gatt_is_subscribed(bt_conn *,const bt_gatt_attr *,std::uint16_t) { return true; }
+int bt_gatt_notify(bt_conn *conn,const bt_gatt_attr *attr,const void *,std::size_t) {
+ if (attr==&pico_service.attrs[parking_attr_index]) {
+     assert(conn==&companion && conn->security>=BT_SECURITY_L3);
+     ++parking_notifications;
+ }
+ return 0;
+}
 int main(int argc, char **argv) {
  assert(argc<=2);
  const bool export_clock=argc==2 && std::string_view(argv[1])=="--clock-fixture";
- assert(argc==1 || export_clock);
+ const bool export_parking=argc==2 && std::string_view(argv[1])=="--parking-fixture";
+ assert(argc==1 || export_clock || export_parking);
  pico::platform::Ble ble;
  assert(!ble.forget_companions()); assert(ble.init(sink));
  connection_callbacks.connected(&network,0); assert(events.empty());
@@ -111,6 +120,40 @@ int main(int argc, char **argv) {
  auto print_hex=[](const auto &bytes) {
      for (const auto byte : bytes) std::printf("%02x",unsigned(byte));
  };
+ pico::State parking_state;
+ parking_state.parking = {0x7b234591, 0x01abcd, pico::parking::Phase::Saving};
+ companion.security=BT_SECURITY_L2; network.security=BT_SECURITY_L4;
+ ble.publish_parking(parking_state);
+ assert(parking_notifications==0);
+ companion.security=BT_SECURITY_L4;
+ ble.publish_parking(parking_state);
+ assert(parking_notifications==1);
+ ParkingPacket request_bytes{};
+ assert(pico_service.attrs[parking_attr_index].read(&companion,nullptr,
+     request_bytes.data(),22,0)==static_cast<ssize_t>(request_bytes.size()));
+ assert(read_parking(&network,nullptr,request_bytes.data(),22,0)==-BT_ATT_ERR_READ_NOT_PERMITTED);
+ assert(!pico_authorized(&network,&pico_service.attrs[parking_attr_index]));
+ assert(write_parking_ccc(&network,nullptr,1)==-BT_ATT_ERR_WRITE_NOT_PERMITTED);
+ const std::uint8_t ready[]{0x70,1};
+ assert(write_command(&network,nullptr,ready,sizeof(ready),0,0)==-BT_ATT_ERR_WRITE_NOT_PERMITTED);
+ const std::uint8_t saved[]{0x71,2,request_bytes[2],request_bytes[3],request_bytes[4],
+     request_bytes[5],request_bytes[6],request_bytes[7],request_bytes[8]};
+ accepting=true;
+ assert(write_command(&companion,nullptr,saved,sizeof(saved),0,0)==sizeof(saved));
+ assert(events.back().kind==pico::EventKind::ParkingResult &&
+     events.back().value==parking_state.parking.boot_id &&
+     events.back().auxiliary==(2U<<24U | parking_state.parking.sequence));
+ ble.publish(parking_state,pico::capability(pico::Capability::Parking));
+ if (export_parking) {
+     std::printf("{\n  \"primary\": \"");
+     print_hex(status_value);
+     std::printf("\",\n  \"request\": \"");
+     print_hex(request_bytes);
+     std::printf("\",\n  \"saved\": \"");
+     print_hex(saved);
+     std::printf("\"\n}\n");
+     return 0;
+ }
  if (export_clock) {
      std::printf("{\n  \"status\": \"");
      print_hex(wire_status);
@@ -120,7 +163,7 @@ int main(int argc, char **argv) {
      return 0;
  }
  // Local window and actual production authentication callbacks.
- accepting=true; events.clear(); companion.connected=false; network.connected=true;
+ accepting=true; events.clear(); companion.connected=false; companion.security=BT_SECURITY_L2; network.connected=true;
  assert(accept_pairing(&companion,nullptr)==BT_SECURITY_ERR_PAIR_NOT_ALLOWED);
  assert(ble.open_pairing(10));
  assert(accept_pairing(&network,nullptr)==BT_SECURITY_ERR_PAIR_NOT_ALLOWED);

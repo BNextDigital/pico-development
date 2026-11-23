@@ -89,6 +89,35 @@ class BackendTests(unittest.TestCase):
         self.assertEqual(returned["state"]["menu_index"], 3)
         self.assertEqual(returned["frame_hex"], frames[3])
 
+    def test_parking_button_request_and_simulated_phone_reply(self) -> None:
+        self.harness.send("event OpenMenu")
+        for _ in range(4):
+            self.harness.send("event NavigateNext")
+        page = self.harness.send("event FocusButtonTapped")
+        self.assertEqual(page["state"]["screen"], 20)
+        offline = self.harness.send("event FocusButtonTapped")
+        self.assertEqual(offline["state"]["parking_phase"], 3)
+        self.harness.send("event Connected")
+        self.harness.send("ble 7001")
+        pending = self.harness.send("event FocusButtonTapped")
+        self.assertTrue(pending["state"]["parking_simulated"])
+        self.assertIn("NotifyParking", pending["effect_names"])
+        self.assertEqual(pending["state"]["parking_phase"], 1)
+        self.assertNotEqual(page["frame_hex"], pending["frame_hex"])
+        request = pending["state"]["parking_hex"]
+        result = self.harness.send("ble 7102" + request[4:])
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["state"]["parking_phase"], 2)
+        self.assertNotEqual(result["frame_hex"], pending["frame_hex"])
+        self.assertNotIn("Chirp", result["effect_names"])
+        self.assertNotIn("Persist", result["effect_names"])
+        self.harness.send("event FocusButtonTapped")
+        expired = self.harness.send("advance 45")
+        self.assertEqual(expired["state"]["parking_phase"], 7)
+        restarted = self.harness.send("power_cycle")
+        self.assertEqual(restarted["state"]["parking_phase"], 0)
+        self.assertNotEqual(restarted["state"]["parking_hex"][4:12], request[4:12])
+
     def test_core_deadlines_follow_expression_and_metronome(self) -> None:
         self.assertEqual(self.harness.initial["next_core_wake_ms"], 1000)
         self.harness.send("event PrimaryPressed")
@@ -277,7 +306,7 @@ class BackendTests(unittest.TestCase):
     def test_boot_and_interaction_use_real_core_and_renderer(self) -> None:
         boot = self.harness.initial
         self.assertEqual(boot["state"]["mode_name"], "companion")
-        self.assertEqual(boot["effect_names"], ["Render", "Notify", "NotifyClock"])
+        self.assertEqual(boot["effect_names"], ["Render", "Notify", "NotifyClock", "NotifyParking"])
         self.assertEqual(len(bytes.fromhex(boot["frame_hex"])), 1024)
 
         interaction = self.harness.send("event PrimaryPressed")

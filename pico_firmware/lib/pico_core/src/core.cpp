@@ -145,6 +145,12 @@ Effects Core::navigate(EventKind kind)
         }
         return effect(Effect::None); // Short taps/remote Select cannot erase bonds.
     }
+    if (state_.screen == Screen::Parking) {
+        if (kind != EventKind::Back && kind != EventKind::OpenMenu) return effect(Effect::None);
+        state_.screen = Screen::Menu;
+        return state_.parking.phase == parking::Phase::Saving
+            ? finish_parking(parking::Phase::Cancelled) | Effect::Render : effect(Effect::Render);
+    }
     if (state_.screen >= Screen::Clock) return clock_navigation(kind);
     if (state_.screen == Screen::ReferenceTone) {
         if (kind == EventKind::Back || kind == EventKind::OpenMenu) {
@@ -213,6 +219,10 @@ Effects Core::navigate(EventKind kind)
     if (kind != EventKind::Select) return effect(Effect::None);
     if (state_.screen == Screen::Menu) {
         if (state_.menu_index == 9) return handle({EventKind::OpenClock,0});
+        if (state_.menu_index < std::size(menu_modes) && menu_modes[state_.menu_index] == Mode::Wayfinding) {
+            state_.screen = Screen::Parking;
+            return effect(Effect::Render);
+        }
         if (state_.menu_index == 6) state_.screen = Screen::Themes;
         else if (state_.menu_index == 7) return handle({EventKind::OpenSettings,0});
         else if (state_.menu_index == 8 || state_.menu_index == 2) {
@@ -281,6 +291,32 @@ Effects Core::navigate(EventKind kind)
     }
     return effect(Effect::Render);
 }
+Effects Core::begin_parking()
+{
+    using parking::Phase;
+    if (state_.parking.phase == Phase::Saving || state_.timer_completed ||
+        state_.dock == Dock::Car) return effect(Effect::None);
+    activity();
+    if (!state_.connected || !parking_ready_) {
+        state_.parking.sequence = 0;
+        return finish_parking(Phase::OpenApp);
+    }
+    parking_sequence_ = (parking_sequence_ % parking::kSequenceMask) + 1U;
+    state_.parking.sequence = parking_sequence_;
+    parking_started_ = state_.uptime_seconds;
+    return finish_parking(Phase::Saving);
+}
+
+Effects Core::finish_parking(parking::Phase phase)
+{
+    state_.parking.phase = phase;
+    state_.parking.reaction = phase == parking::Phase::Saved &&
+        state_.screen == Screen::Parking && !state_.display_asleep;
+    if (state_.parking.reaction) parking_saved_at_ = state_.uptime_seconds;
+    return effect(Effect::NotifyParking) |
+        (state_.screen == Screen::Parking && !state_.display_asleep ? effect(Effect::Render) : 0U);
+}
+
 Effects Core::handle(const Event &event)
 {
     if (event.kind==EventKind::CancelPairing) return close_pairing(PairingStage::Confirm);
@@ -416,6 +452,10 @@ Effects Core::handle(const Event &event)
         state_.screen = Screen::Home; state_.display_asleep = true;
         return effect(Effect::Render);
     case EventKind::Boot:
+        state_.parking = {event.value ? event.value : 1U, 0, parking::Phase::Idle};
+        parking_sequence_ = 0;
+        parking_ready_ = false;
+        state_.connected = false;
         state_.pairing=PairingState{};
         clock_.reboot(state_.clock);
         locator_.stop(); state_.finding=false; state_.finding_remaining_seconds=0;
@@ -428,7 +468,7 @@ Effects Core::handle(const Event &event)
         timer_.cancel(); focus_.cancel();
         state_.focus_history = {}; state_.focus_history_count = 0; state_.focus_goal = 0;
         metronome_ = Metronome{}; sync_metronome(); sync_timer(); sync_focus(); activity();
-        return Effect::Render | Effect::Notify | Effect::NotifyClock;
+        return Effect::Render | Effect::Notify | Effect::NotifyClock | Effect::NotifyParking;
     case EventKind::Tick: return on_tick(event.value);
     case EventKind::AnimationTick: {
         animation_ms_ = event.value;
@@ -458,16 +498,36 @@ Effects Core::handle(const Event &event)
     case EventKind::NavigatePrevious: case EventKind::Select: case EventKind::Back:
         return navigate(event.kind);
     case EventKind::FocusButtonTapped:
+        if (state_.screen == Screen::Parking) return begin_parking();
         if (state_.screen != Screen::Home) return navigate(EventKind::Select);
         return handle({EventKind::PrimaryPressed,0});
     case EventKind::FocusButtonHeld:
         return navigate(EventKind::Back);
     case EventKind::Connected:
+        parking_ready_ = false;
         if (state_.connected) return effect(Effect::None);
         state_.connected = true; return Effect::Render | Effect::Notify | Effect::NotifyClock;
     case EventKind::Disconnected:
+        parking_ready_ = false;
         if (!state_.connected) return effect(Effect::None);
-        state_.connected = false; return Effect::Render | Effect::Notify;
+        state_.connected = false;
+        return (state_.parking.phase == parking::Phase::Saving
+            ? finish_parking(parking::Phase::Interrupted) : effect(Effect::None)) |
+            Effect::Render | Effect::Notify;
+    case EventKind::ParkingReady:
+        parking_ready_ = state_.connected && event.value == 1U;
+        return effect(Effect::None);
+    case EventKind::ParkingResult: {
+        using parking::Phase;
+        const auto phase = static_cast<Phase>(event.auxiliary >> 24U);
+        const auto current = state_.parking.phase;
+        if (!state_.connected || !parking::app_result(phase) || !state_.parking.sequence ||
+            event.value != state_.parking.boot_id ||
+            (event.auxiliary & parking::kSequenceMask) != state_.parking.sequence) return effect(Effect::None);
+        if (current == Phase::Saving || (phase == Phase::Saved &&
+            (current == Phase::Interrupted || current == Phase::TimedOut))) return finish_parking(phase);
+        return effect(Effect::None);
+    }
     case EventKind::DockChanged: {
         if (event.value >= static_cast<std::uint32_t>(Dock::Count)) return effect(Effect::None);
         const auto dock = static_cast<Dock>(event.value);
@@ -486,7 +546,9 @@ Effects Core::handle(const Event &event)
             state_.mode = Mode::Driving;
         } else if (previous == Dock::Car && state_.mode == Mode::Driving)
             state_.mode = mode_before_car_dock_;
-        return Effect::Render | Effect::Notify | Effect::Persist;
+        const Effects parking_effects = dock == Dock::Car && state_.parking.phase == parking::Phase::Saving
+            ? finish_parking(parking::Phase::Cancelled) : effect(Effect::None);
+        return parking_effects | Effect::Render | Effect::Notify | Effect::Persist;
     }
     case EventKind::SetTheme:
         return event.value < static_cast<unsigned>(FaceTheme::Count) ? set_theme(static_cast<FaceTheme>(event.value)) : effect(Effect::None);
@@ -685,6 +747,13 @@ Effects Core::on_tick(std::uint32_t now)
     const bool complete = timer_.advance(now);
     sync_timer();
     Effects effects = advance_clock(now);
+    if (state_.parking.phase == parking::Phase::Saving &&
+        now - parking_started_ >= parking::kTimeoutSeconds)
+        effects |= finish_parking(parking::Phase::TimedOut);
+    if (state_.parking.reaction && now - parking_saved_at_ >= 3U) {
+        state_.parking.reaction = false;
+        if (state_.screen == Screen::Parking && !state_.display_asleep) effects |= effect(Effect::Render);
+    }
     if (previous != state_.timer_remaining_seconds) effects |= Effect::Render | Effect::Notify;
     if (complete) effects |= timer_complete();
     if (state_.pairing.active() && (now-state_.pairing.started>=120U || state_.timer_completed || state_.clock.ringing))

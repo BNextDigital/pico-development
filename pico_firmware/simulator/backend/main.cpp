@@ -27,7 +27,7 @@ namespace {
 
 constexpr std::uint32_t kSaveDelaySeconds = 5;
 constexpr pico::Capabilities kSimulatedCapabilities =
-    pico::capability(pico::Capability::Clock) | pico::capability(pico::Capability::Locator) |
+    pico::capability(pico::Capability::Parking) | pico::capability(pico::Capability::Clock) | pico::capability(pico::Capability::Locator) |
     pico::capability(pico::Capability::Display) |
     pico::capability(pico::Capability::Speaker) |
     pico::capability(pico::Capability::HomeDock) |
@@ -153,6 +153,8 @@ std::string event_name(pico::EventKind kind)
     case pico::EventKind::PairingComplete: return "PairingComplete";
     case pico::EventKind::PairingFailed: return "PairingFailed";
     case pico::EventKind::CancelPairing: return "CancelPairing";
+    case pico::EventKind::ParkingReady: return "ParkingReady";
+    case pico::EventKind::ParkingResult: return "ParkingResult";
     case pico::EventKind::OpenClock: return "OpenClock";
     case pico::EventKind::SyncTime: return "SyncTime";
     case pico::EventKind::SetClockOptions: return "SetClockOptions";
@@ -418,7 +420,7 @@ public:
         core_.handle({pico::EventKind::MotionReady,1});
         core_.handle({pico::EventKind::MicrophoneReady,1});
         core_.handle({pico::EventKind::AudioReady,1});
-        last_result_ = dispatch({pico::EventKind::Boot, 0});
+        last_result_ = dispatch({pico::EventKind::Boot, ++boot_id_});
         last_result_.message = restored_ ? "Booted with saved state"
                                          : "Booted with default state";
     }
@@ -562,7 +564,7 @@ public:
         core_.handle({pico::EventKind::MotionReady,1});
         core_.handle({pico::EventKind::MicrophoneReady,1});
         core_.handle({pico::EventKind::AudioReady,1});
-        auto result = dispatch({pico::EventKind::Boot, 0});
+        auto result = dispatch({pico::EventKind::Boot, ++boot_id_});
         result.event = factory_reset ? "FactoryReset" : "PowerCycle";
         result.message = factory_reset
                              ? "Cleared simulated flash and rebooted"
@@ -629,6 +631,9 @@ public:
                << "\"timer_remaining_seconds\":"
                << state.timer_remaining_seconds << ','
                << "\"clock\":" << clock_json() << ','
+               << "\"parking_simulated\":true,"
+               << "\"parking_phase\":" << unsigned(state.parking.phase) << ','
+               << "\"parking_hex\":" << quoted(parking_hex()) << ','
                << "\"theme\":" << static_cast<unsigned>(state.theme) << ','
                << "\"screen\":" << static_cast<unsigned>(state.screen) << ','
                << "\"pairing_stage\":" << static_cast<unsigned>(state.pairing.stage) << ','
@@ -690,6 +695,13 @@ public:
     }
 
 private:
+    std::string parking_hex() const
+    {
+        std::uint8_t packet[pico::protocol::kParkingStatusSize]{};
+        pico::protocol::encode_parking(core_.state(), packet);
+        return hex_string(packet);
+    }
+
     std::string clock_json() const
     {
         const auto &s=core_.state().clock;
@@ -849,6 +861,7 @@ private:
         append(pico::Effect::Chirp, "Chirp");
         append(pico::Effect::PersistClock, "PersistClock");
         append(pico::Effect::NotifyClock, "NotifyClock");
+        append(pico::Effect::NotifyParking, "NotifyParking");
         append(pico::Effect::ForgetCompanionBonds,"ForgetCompanionBonds");
         append(pico::Effect::OpenPairing,"OpenPairing"); append(pico::Effect::ClosePairing,"ClosePairing");
         output << ']';
@@ -896,6 +909,7 @@ private:
     std::uint32_t clock_save_due_{};
     std::uint32_t save_due_seconds_{0};
     bool restored_{false};
+    std::uint32_t boot_id_{};
     std::array<std::uint8_t, pico::display::kDefaultBufferSize> frame_buffer_{};
     std::array<std::uint8_t, pico::protocol::kStatusSize> status_packet_{};
     Result last_result_{};

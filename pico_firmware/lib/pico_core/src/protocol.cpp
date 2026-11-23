@@ -53,6 +53,19 @@ DecodeResult decode_command(const std::uint8_t *data, std::size_t size)
         return {DecodeStatus::Ok,{EventKind::ConfigureAlarm,data[1],
             minute|(std::uint32_t(data[4])<<16)|(std::uint32_t(data[5])<<24)}};
     }
+    case Command::ParkingReady:
+        if (size != 2U) return {DecodeStatus::WrongLength, {}};
+        if (data[1] > 1U) return {DecodeStatus::InvalidValue, {}};
+        return {DecodeStatus::Ok, {EventKind::ParkingReady, data[1]}};
+    case Command::ParkingResult: {
+        if (size != kParkingStatusSize) return {DecodeStatus::WrongLength, {}};
+        const auto boot = read_u32_le(data + 2);
+        const auto request = std::uint32_t(data[6]) | (std::uint32_t(data[7]) << 8U) |
+            (std::uint32_t(data[8]) << 16U);
+        if (!boot || !request || !parking::app_result(static_cast<parking::Phase>(data[1])))
+            return {DecodeStatus::InvalidValue, {}};
+        return {DecodeStatus::Ok, {EventKind::ParkingResult, boot, request | (std::uint32_t(data[1]) << 24U)}};
+    }
     case Command::DismissAlarm: case Command::StopwatchStart: case Command::StopwatchPause:
     case Command::StopwatchResume: case Command::StopwatchReset: case Command::OpenClock: {
         if (size!=1U) return wrong_length();
@@ -210,6 +223,16 @@ void encode_clock(const State &state,std::uint8_t (&output)[kClockStatusSize])
     write_u32_le(s.sync_age,output+14);
     output[18]=static_cast<std::uint8_t>(s.stopwatch_fraction_ms);
     output[19]=static_cast<std::uint8_t>(s.stopwatch_fraction_ms>>8);
+}
+
+void encode_parking(const State &state, std::uint8_t (&output)[kParkingStatusSize])
+{
+    const auto &request = state.parking;
+    output[0] = 1;
+    output[1] = static_cast<std::uint8_t>(request.phase);
+    write_u32_le(request.boot_id, output + 2);
+    for (unsigned i = 0; i < 3; ++i)
+        output[6 + i] = static_cast<std::uint8_t>(request.sequence >> (8U * i));
 }
 
 void encode_locator(const State &state, Capabilities capabilities,
