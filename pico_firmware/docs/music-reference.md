@@ -30,10 +30,9 @@ the device.
 ## Core, PCM and platform
 
 The portable audio module uses a fixed millihertz table and integer phase math.
-It renders bounded, identical left/right 16-bit PCM at the existing 31,250 Hz
-sample rate; peak is limited to 2048 before the existing 0–100% volume scaling.
+It renders bounded, identical left/right 16-bit PCM at the [shared I²S sample rate](audio-clock-repair.md); peak is limited to 2048 before the existing 0–100% volume scaling.
 Chunk boundaries do not change the waveform. The core owns the transient note,
-play intent and two-second deadline; it does not own another Timer or worker.
+play intent and a deadline covering the two-second PCM plus startup and teardown; it does not own another Timer or worker.
 Music service deadlines include reference expiry. Boot resets to A4 and stopped.
 
 The existing I2S worker snapshots note, volume and a generation token in each

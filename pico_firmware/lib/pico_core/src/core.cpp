@@ -557,7 +557,7 @@ Effects Core::handle(const Event &event)
             if (pulse && !state_.clock.ringing) { state_.sound_cue=audio::Cue::Interact; return Effect::Chirp | Effect::Notify | stopwatch_effects; }
             return stopwatch_effects;
         }
-        const bool ended = state_.reference_playing && music_ms_ - reference_started_ms_ >= 2000U;
+        const bool ended = state_.reference_playing && music_ms_ - reference_started_ms_ >= audio::kReferencePlaybackMs;
         if (ended) state_.reference_playing = false;
         const bool previous_pulse = state_.beat_pulse;
         const bool due = metronome_.advance(music_ms_);

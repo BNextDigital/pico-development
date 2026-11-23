@@ -62,7 +62,7 @@ Both I2S channels contain identical mono samples. SD_MODE is tied high only
 while amplifier VIN is powered from USB 5V. Battery supply/amp-enable sequencing
 requires a separate design; VBUS is not a battery rail.
 
-PCM is signed 16-bit stereo at 31,250 frames/s. The integer triangle oscillator
+PCM is signed 16-bit stereo. See the [audio clock and playback guide](audio-clock-repair.md) for the current sample rate and bench procedure. The integer triangle oscillator
 has short fades and a hard digital peak ceiling of 2048/32768; the default
 25% volume scales that ceiling to 512/32768. This is a conservative starting
 setting, **not a measured speaker-power limiter**. Keep the default for first
@@ -169,7 +169,7 @@ review, not a successful target build.
 1. Build/flash OLED-only first. Confirm menu, both button holds, eight themes,
    BLE reconnect/bond, and the old one-tap single timer still work.
 2. Wire the powered-off amplifier by labels, then build/flash audio profile.
-   Confirm `MAX98357 I2S ready` log and trigger `23 00` at default volume.
+   Confirm the `MCU I2S ready` log and trigger `23 00` at default volume.
 3. Test all four cues, mute/unmute, repeated pats and BLE commands during audio.
    Check that face/button/serial response remains responsive and no slab errors
    or resets occur. The pre-existing USB `net_buf 4095` warning remains unresolved.

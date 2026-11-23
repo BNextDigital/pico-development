@@ -19,6 +19,9 @@ ${CXX:-c++} \
 "$build_dir/pico_core_tests"
 
 sh "$project_dir/tests/host/check_nordic_limits.sh"
+if [ -n "${PICO_TEST_NRF_DIR:-}" ]; then
+    python3 "$project_dir/tests/host/check_audio_clock.py" "$PICO_TEST_NRF_DIR"
+fi
 
 sh "$project_dir/tests/platform/run.sh"
 

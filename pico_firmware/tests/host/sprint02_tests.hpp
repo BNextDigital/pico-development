@@ -1,10 +1,12 @@
 // Included inside the host test namespace.
 void test_sound_pcm_is_bounded_and_chunk_independent()
 {
+    using namespace pico::audio;
+    constexpr unsigned expected_frames[]{2857, 10236, 14283, 10950, 571, 761, 95238};
     for (unsigned cue = 0; cue < static_cast<unsigned>(pico::audio::Cue::Count); ++cue) {
         const auto kind = static_cast<pico::audio::Cue>(cue);
         const auto frames = pico::audio::frames(kind);
-        CHECK(frames > 0 && frames <= (kind == pico::audio::Cue::ReferenceTone ? pico::audio::kReferenceFrames : pico::audio::kSampleRate));
+        CHECK(frames == expected_frames[cue]);
         std::vector<std::int16_t> full((frames + 10) * 2), chunks(full.size());
         pico::audio::render(kind, 0, full.data(), frames + 10, 100);
         for (unsigned offset = 0; offset < frames + 10; offset += 128) {
@@ -26,6 +28,22 @@ void test_sound_pcm_is_bounded_and_chunk_independent()
         pico::audio::render(kind, 128, clamped, 128, 200);
         for (unsigned i=0; i<256; ++i) { CHECK(muted[i] == 0); CHECK(clamped[i] == full[256+i]); }
     }
+    std::vector<std::int16_t> interaction(2 * frames(Cue::Interact));
+    render(Cue::Interact, 0, interaction.data(), interaction.size()/2, 100);
+    unsigned first_crossing=0, last_crossing=0, crossings=0;
+    for (unsigned i=frames_for_ms(6); i<frames_for_ms(54); ++i) {
+        if (interaction[2*i-2] <= 0 && interaction[2*i] > 0) {
+            if (!crossings++) first_crossing=i;
+            last_crossing=i;
+        }
+    }
+    CHECK(crossings>35 && last_crossing>first_crossing);
+    if (last_crossing>first_crossing)
+        CHECK(std::abs((crossings-1) * double(kSampleRate) / (last_crossing-first_crossing) - 880.0) < 1.0);
+    std::int16_t half[256], full[256];
+    render(Cue::Interact, 256, half, 128, 50);
+    render(Cue::Interact, 256, full, 128, 100);
+    for (unsigned i = 0; i < 256; ++i) CHECK(std::abs(2 * half[i] - full[i]) <= 1);
     std::int16_t invalid[4]{1,1,1,1};
     pico::audio::render(static_cast<pico::audio::Cue>(255), UINT32_MAX, invalid, 2);
     CHECK(invalid[0] == 0 && invalid[3] == 0);

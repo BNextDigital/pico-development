@@ -31,7 +31,7 @@ public:
         if (state_.clock.ringing) return UINT32_MAX; // Suppressed features resume phase without fast cosmetic wakes.
         const auto elapsed = now - reference_started_ms_;
         const std::uint32_t reference_delay = state_.reference_playing ?
-            (elapsed >= 2000U ? 0U : 2000U-elapsed) : UINT32_MAX;
+            (elapsed >= audio::kReferencePlaybackMs ? 0U : audio::kReferencePlaybackMs-elapsed) : UINT32_MAX;
         return std::min(std::min(metronome_.next_update_ms(now), reference_delay), locator_.next(now));
     }
 
