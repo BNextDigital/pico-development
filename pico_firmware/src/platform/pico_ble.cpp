@@ -47,6 +47,26 @@ std::array<std::uint8_t,pico::protocol::kClockStatusSize> clock_value{};
 pico::clock::Blob clock_config_value{};
 std::uint32_t clock_uptime, stopwatch_uptime_ms;
 constexpr std::uint8_t clock_attr_index=10;
+constexpr std::uint8_t parking_attr_index=15;
+using ParkingPacket = std::array<std::uint8_t, pico::protocol::kParkingStatusSize>;
+ParkingPacket parking_value{{1, 0, 1}};
+bool is_companion(bt_conn *conn);
+
+ssize_t read_parking(bt_conn *conn, const bt_gatt_attr *attr, void *buffer,
+                     std::uint16_t length, std::uint16_t offset)
+{
+    if (!is_companion(conn)) return BT_GATT_ERR(BT_ATT_ERR_READ_NOT_PERMITTED);
+    ParkingPacket value{};
+    k_mutex_lock(&status_mutex, K_FOREVER);
+    value = parking_value;
+    k_mutex_unlock(&status_mutex);
+    return bt_gatt_attr_read(conn, attr, buffer, length, offset, value.data(), value.size());
+}
+
+ssize_t write_parking_ccc(bt_conn *conn, const bt_gatt_attr *, std::uint16_t)
+{
+    return is_companion(conn) ? sizeof(std::uint16_t) : BT_GATT_ERR(BT_ATT_ERR_WRITE_NOT_PERMITTED);
+}
 std::uint32_t read32(const std::uint8_t *p)
 { return std::uint32_t(p[0])|(std::uint32_t(p[1])<<8)|(std::uint32_t(p[2])<<16)|(std::uint32_t(p[3])<<24); }
 void write32(std::uint8_t *p,std::uint32_t value)
@@ -111,7 +131,7 @@ ssize_t read_status(bt_conn *connection, const bt_gatt_attr *attribute,
                              snapshot.data(), snapshot.size());
 }
 
-ssize_t write_command(bt_conn *, const bt_gatt_attr *, const void *buffer,
+ssize_t write_command(bt_conn *conn, const bt_gatt_attr *, const void *buffer,
                       std::uint16_t length, std::uint16_t offset, std::uint8_t)
 {
     if (offset != 0U) {
@@ -124,6 +144,10 @@ ssize_t write_command(bt_conn *, const bt_gatt_attr *, const void *buffer,
         LOG_WRN("Rejected BLE command (%u)",
                 static_cast<unsigned int>(decoded.status));
         return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
+    }
+    if ((decoded.event.kind == pico::EventKind::ParkingReady ||
+         decoded.event.kind == pico::EventKind::ParkingResult) && !is_companion(conn)) {
+        return BT_GATT_ERR(BT_ATT_ERR_WRITE_NOT_PERMITTED);
     }
     if (event_sink == nullptr || !event_sink(decoded.event)) {
         return BT_GATT_ERR(BT_ATT_ERR_INSUFFICIENT_RESOURCES);
@@ -158,7 +182,11 @@ BT_GATT_SERVICE_DEFINE(
         BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY,BT_GATT_PERM_READ_AUTHEN,read_clock,nullptr,nullptr),
     BT_GATT_CCC(status_subscription_changed,BT_GATT_PERM_READ_AUTHEN | BT_GATT_PERM_WRITE_AUTHEN),
     BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(BT_UUID_128_ENCODE(0x8e7b0006,0x54f2,0x4d9b,0xa3d1,0x9f150000c001)),
-        BT_GATT_CHRC_READ,BT_GATT_PERM_READ_AUTHEN,read_clock_config,nullptr,nullptr));
+        BT_GATT_CHRC_READ,BT_GATT_PERM_READ_AUTHEN,read_clock_config,nullptr,nullptr),
+    BT_GATT_CHARACTERISTIC(BT_UUID_DECLARE_128(BT_UUID_128_ENCODE(0x8e7b0007,0x54f2,0x4d9b,0xa3d1,0x9f150000c001)),
+        BT_GATT_CHRC_READ | BT_GATT_CHRC_NOTIFY, BT_GATT_PERM_READ_AUTHEN, read_parking, nullptr, nullptr),
+    BT_GATT_CCC_WITH_WRITE_CB(status_subscription_changed, write_parking_ccc,
+        BT_GATT_PERM_READ_AUTHEN | BT_GATT_PERM_WRITE_AUTHEN));
 
 const bt_data advertising_data[] = {
     BT_DATA_BYTES(BT_DATA_FLAGS, BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR),
@@ -511,6 +539,23 @@ void Ble::publish_clock(const State &state,bool notify)
 #else
     bt_gatt_notify(nullptr,&pico_service.attrs[clock_attr_index],encoded,sizeof(encoded));
 #endif
+}
+
+void Ble::publish_parking(const State &state)
+{
+    if (!ready_) return;
+    std::uint8_t encoded[protocol::kParkingStatusSize]{};
+    protocol::encode_parking(state, encoded);
+    k_mutex_lock(&status_mutex, K_FOREVER);
+    std::memcpy(parking_value.data(), encoded, sizeof(encoded));
+    k_mutex_unlock(&status_mutex);
+    bt_conn_foreach(BT_CONN_TYPE_LE, [](bt_conn *conn, void *data) {
+        const auto *attribute = &pico_service.attrs[parking_attr_index];
+        if (is_companion(conn) && bt_conn_get_security(conn) >= BT_SECURITY_L3 &&
+            bt_gatt_is_subscribed(conn, attribute, BT_GATT_CCC_NOTIFY)) {
+            bt_gatt_notify(conn, attribute, data, protocol::kParkingStatusSize);
+        }
+    }, encoded);
 }
 
 void Ble::publish(const State &state, Capabilities capabilities)

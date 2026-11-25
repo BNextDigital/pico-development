@@ -17,7 +17,7 @@ config PICO_RUNTIME_PROFILE
 
 config PICO_FIRMWARE_VERSION
     string "Firmware version"
-    default "0.15.0-rc1"
+    default "0.16.0-rc1"
 
 config PICO_DISPLAY
     bool "Render Pico on the chosen monochrome display"
@@ -38,6 +38,14 @@ config PICO_AUDIO_I2S
     bool "Optional MAX98357 I2S sound cues"
     depends on I2S
     default n
+
+config PICO_AUDIO_POST_BEEP
+    bool "Play one diagnostic I2S beep at boot"
+    depends on PICO_AUDIO_I2S
+    default n
+    help
+      Queue one short startup tone after restoring audio preferences.
+      Intended for hardware bring-up. Honors mute and volume.
 
 config PICO_AUDIO_VOLUME_PERCENT
     int "Default sound cue volume percent (saved settings override)"

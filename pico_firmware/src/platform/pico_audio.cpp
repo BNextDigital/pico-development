@@ -71,7 +71,15 @@ bool drop_stream()
 
 void play_cue(const SoundJob &job)
 {
-    if (!drop_stream() || cancelled(job)) return;
+#if defined(CONFIG_PICO_AUDIO_POST_BEEP)
+    const bool post = job.cue == pico::audio::Cue::PostBeep;
+#endif
+    if (!drop_stream() || cancelled(job)) {
+#if defined(CONFIG_PICO_AUDIO_POST_BEEP)
+        if (post) LOG_WRN("POST beep did not start; stream unavailable or preempted");
+#endif
+        return;
+    }
     const auto frames = pico::audio::frames(job.cue);
     bool started = false;
     bool submitted = true;
@@ -108,12 +116,22 @@ void play_cue(const SoundJob &job)
         }
         if (!started && block == 1 && !cancelled(job)) {
             started = trigger(I2S_TRIGGER_START, "START");
+#if defined(CONFIG_PICO_AUDIO_POST_BEEP)
+            if (post && started) LOG_INF("POST beep I2S START accepted");
+#endif
             if (!started) break;
         }
     }
 
     if (submitted && started && !cancelled(job) && trigger(I2S_TRIGGER_DRAIN, "DRAIN")) {
-        if (wait_buffers(&job)) {
+        if (wait_buffers(&job) && !cancelled(job)) {
+#if defined(CONFIG_PICO_AUDIO_POST_BEEP)
+            if (post) {
+                LOG_INF("POST beep MCU-side I2S transmission completed; DRAIN accepted, DMA buffers released (%u PCM frames)",
+                        frames);
+                return;
+            }
+#endif
 #if defined(CONFIG_PICO_BRINGUP_DIAGNOSTICS)
             if (!beat_cue(job.cue))
                 LOG_INF("I2S DMA released cue=%u, PCM frames=%u", static_cast<unsigned>(job.cue), frames);
@@ -122,7 +140,14 @@ void play_cue(const SoundJob &job)
         }
         if (!cancelled(job)) LOG_WRN("I2S DRAIN timed out; dropping stream");
     }
-    drop_stream();
+    [[maybe_unused]] const bool recovered = drop_stream();
+#if defined(CONFIG_PICO_AUDIO_POST_BEEP)
+    if (post) {
+        LOG_WRN("POST beep %s; I2S recovery %s",
+                cancelled(job) ? "preempted" : "transfer failed",
+                recovered ? "complete" : "failed");
+    }
+#endif
 }
 void audio_loop(void *, void *, void *)
 {
@@ -176,6 +201,42 @@ bool Audio::ready() const
     return false;
 #endif
 }
+void Audio::submit_post_beep(bool muted, unsigned volume_percent)
+{
+#if defined(CONFIG_PICO_AUDIO_POST_BEEP)
+    if (post_checked_) return;
+    post_checked_ = true;
+#if defined(CONFIG_PICO_AUDIO_I2S) && DT_NODE_HAS_STATUS(DT_ALIAS(pico_i2s), okay)
+    if (!ready()) { LOG_WRN("POST beep enabled but skipped: I2S unavailable"); return; }
+    if (muted) { LOG_INF("POST beep skipped: muted"); return; }
+    if (!volume_percent) { LOG_INF("POST beep skipped: zero volume"); return; }
+    if (atomic_get(&audio_muted)) { LOG_INF("POST beep skipped: audio suppressed"); return; }
+    if (atomic_get(&audio_owner) != static_cast<atomic_val_t>(audio::Owner::Feature) ||
+        atomic_get(&audio_playing) || k_msgq_num_used_get(&audio_queue)) {
+        LOG_INF("POST beep skipped: another audio cue has priority");
+        return;
+    }
+    const SoundJob job{audio::Cue::PostBeep, static_cast<std::uint8_t>(std::min(volume_percent, 100U)),
+                       0, 0, atomic_get(&owner_generation)};
+    const int error = k_msgq_put(&audio_queue, &job, K_NO_WAIT);
+    if (error) {
+        LOG_WRN("POST beep enabled; audio queue rejected the job (%d)", error);
+    } else {
+        LOG_INF("POST beep enabled; audio queue accepted the job");
+    }
+#else
+    (void)muted;
+    (void)volume_percent;
+    LOG_WRN("POST beep enabled but skipped: I2S device absent");
+#endif
+#else
+    (void)muted;
+    (void)volume_percent;
+#if defined(CONFIG_PICO_BRINGUP_DIAGNOSTICS) && defined(CONFIG_PICO_AUDIO_I2S) && DT_NODE_HAS_STATUS(DT_ALIAS(pico_i2s), okay)
+    LOG_INF("POST beep disabled");
+#endif
+#endif
+}
 void Audio::set_metronome_running(bool running)
 {
 #if defined(CONFIG_PICO_AUDIO_I2S) && DT_NODE_HAS_STATUS(DT_ALIAS(pico_i2s), okay)
@@ -216,7 +277,7 @@ void Audio::set_reference(bool running, std::uint8_t note)
 void Audio::play(audio::Cue cue,unsigned volume_percent,std::uint8_t note)
 {
 #if defined(CONFIG_PICO_AUDIO_I2S) && DT_NODE_HAS_STATUS(DT_ALIAS(pico_i2s), okay)
-    if (!ready() || atomic_get(&audio_muted) || cue >= audio::Cue::Count || !volume_percent) return;
+    if (!ready() || atomic_get(&audio_muted) || cue >= audio::Cue::PostBeep || !volume_percent) return;
     if (cue == audio::Cue::ReferenceTone &&
         (!(atomic_get(&reference_request) & 1) || !audio::frequency_millihz(note))) return;
     const SoundJob job{cue,static_cast<std::uint8_t>(volume_percent > 100 ? 100 : volume_percent),

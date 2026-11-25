@@ -21,13 +21,17 @@ for profile in enabled absent; do
     "$project_dir/build-host/display_adapter_$profile"
 done
 
-${CXX:-c++} -std=c++17 -Wall -Wextra -Wpedantic -Werror ${CXXFLAGS:-} \
-    -DCONFIG_PICO_AUDIO_I2S=1 -DCONFIG_PICO_AUDIO_VOLUME_PERCENT=25 \
-    -I"$project_dir/tests/platform/audio_fakes" -I"$project_dir/tests/platform/fakes" \
-    -I"$project_dir/lib/pico_core/include" -I"$project_dir/src" \
-    "$project_dir/tests/platform/audio_reference_tests.cpp" \
-    "$project_dir/lib/pico_core/src/audio.cpp" -o "$project_dir/build-host/audio_reference_tests"
-"$project_dir/build-host/audio_reference_tests"
+for post in disabled enabled; do
+    post_options=""
+    if [ "$post" = enabled ]; then post_options="-DCONFIG_PICO_AUDIO_POST_BEEP=1"; fi
+    ${CXX:-c++} -std=c++17 -Wall -Wextra -Wpedantic -Werror ${CXXFLAGS:-} \
+        $post_options -DCONFIG_PICO_AUDIO_I2S=1 -DCONFIG_PICO_AUDIO_VOLUME_PERCENT=25 \
+        -I"$project_dir/tests/platform/audio_fakes" -I"$project_dir/tests/platform/fakes" \
+        -I"$project_dir/lib/pico_core/include" -I"$project_dir/src" \
+        "$project_dir/tests/platform/audio_reference_tests.cpp" \
+        "$project_dir/lib/pico_core/src/audio.cpp" -o "$project_dir/build-host/audio_reference_tests_$post"
+    "$project_dir/build-host/audio_reference_tests_$post"
+done
 
 ${CXX:-c++} -std=c++17 -Wall -Wextra -Wpedantic -Werror \
     -I"$project_dir/tests/platform/storage_fakes" -I"$project_dir/tests/platform/fakes" \

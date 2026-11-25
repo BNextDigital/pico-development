@@ -4,6 +4,7 @@ namespace pico::audio {
 namespace {
 struct Note { unsigned frequency, ms; };
 constexpr Note interaction[]{{880,60}};
+constexpr Note post[]{{880,100}};
 constexpr Note timer[]{{660,70},{0,45},{880,100}};
 constexpr Note work[]{{660,65},{0,40},{880,65},{0,40},{1100,90}};
 constexpr Note click[]{{1600,12}};
@@ -19,6 +20,7 @@ Score score(Cue cue)
     case Cue::BreakComplete: return {rest,3};
     case Cue::MetronomeClick: return {click,1};
     case Cue::MetronomeAccent: return {accent,1};
+    case Cue::PostBeep: return {post,1};
     case Cue::ReferenceTone: case Cue::Count: break;
     }
     return {nullptr,0};

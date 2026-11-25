@@ -2,6 +2,7 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/random/random.h>
 #include <zephyr/sys/atomic.h>
 #if defined(CONFIG_PICO_RUNTIME_PROFILE)
 #include "platform/pico_runtime_profile.hpp"
@@ -85,6 +86,9 @@ void apply_effects(pico::Effects effects, pico::Core &core,
         effects|=core.handle({pico::EventKind::PairingFailed,255U,state.pairing.token});
         ble.close_pairing();
     }
+    if (pico::has_effect(effects, pico::Effect::NotifyParking)) {
+        ble.publish_parking(core.state());
+    }
     if (pico::has_effect(effects, pico::Effect::Notify)) {
         const auto microphone_bit = pico::capability(pico::Capability::Microphone);
         const auto current = static_cast<pico::Capabilities>((capabilities & ~microphone_bit) |
@@ -134,21 +138,20 @@ int main()
     core.handle({pico::EventKind::MicrophoneReady, microphone.init(queue_event) ? 1U : 0U});
     display.init();
     hardware.init(queue_event);
-    const auto capabilities = pico::capability(pico::Capability::Clock) | pico::capability(pico::Capability::Locator) | hardware.capabilities() | display.capabilities() |
+    const auto capabilities = pico::capability(pico::Capability::Parking) | pico::capability(pico::Capability::Clock) | pico::capability(pico::Capability::Locator) | hardware.capabilities() | display.capabilities() |
         (audio.ready() ? pico::capability(pico::Capability::Speaker) : 0U) |
         (microphone.ready() ? pico::capability(pico::Capability::Microphone) : 0U);
 
+    apply_effects(core.handle({pico::EventKind::Boot, sys_rand32_get()}), core, hardware, audio, microphone,
+                  display, storage, ble, capabilities);
     if (ble_ready) {
         ble.start_advertising();
     }
-
-    apply_effects(core.handle({pico::EventKind::Boot, 0}), core, hardware, audio, microphone,
-                  display, storage, ble, capabilities);
     hardware.reflect(core.state());
 
     std::uint32_t last_tick = UINT32_MAX;
     // Service clocks before actions, so a pause/tap uses the actual wake time.
-    const auto service_clocks = [&] {
+    const auto service_clocks = [&](bool boot = false) {
         const auto now = k_uptime_get();
         const auto seconds = static_cast<std::uint32_t>(now / MSEC_PER_SEC);
         if (seconds != last_tick) {
@@ -171,9 +174,10 @@ int main()
                       audio, microphone, display, storage, ble, capabilities);
         apply_effects(core.handle({pico::EventKind::AnimationTick, ms}), core, hardware,
                       audio, microphone, display, storage, ble, capabilities);
+        if (boot) audio.submit_post_beep(core.state().sound_muted, core.state().sound_volume_percent);
     };
     while (true) {
-        service_clocks();
+        service_clocks(last_tick == UINT32_MAX);
 #if defined(CONFIG_PICO_RUNTIME_PROFILE)
         const auto used = k_msgq_num_used_get(&event_queue);
         if (used > queue_peak) queue_peak = used;

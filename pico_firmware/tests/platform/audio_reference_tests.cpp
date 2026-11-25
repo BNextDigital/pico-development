@@ -83,12 +83,102 @@ int i2s_write(const device *, void *data, std::size_t bytes)
     if (after_write) after_write();
     return 0;
 }
+#if defined(CONFIG_PICO_AUDIO_POST_BEEP)
+void test_post_beep(pico::platform::Audio &adapter)
+{
+    using namespace pico::audio;
+    auto check_suppressed = [&](bool muted, unsigned volume) {
+        pico::platform::Audio boot;
+        boot.submit_post_beep(muted, volume);
+        boot.submit_post_beep(false, 25); // A skipped attempt is never retried.
+        CHECK(k_msgq_num_used_get(&audio_queue) == 0);
+    };
+    check_suppressed(true, 25);
+    adapter.set_muted(true); // The startup effect path also mutes at zero volume.
+    check_suppressed(false, 0);
+    adapter.set_muted(false);
+    adapter.set_owner(Owner::Alarm);
+    check_suppressed(false, 25);
+    adapter.set_owner(Owner::Feature);
+
+    constexpr unsigned tone_frames = frames_for_ms(100);
+    constexpr unsigned fade_frames = frames_for_ms(5);
+    CHECK(tone_frames == 4761 && frames(Cue::PostBeep) == tone_frames && fade_frames == 238);
+    adapter.submit_post_beep(false, 37);
+    adapter.submit_post_beep(false, 37);
+    adapter.play(Cue::PostBeep, 37);
+    CHECK(k_msgq_num_used_get(&audio_queue) == 1);
+    SoundJob post{};
+    CHECK(k_msgq_get(&audio_queue, &post, K_NO_WAIT) == 0);
+    CHECK(post.cue == Cue::PostBeep && post.volume == 37);
+
+    reset_trace();
+    play_cue(post);
+    CHECK(starts == 1 && drains == 1 && drops == 1 && pending.empty());
+    const std::size_t lead_samples = 3 * 128 * 2;
+    CHECK(transmitted.size() == lead_samples + tone_frames * 2);
+    if (transmitted.size() == lead_samples + tone_frames * 2) {
+        CHECK(std::all_of(transmitted.begin(), transmitted.begin() + lead_samples,
+                          [](int x) { return x == 0; }));
+        const auto *pcm = transmitted.data() + lead_samples;
+        CHECK(pcm[0] == 0 && pcm[(tone_frames-1)*2] == 0);
+        const auto ceiling = kPeakLimit * post.volume / 100;
+        unsigned crossings = 0;
+        unsigned rising = 0;
+        for (unsigned frame = 0; frame < tone_frames; ++frame) {
+            const auto sample = pcm[2*frame];
+            CHECK(sample == pcm[2*frame+1]);
+            const auto fade = std::min({frame, tone_frames-1-frame, fade_frames});
+            CHECK(std::abs(sample) <= static_cast<int>(kPeakLimit * post.volume * fade / (100 * fade_frames)));
+            if (frame > fade_frames && frame < tone_frames - fade_frames &&
+                pcm[2*(frame-1)] <= 0 && sample > 0) {
+                if (rising) CHECK(frame-rising == 54 || frame-rising == 55);
+                rising = frame;
+                ++crossings;
+            }
+        }
+        CHECK(crossings >= 79 && crossings <= 80);
+        CHECK(std::abs(pcm[2*271]) >= ceiling * 95 / 100);
+    }
+
+    reset_trace();
+    fail_start = true;
+    play_cue(post);
+    CHECK(writes == 2 && drains == 0 && drops == 2 && pending.empty() && adapter.ready());
+
+    reset_trace();
+    fail_drain = true;
+    play_cue(post);
+    CHECK(starts == 1 && drains == 1 && drops == 2 && pending.empty() && adapter.ready());
+
+    reset_trace();
+    after_write = [&] {
+        if (writes == 4) {
+            adapter.set_owner(Owner::Alarm);
+            adapter.play(Cue::TimerComplete, 25);
+        }
+    };
+    play_cue(post);
+    CHECK(writes == 4 && drains == 0 && drops == 2 && pending.empty() && cancelled(post));
+    SoundJob alarm{};
+    CHECK(k_msgq_get(&audio_queue, &alarm, K_NO_WAIT) == 0);
+    CHECK(alarm.cue == Cue::TimerComplete && !cancelled(alarm));
+    reset_trace();
+    play_cue(alarm);
+    CHECK(starts == 1 && drains == 1 && drops == 1 && pending.empty() && adapter.ready());
+    adapter.set_owner(Owner::Feature);
+}
+#endif
+
 int main()
 {
     using namespace pico::audio;
     pico::platform::Audio adapter;
     config_error = -EIO;
     CHECK(!adapter.init() && !adapter.ready());
+    pico::platform::Audio failed_boot;
+    failed_boot.submit_post_beep(false, 25);
+    CHECK(k_msgq_num_used_get(&audio_queue) == 0);
     config_error = 0;
     CHECK(adapter.init());
     CHECK(configured.frame_clk_freq == kSampleRate && kSampleRate == 47619);
@@ -96,6 +186,16 @@ int main()
     CHECK(configured.format == I2S_FMT_DATA_FORMAT_I2S);
     CHECK(configured.options == (I2S_OPT_FRAME_CLK_CONTROLLER | I2S_OPT_BIT_CLK_CONTROLLER));
     CHECK(configured.block_size == 512 && audio_slab.capacity == 4);
+
+    failed_boot.submit_post_beep(false, 25);
+    CHECK(k_msgq_num_used_get(&audio_queue) == 0);
+#if defined(CONFIG_PICO_AUDIO_POST_BEEP)
+    test_post_beep(adapter);
+#else
+    adapter.submit_post_beep(false, 25);
+    CHECK(k_msgq_num_used_get(&audio_queue) == 0);
+#endif
+    reset_trace();
 
     adapter.set_reference(true,69);
     adapter.play(Cue::ReferenceTone,25,69);

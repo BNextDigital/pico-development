@@ -310,6 +310,40 @@ void render_screen(const State &state, MonoSurface &surface)
             status==PairingResetState::Confirm ? "HOLD ACTION" : "BACK");
         return;
     }
+    if (state.screen == Screen::Parking) {
+        using parking::Phase;
+        const char *label = "PARK HERE";
+        switch (state.parking.phase) {
+        case Phase::Idle: break;
+        case Phase::Saving: label = "SAVING"; break;
+        case Phase::Saved: {
+            if (!state.parking.reaction) { label = "SAVED"; break; }
+            State happy = state;
+            happy.mood = Mood::Happy;
+            happy.eyes_closed = false;
+            render_face(happy, surface);
+            centered(surface, "SAVED", surface.height - 11U, 2);
+            return;
+        }
+        case Phase::OpenApp: label = "OPEN APP"; break;
+        case Phase::NoLocation: label = "NO LOCATION"; break;
+        case Phase::Failed: label = "FAILED"; break;
+        case Phase::Cancelled: label = "CANCELLED"; break;
+        case Phase::TimedOut: label = "TIMED OUT"; break;
+        case Phase::Interrupted: label = "LINK LOST"; break;
+        case Phase::Permission: label = "ALLOW GPS"; break;
+        }
+        const bool large = surface.height >= 56 && surface.width >= 96;
+        centered(surface, "PARKING", 0, large ? 2U : 1U);
+        centered(surface, label, large ? 15U : 8U, large ? 4U : 2U);
+        if (state.parking.phase == Phase::OpenApp && !state.connected)
+            centered(surface, "CONNECT PICO", large ? 37U : 20U, large ? 2U : 1U);
+        const auto hint = state.parking.phase == Phase::Saving ? "HOLD TO CANCEL" :
+            state.parking.phase == Phase::Saved ? "PARK AGAIN" :
+            state.parking.phase == Phase::Idle ? "PRESS ACTION" : "PRESS TO RETRY";
+        centered(surface, hint, large ? 52U : 26U, large ? 2U : 1U);
+        return;
+    }
     if (state.screen>=Screen::Clock) { render_clock_utility(state,surface); return; }
     if (state.screen == Screen::Home || state.screen == Screen::Themes) {
         if (state.screen==Screen::Home && state.clock.settings.usb_desk && state.clock.usb_powered && state.mood!=Mood::Happy) {

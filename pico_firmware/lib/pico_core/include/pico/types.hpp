@@ -8,6 +8,7 @@
 #include <pico/pitch.hpp>
 #include <pico/motion.hpp>
 #include <pico/focus_session.hpp>
+#include <pico/parking.hpp>
 
 namespace pico {
 
@@ -130,9 +131,10 @@ enum class EventKind : std::uint8_t {
     UsbPower,
     PairingResetResult = 72,
     PairingPasskey = 73, PairingComplete, PairingFailed, CancelPairing,
+    ParkingReady, ParkingResult,
 };
 
-enum class Screen : std::uint8_t { Home, Menu, Utility, Themes, Unavailable, Music, Tuner, DurationEdit, Settings, SettingEdit, FocusSummary = 10, ReferenceTone = 11, Clock = 12, Alarms, Stopwatch, ClockEdit, AlarmEdit, ClockOptions, PairingRecovery = 18, Pairing = 19 };
+enum class Screen : std::uint8_t { Home, Menu, Utility, Themes, Unavailable, Music, Tuner, DurationEdit, Settings, SettingEdit, FocusSummary = 10, ReferenceTone = 11, Clock = 12, Alarms, Stopwatch, ClockEdit, AlarmEdit, ClockOptions, PairingRecovery = 18, Pairing = 19, Parking = 20 };
 
 enum class SettingKey : std::uint8_t { Theme, Mute, Volume, Motion, Brightness, DisplayTimeout, FocusGoal };
 
@@ -154,6 +156,7 @@ enum class Effect : std::uint16_t {
     NotifyClock = 1U << 5,
     ForgetCompanionBonds = 1U << 6,
     OpenPairing = 1U << 7, ClosePairing = 1U << 8,
+    NotifyParking = 1U << 9,
 };
 
 using Effects = std::uint16_t;
@@ -189,6 +192,7 @@ struct PairingState {
 };
 
 struct State {
+    parking::State parking{};
     PairingState pairing{};
     PairingResetState pairing_reset{PairingResetState::Confirm};
     clock::State clock{};

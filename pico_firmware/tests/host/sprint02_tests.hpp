@@ -2,7 +2,7 @@
 void test_sound_pcm_is_bounded_and_chunk_independent()
 {
     using namespace pico::audio;
-    constexpr unsigned expected_frames[]{2857, 10236, 14283, 10950, 571, 761, 95238};
+    constexpr unsigned expected_frames[]{2857, 10236, 14283, 10950, 571, 761, 95238, 4761};
     for (unsigned cue = 0; cue < static_cast<unsigned>(pico::audio::Cue::Count); ++cue) {
         const auto kind = static_cast<pico::audio::Cue>(cue);
         const auto frames = pico::audio::frames(kind);

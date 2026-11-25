@@ -41,6 +41,8 @@ public:
     bool restore(const PersistedState &persisted);
 
 private:
+    Effects begin_parking();
+    Effects finish_parking(parking::Phase phase);
     Effects close_pairing(PairingStage stage);
     Effects clock_event(const Event &event);
     Effects clock_navigation(EventKind kind);
@@ -66,6 +68,10 @@ private:
     Effects start_focus_phase();
 
     State state_{};
+    std::uint32_t parking_started_{};
+    std::uint32_t parking_sequence_{};
+    std::uint32_t parking_saved_at_{};
+    bool parking_ready_{};
     clock::Engine clock_{};
     std::uint32_t alarm_signal_seconds_{0};
     Mode mode_before_car_dock_{Mode::Companion};

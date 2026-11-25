@@ -21,6 +21,7 @@ struct bt_conn_cb {
 #define BT_CONN_TYPE_LE 1
 #define BT_CONN_STATE_DISCONNECTED 0
 #define BT_SECURITY_L2 2
+#define BT_SECURITY_L3 3
 int bt_conn_get_info(bt_conn *,bt_conn_info *);
 void bt_conn_foreach(int,void (*)(bt_conn *,void *),void *);
 int bt_conn_disconnect(bt_conn *,std::uint8_t);
