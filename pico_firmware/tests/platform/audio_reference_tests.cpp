@@ -187,6 +187,18 @@ int main()
     CHECK(configured.options == (I2S_OPT_FRAME_CLK_CONTROLLER | I2S_OPT_BIT_CLK_CONTROLLER));
     CHECK(configured.block_size == 512 && audio_slab.capacity == 4);
 
+    // Half-scale bench profile: verify the ceiling and emitted PCM at 100% UI volume.
+    CHECK(kPeakLimit == 16384);
+    std::vector<std::int16_t> bench_samples(kReferenceFrames * 2);
+    render_reference(69, 0, bench_samples.data(), kReferenceFrames, 100);
+    int maximum_magnitude = 0;
+    for (const auto sample : bench_samples) {
+        const int magnitude = std::abs(static_cast<int>(sample));
+        CHECK(magnitude <= kPeakLimit);
+        maximum_magnitude = std::max(maximum_magnitude, magnitude);
+    }
+    CHECK(maximum_magnitude >= kPeakLimit - 10);
+
     failed_boot.submit_post_beep(false, 25);
     CHECK(k_msgq_num_used_get(&audio_queue) == 0);
 #if defined(CONFIG_PICO_AUDIO_POST_BEEP)

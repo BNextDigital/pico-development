@@ -2,7 +2,16 @@
 
 ## Finding
 
-The silent speaker has no confirmed root cause. The previous 31,250 Hz
+The silent speaker has no confirmed root cause. A separate, unvalidated bench
+branch now raises the PCM ceiling from 2048 to 16384 (50% of signed 16-bit
+full scale, approximately -6 dBFS at UI volume 100%). This is an 18 dB
+increase over the prior 2048 ceiling; it is not a proven fix. With Pico's
+1 W speaker, lower the saved UI volume to 10% before flashing or playing
+any cue, then test the two-second reference tone and increase cautiously.
+Do not enable automatic POST audio at high volume. Real speaker power and
+clipping remain unmeasured. Return to the unchanged main branch for rollback.
+
+The previous 31,250 Hz
 request did produce a nominal 31,250 Hz physical clock. This falls within
 the MAX98357A electrical range for its 32/44.1/48 kHz family. Changing the
 request alone cannot establish or restore acoustic output.
@@ -142,7 +151,7 @@ partitions, or bonds.
 | Clocks present, DIN stays zero after lead-in | D10 routing, PCM/volume or probe/decode. Check for the same signal at the XIAO and amp. |
 | Clocks and data present with incorrect ratio or alignment | BCLK/LRC swapped, wrong silicon variant/framing, or wrong flashed overlay |
 | Clean I²S at amp DIN with steady VIN/SD_MODE, speaker silent | Speaker continuity, OUT+/OUT− wiring and breakout health. Use a known-good speaker/module when available. |
-| Quiet clean output | At 25%, PCM is limited to a peak of 512 of 32,768. Verify amp gain/options before changing volume. Keep the existing ceiling. |
+| Quiet clean output | On this bench branch, 25% UI volume peaks at 4096 of 32,768. The old main-branch peak was 512 at 25%. Avoid assuming UI 100% is safe for a 1 W speaker; measure output before increasing further. |
 | Slab allocation, TX submit, DRAIN or recovery failure | Capture the log from job submission through recovery, plus any driver underrun message. On unreleased DMA blocks, firmware disables I²S until restart and retains visual operation. |
 
 `I2S job submit` reports worker-queue acceptance and `I2S DMA released`
