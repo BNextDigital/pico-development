@@ -23,13 +23,14 @@ constexpr std::uint32_t frames_for_ms(unsigned ms)
 {
     return static_cast<std::uint32_t>(static_cast<std::uint64_t>(ms) * kSampleRate / 1000U);
 }
-inline constexpr std::int16_t kPeakLimit = 2048;
+// Bench diagnostic: 50% of signed 16-bit full scale. Begin at low UI volume.
+inline constexpr std::int16_t kPeakLimit = 16384;
 inline constexpr std::uint32_t kReferenceFrames = frames_for_ms(kReferenceDurationMs);
 std::uint32_t frequency_millihz(std::uint8_t midi_note);
 void render_reference(std::uint8_t midi_note, std::uint32_t first_frame,
                       std::int16_t *stereo, std::size_t frame_count, unsigned volume_percent = 25);
 std::uint32_t frames(Cue cue);
-// Identical left/right 16-bit PCM. Volume is clamped to 0..100; peak <= 2048.
+// Identical left/right 16-bit PCM. Volume is clamped to 0..100; peak <= kPeakLimit.
 void render(Cue cue, std::uint32_t first_frame, std::int16_t *stereo,
             std::size_t frame_count, unsigned volume_percent = 25);
 }
